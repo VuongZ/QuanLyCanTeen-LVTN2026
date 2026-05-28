@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace LuanVanTotNghiep.Controllers;
     [ApiController]
      [Route("api/[controller]")] 
-public class UserController (UserService userService) : ControllerBase 
+public class UserController (UserService userService) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAllUser()

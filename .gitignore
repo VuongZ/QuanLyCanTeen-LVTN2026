@@ -1,0 +1,6 @@
+# Bỏ qua các file cấu hình chứa mật khẩu Database Aiven
+appsettings.json
+appsettings.Development.json
+
+bin/
+obj/
