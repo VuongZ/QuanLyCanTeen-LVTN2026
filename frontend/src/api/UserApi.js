@@ -1,0 +1,21 @@
+const BASE_URL = '/api/User'
+
+export async function getUserPageData() {
+  const response = await fetch(BASE_URL)
+
+  if (!response.ok) {
+    throw new Error(`Khong the lay du lieu User: ${response.status}`)
+  }
+
+  return response.json()
+}
+
+export async function getUserById(id) {
+  const response = await fetch(`${BASE_URL}/${id}`)
+
+  if (!response.ok) {
+    throw new Error(`Khong the lay User id ${id}: ${response.status}`)
+  }
+
+  return response.json()
+}

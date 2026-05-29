@@ -7,32 +7,32 @@ public class UserService(UserRepo userRepo)
     //Xử Lý Luôn Điều Kiện 
     public async Task<IEnumerable<NsUser>> GetAllUser()
     {
-        return await userRepo.GetAllUser();
+        return await userRepo.GetAll();
     }
      public async Task<NsUser?> GettUserbyId(int id)
     {
-        var user= await userRepo.GettUserbyId(id);
+        var user= await userRepo.GetbyId(id);
         if(user == null) return null;
         return user;
     }
     public async Task AddUser(NsUser user)
     {
-            await userRepo.AddUser(user);
+            await userRepo.Add(user);
     }
       public async Task UpdateUser(NsUser user)
         {
-           var us1=await userRepo.GettUserbyId(user.Id);
+           var us1=await userRepo.GetbyId(user.Id);
            if(us1 !=null)
         {
-            await userRepo.UpdateUser(us1);
+            await userRepo.Update(us1);
         }
         }
           public async Task DeleteUser(int id)
         {
-            var us1=await userRepo.GettUserbyId(id);
+            var us1=await userRepo.GetbyId(id);
            if(us1 !=null)
         {
-            await userRepo.DeleteUser(id);
+            await userRepo.Delete(id);
         }
         
         }

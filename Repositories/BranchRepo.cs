@@ -2,39 +2,17 @@ using LuanVanTotNghiep.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 namespace LuanVanTotNghiep.Repositories
 {
-    public class BranchRepo
+    public class BranchRepo : Repository<DmBranch>
     {
-        private readonly AppDbContext _context;
-        public BranchRepo(AppDbContext context)
+      
+        public BranchRepo(AppDbContext context) : base (context)
         {
-            _context = context;
+          
         }
 
-        public async Task<List<DmBranch>> GetAllBranchAsync()
+        public override async Task<DmBranch?> GetbyId(int id)
         {
-            return await _context.DmBranches.ToListAsync();
-        }
-        public async Task<DmBranch?> GetBranchByIdAsynce(int id)
-        {
-            return await _context.DmBranches.FindAsync(id);
-        }
-
-        public async Task AddBranchAsync(DmBranch branch)
-        {
-            await _context.DmBranches.AddAsync(branch);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task UpdateBranchAsync(DmBranch branch)
-        {
-            _context.DmBranches.Update(branch);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task DeleteBranchAsync(DmBranch branch)
-        {
-            _context.DmBranches.Remove(branch);
-            await _context.SaveChangesAsync();
+            return await _dbSet.FirstOrDefaultAsync(b=>b.Id ==id);
         }
     }
 }

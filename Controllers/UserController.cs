@@ -1,3 +1,4 @@
+using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.Repositories;
 using LuanVanTotNghiep.Services;
@@ -6,13 +7,39 @@ using Microsoft.AspNetCore.Mvc;
 namespace LuanVanTotNghiep.Controllers;
     [ApiController]
      [Route("api/[controller]")] 
-public class UserController (UserService userService) : ControllerBase
+public class UserController (UserService userService,
+    RoleService roleService,
+    BranchService branchService) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAllUser()
     {
-        var user= await userService.GetAllUser();
-        return Ok(user);
+        var users    = await userService.GetAllUser();
+        var roles    = await roleService.GetAllRole();
+       var result = new UserPageDataDto
+    {
+        Users = users.Select(u => new UserDto
+        {
+            Id         = u.Id,
+            Username   = u.Username,
+            FullName   = u.FullName,
+            BranchId   = u.BranchId,
+            BranchName = u.Branch?.Name,
+            RoleId     = u.RoleId,
+            RoleName   = u.Role?.RoleName,
+            HireDate   = u.HireDate
+        }),
+        Roles    = roles.Select(r => new RoleDto
+        {
+            Id          = r.Id,
+            RoleName    = r.RoleName,
+            Description = r.Description,
+            HourlyWage  = r.HourlyWage,
+            SeniorWage  = r.SeniorWage
+        }),
+  
+    };
+        return Ok(result);
     }
     [HttpGet("{id}")]
        public async Task<IActionResult> GetUserById(int id)

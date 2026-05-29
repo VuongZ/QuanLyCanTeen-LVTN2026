@@ -22,6 +22,8 @@ builder.Services.AddSwaggerGen();
 // 3. Đăng ký các "Nhân viên" (Services & Repositories)
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<UserRepo>();
+builder.Services.AddScoped<RoleRepo>();
+builder.Services.AddScoped<RoleService>();  
 builder.Services.AddScoped<BranchRepo>();
 builder.Services.AddScoped<BranchService>();
 

@@ -10,13 +10,13 @@ namespace LuanVanTotNghiep.Services
         {
             _repo = repo;
         }
-        public async Task<List<DmBranch>> GettAllBranchAsync()
+        public async Task<IEnumerable<DmBranch>> GettAllBranchAsync()
         {
-            return await _repo.GetAllBranchAsync();
+            return await _repo.GetAll();
         }
         public async Task<DmBranch?> getBranchByIdAsync(int id)
         {
-            var branch = await _repo.GetBranchByIdAsynce(id);
+            var branch = await _repo.GetbyId(id);
             if(branch == null)
             return null;
             return branch;
@@ -24,29 +24,29 @@ namespace LuanVanTotNghiep.Services
         }
         public async Task AddBranchAsync(DmBranch branch)
         {
-            await _repo.AddBranchAsync(branch);
+            await _repo.Add(branch);
         }
         public async Task UpdateBranchAsync(int id, DmBranch branchInput)
         {
-            var existingBranch = await _repo.GetBranchByIdAsynce(id);
+            var existingBranch = await _repo.GetbyId(id);
             if(existingBranch != null)
             {
                 existingBranch.Name = branchInput.Name;
                 existingBranch.Address = branchInput.Address;
                 existingBranch.Latitude = branchInput.Latitude;
                 existingBranch.Longitude = branchInput.Longitude;
-                await _repo.UpdateBranchAsync(existingBranch);
+                await _repo.Update(existingBranch);
             }
         }
 
         public async Task<bool> DeletebranchAsync(int id)
         {
-            var branch = await _repo.GetBranchByIdAsynce(id);
+            var branch = await _repo.GetbyId(id);
             if(branch == null)
             {
                 return false;
             }
-            await _repo.DeleteBranchAsync(branch);
+            await _repo.Delete(branch.Id);
             return true;
         }
     }
