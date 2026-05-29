@@ -5,6 +5,7 @@ public class UserDto
     public int Id { get; set; }
     public string? Username { get; set; }
     public string? FullName { get; set; }
+    public string? Password { get; set; } = null!;
     public int? BranchId { get; set; }
     public string? BranchName { get; set; }   // tên branch cho tiện
     public int? RoleId { get; set; }

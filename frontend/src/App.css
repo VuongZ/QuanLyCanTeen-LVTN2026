@@ -15,6 +15,10 @@
     var(--page-bg);
 }
 
+.redesigned-auth {
+  grid-template-columns: minmax(340px, 480px) minmax(360px, 1fr);
+}
+
 .login-panel,
 .login-summary,
 .profile-strip,
@@ -33,6 +37,12 @@
   justify-content: center;
   gap: 28px;
   padding: 36px;
+}
+
+.login-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .brand-mark {
@@ -139,14 +149,33 @@ button:disabled {
 }
 
 .login-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 16px;
   align-content: end;
   padding: 24px;
   background:
     linear-gradient(160deg, rgba(26, 76, 91, 0.9), rgba(32, 37, 43, 0.94)),
     var(--ink);
+}
+
+.summary-copy {
+  max-width: 620px;
+  color: white;
+}
+
+.summary-copy h2 {
+  margin: 0;
+  color: white;
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1.02;
+}
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .login-summary .metric {
@@ -248,6 +277,12 @@ button:disabled {
   padding: 22px;
 }
 
+.info-panel {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+}
+
 .action-list {
   display: grid;
   gap: 12px;
@@ -300,6 +335,35 @@ dd {
   text-align: right;
 }
 
+.password-form {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.password-form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.password-form input:focus {
+  border-color: var(--role-accent);
+  outline: 3px solid rgba(26, 76, 91, 0.14);
+}
+
+.form-status {
+  margin: 0;
+  color: var(--teal);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .dashboard-admin {
   --role-accent: #7a3d9a;
 }
@@ -332,6 +396,7 @@ dd {
   }
 
   .login-summary,
+  .summary-metrics,
   .metric-grid {
     grid-template-columns: 1fr;
   }

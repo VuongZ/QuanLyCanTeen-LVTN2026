@@ -19,3 +19,17 @@ export async function getUserById(id) {
 
   return response.json()
 }
+
+export async function updateUser(id, user) {
+  const response = await fetch(`${BASE_URL}/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(user),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Khong the cap nhat User id ${id}: ${response.status}`)
+  }
+}

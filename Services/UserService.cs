@@ -24,6 +24,12 @@ public class UserService(UserRepo userRepo)
            var us1=await userRepo.GetbyId(user.Id);
            if(us1 !=null)
         {
+            us1.Username = user.Username;
+            us1.Password = user.Password;
+            us1.FullName = user.FullName;
+            us1.BranchId = user.BranchId;
+            us1.RoleId = user.RoleId;
+            us1.HireDate = user.HireDate;
             await userRepo.Update(us1);
         }
         }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getUserPageData } from './api/UserApi'
+import { getUserPageData, updateUser } from './api/UserApi'
 import './App.css'
 
 const roleProfiles = {
@@ -37,7 +37,7 @@ function normalizeRole(roleName = '') {
 
 function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
-  const [username, setUsername] = useState('')
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' })
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem('currentUser')
     return savedUser ? JSON.parse(savedUser) : null
@@ -66,28 +66,25 @@ function App() {
     loadUsers()
   }, [])
 
-  const userOptions = useMemo(
-    () =>
-      pageData.users.map((user) => ({
-        ...user,
-        label: `${user.fullName || user.username} - ${user.roleName || 'Chua co role'}`,
-      })),
-    [pageData.users],
-  )
-
   const selectedUser = useMemo(
     () =>
       pageData.users.find(
-        (user) => user.username?.toLowerCase() === username.trim().toLowerCase(),
+        (user) =>
+          user.username?.toLowerCase() === loginForm.username.trim().toLowerCase(),
       ),
-    [pageData.users, username],
+    [pageData.users, loginForm.username],
   )
+
+  function handleLoginChange(event) {
+    const { name, value } = event.target
+    setLoginForm((form) => ({ ...form, [name]: value }))
+  }
 
   function handleSubmit(event) {
     event.preventDefault()
 
-    if (!selectedUser) {
-      setError('Khong tim thay username trong danh sach User')
+    if (!selectedUser || selectedUser.password !== loginForm.password) {
+      setError('Username hoac password khong dung')
       return
     }
 
@@ -99,7 +96,16 @@ function App() {
   function handleLogout() {
     setCurrentUser(null)
     localStorage.removeItem('currentUser')
-    setUsername('')
+    setLoginForm({ username: '', password: '' })
+  }
+
+  function handleUserUpdated(updatedUser) {
+    setCurrentUser(updatedUser)
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser))
+    setPageData((data) => ({
+      ...data,
+      users: data.users.map((user) => (user.id === updatedUser.id ? updatedUser : user)),
+    }))
   }
 
   if (currentUser) {
@@ -107,6 +113,7 @@ function App() {
       <Dashboard
         branches={pageData.branches}
         onLogout={handleLogout}
+        onUserUpdated={handleUserUpdated}
         roles={pageData.roles}
         user={currentUser}
         users={pageData.users}
@@ -115,12 +122,14 @@ function App() {
   }
 
   return (
-    <main className="auth-page">
+    <main className="auth-page redesigned-auth">
       <section className="login-panel" aria-labelledby="login-title">
-        <div className="brand-mark">CT</div>
-        <div>
-          <p className="eyebrow">Canteen Management</p>
-          <h1 id="login-title">Dang nhap</h1>
+        <div className="login-header">
+          <div className="brand-mark">CT</div>
+          <div>
+            <p className="eyebrow">Canteen Management</p>
+            <h1 id="login-title">Đăng Nhập</h1>
+          </div>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -128,43 +137,53 @@ function App() {
           <input
             autoComplete="username"
             id="username"
-            list="usernames"
-            onChange={(event) => setUsername(event.target.value)}
+            name="username"
+            onChange={handleLoginChange}
             placeholder="Nhap username"
             type="text"
-            value={username}
+            value={loginForm.username}
           />
-          <datalist id="usernames">
-            {userOptions.map((user) => (
-              <option key={user.id} value={user.username}>
-                {user.label}
-              </option>
-            ))}
-          </datalist>
+
+          <label htmlFor="password">Password</label>
+          <input
+            autoComplete="current-password"
+            id="password"
+            name="password"
+            onChange={handleLoginChange}
+            placeholder="Nhap password"
+            type="password"
+            value={loginForm.password}
+          />
 
           <div className="selected-role">
             <span>Role</span>
-            <strong>{selectedUser?.roleName || 'Chua chon user'}</strong>
+            <strong>{selectedUser?.roleName || 'Chưa Xác Định'}</strong>
           </div>
 
           {error && <p className="form-error">{error}</p>}
 
           <button disabled={isLoading} type="submit">
-            {isLoading ? 'Dang tai...' : 'Vao dashboard'}
+            {isLoading ? 'Dang tai...' : 'Đăng nhập'}
           </button>
         </form>
       </section>
 
       <aside className="login-summary" aria-label="Thong tin he thong">
-        <Metric label="Users" value={pageData.users.length} />
-        <Metric label="Roles" value={pageData.roles.length} />
-        <Metric label="Branches" value={pageData.branches.length} />
+        <div className="summary-copy">
+          <p className="eyebrow">Role dashboard</p>
+          <h2>Mời Nhân Viên vào đúng dashboard theo role của mình</h2>
+        </div>
+        <div className="summary-metrics">
+          <Metric label="Users" value={pageData.users.length} />
+          <Metric label="Roles" value={pageData.roles.length} />
+          <Metric label="Branches" value={pageData.branches.length} />
+        </div>
       </aside>
     </main>
   )
 }
 
-function Dashboard({ branches, onLogout, roles, user, users }) {
+function Dashboard({ branches, onLogout, onUserUpdated, roles, user, users }) {
   const roleKey = normalizeRole(user.roleName)
   const profile = roleProfiles[roleKey]
   const branch = branches.find((item) => item.id === user.branchId)
@@ -183,9 +202,7 @@ function Dashboard({ branches, onLogout, roles, user, users }) {
       </header>
 
       <section className="profile-strip">
-        <div>
-          <span className="avatar">{getInitials(user.fullName || user.username)}</span>
-        </div>
+        <span className="avatar">{getInitials(user.fullName || user.username)}</span>
         <div>
           <h2>{user.fullName || user.username}</h2>
           <p>{branch?.name || user.branchName || 'Chua gan chi nhanh'}</p>
@@ -233,9 +250,95 @@ function Dashboard({ branches, onLogout, roles, user, users }) {
               <dd>{formatDate(user.hireDate)}</dd>
             </div>
           </dl>
+          <PasswordForm onUserUpdated={onUserUpdated} user={user} />
         </div>
       </section>
     </main>
+  )
+}
+
+function PasswordForm({ onUserUpdated, user }) {
+  const [form, setForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+  const [status, setStatus] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  function handleChange(event) {
+    const { name, value } = event.target
+    setForm((valueForm) => ({ ...valueForm, [name]: value }))
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setStatus('')
+
+    if (form.currentPassword !== user.password) {
+      setStatus('Password hien tai khong dung')
+      return
+    }
+
+    if (form.newPassword.length < 4) {
+      setStatus('Password moi can toi thieu 4 ky tu')
+      return
+    }
+
+    if (form.newPassword !== form.confirmPassword) {
+      setStatus('Nhap lai password moi chua khop')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      const updatedUser = { ...user, password: form.newPassword }
+      await updateUser(user.id, updatedUser)
+      onUserUpdated(updatedUser)
+      setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setStatus('Da cap nhat password')
+    } catch (err) {
+      setStatus(err.message || 'Khong the cap nhat password')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <form className="password-form" onSubmit={handleSubmit}>
+      <div className="section-heading">
+        <p className="eyebrow">Bao mat</p>
+        <h2>Doi password</h2>
+      </div>
+      <input
+        autoComplete="current-password"
+        name="currentPassword"
+        onChange={handleChange}
+        placeholder="Password hien tai"
+        type="password"
+        value={form.currentPassword}
+      />
+      <input
+        autoComplete="new-password"
+        name="newPassword"
+        onChange={handleChange}
+        placeholder="Password moi"
+        type="password"
+        value={form.newPassword}
+      />
+      <input
+        autoComplete="new-password"
+        name="confirmPassword"
+        onChange={handleChange}
+        placeholder="Nhap lai password moi"
+        type="password"
+        value={form.confirmPassword}
+      />
+      {status && <p className="form-status">{status}</p>}
+      <button disabled={isSaving} type="submit">
+        {isSaving ? 'Dang luu...' : 'Cap nhat password'}
+      </button>
+    </form>
   )
 }
 

@@ -27,7 +27,9 @@ public class UserController (UserService userService,
             BranchName = u.Branch?.Name,
             RoleId     = u.RoleId,
             RoleName   = u.Role?.RoleName,
-            HireDate   = u.HireDate
+            HireDate   = u.HireDate,
+            Password=u.Password
+            
         }),
         Roles    = roles.Select(r => new RoleDto
         {
