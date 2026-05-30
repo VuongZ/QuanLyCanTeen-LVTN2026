@@ -99,142 +99,61 @@ function App() {
     return <StaffDashboard {...dashboardProps} />
   }
 
-  return (
-    <main className="auth-root">
-
-      {/* ── LEFT PANEL (form) ── */}
-      <section className="auth-left">
-        <div className="auth-left-inner">
-
-          {/* Brand */}
-          <div className="auth-brand">
-            <span className="auth-brand-mark">CT</span>
-            <div>
-              <span className="auth-brand-name">Canteen</span>
-              <span className="auth-brand-sub">Management System</span>
-            </div>
-          </div>
-
-          {/* Heading */}
-          <div className="auth-heading">
-            <h1>Chào mừng trở lại</h1>
-            <p>Đăng nhập để tiếp tục quản lý hệ thống</p>
-          </div>
-
-          {/* Form */}
-          <div className="auth-form">
-            <div className="auth-field">
-              <label htmlFor="username">Username</label>
-              <div className="auth-input-wrap">
-                <span className="auth-input-icon">◈</span>
-                <input
-                  autoComplete="username"
-                  id="username"
-                  name="username"
-                  onChange={handleLoginChange}
-                  placeholder="Nhập username"
-                  type="text"
-                  value={loginForm.username}
-                />
-              </div>
-            </div>
-
-            <div className="auth-field">
-              <label htmlFor="password">Password</label>
-              <div className="auth-input-wrap">
-                <span className="auth-input-icon">◉</span>
-                <input
-                  autoComplete="current-password"
-                  id="password"
-                  name="password"
-                  onChange={handleLoginChange}
-                  placeholder="Nhập password"
-                  type="password"
-                  value={loginForm.password}
-                />
-              </div>
-            </div>
-
-            {/* Role preview */}
-            <div className="auth-role-row">
-              <span className="auth-role-label">Role được phát hiện</span>
-              <span className={`auth-role-chip ${selectedUser ? 'active' : ''}`}>
-                {selectedUser?.roleName || 'Chưa xác định'}
-              </span>
-            </div>
-
-            {error && (
-              <div className="auth-error">
-                <span>⚠</span>
-                {error}
-              </div>
-            )}
-
-            <button
-              className="auth-submit"
-              disabled={isLoading}
-              onClick={handleSubmit}
-              type="button"
-            >
-              {isLoading ? (
-                <span className="auth-spinner" />
-              ) : (
-                <>Đăng nhập →</>
-              )}
-            </button>
-          </div>
-
+ return (
+    <main className="auth-root-simple">
+      <div className="auth-card">
+        {/* Tiêu đề */}
+        <div className="auth-header">
+          <div className="auth-logo">TriMinh</div>
+          <h2>Quản Lý Nhân Sự Hệ Thống Căn Tin</h2>
+          <p>Đăng nhập để tiếp tục</p>
         </div>
-      </section>
 
-      {/* ── RIGHT PANEL (info) ── */}
-      <aside className="auth-right">
-        <div className="auth-right-inner">
-          <div className="auth-right-copy">
-            <p className="auth-eyebrow">Hệ thống quản lý</p>
-            <h2>Mời nhân viên vào đúng dashboard theo role</h2>
-            <p className="auth-right-desc">
-              Hệ thống tự động điều hướng Admin, Manager và Staff đến giao diện phù hợp sau khi đăng nhập.
-            </p>
+        {/* Form đăng nhập */}
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="auth-field">
+            <label htmlFor="username">Tài khoản</label>
+            <input
+              autoComplete="username"
+              id="username"
+              name="username"
+              onChange={handleLoginChange}
+              placeholder="Nhập username"
+              type="text"
+              value={loginForm.username}
+              className="auth-input"
+            />
           </div>
 
-          <div className="auth-metrics">
-            <MetricCard icon="◈" label="Nhân viên" value={pageData.users.length} accent="#2563eb" />
-            <MetricCard icon="⬡" label="Roles"     value={pageData.roles.length}  accent="#0891b2" />
-            <MetricCard icon="⊞" label="Chi nhánh" value={pageData.branches.length} accent="#7c3aed" />
+          <div className="auth-field">
+            <label htmlFor="password">Mật khẩu</label>
+            <input
+              autoComplete="current-password"
+              id="password"
+              name="password"
+              onChange={handleLoginChange}
+              placeholder="Nhập password"
+              type="password"
+              value={loginForm.password}
+              className="auth-input"
+            />
           </div>
 
-          <div className="auth-roles-list">
-            {[
-              { role: 'ADMIN',   desc: 'Toàn quyền quản lý hệ thống',   color: '#1d4ed8' },
-              { role: 'MANAGER', desc: 'Quản lý nhân viên & chi nhánh',  color: '#0891b2' },
-              { role: 'STAFF',   desc: 'Thao tác nghiệp vụ hàng ngày',   color: '#059669' },
-            ].map(({ role, desc, color }) => (
-              <div className="auth-role-item" key={role}>
-                <span className="auth-role-dot" style={{ background: color }} />
-                <div>
-                  <strong style={{ color }}>{role}</strong>
-                  <span>{desc}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </aside>
 
-    </main>
-  )
-}
+          {/* Hiển thị lỗi */}
+          {error && <div className="auth-error-msg">⚠ {error}</div>}
 
-function MetricCard({ icon, label, value, accent }) {
-  return (
-    <div className="auth-metric" style={{ '--ac': accent }}>
-      <span className="auth-metric-icon">{icon}</span>
-      <div>
-        <p className="auth-metric-label">{label}</p>
-        <p className="auth-metric-value">{value}</p>
+          {/* Nút đăng nhập */}
+          <button
+            className="auth-submit-btn"
+            disabled={isLoading}
+            type="submit"
+          >
+            {isLoading ? 'Đang tải...' : 'Đăng nhập'}
+          </button>
+        </form>
       </div>
-    </div>
+    </main>
   )
 }
 

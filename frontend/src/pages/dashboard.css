@@ -1,0 +1,182 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+.sd-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  padding-bottom: 70px; /* Chừa chỗ cho Bottom Nav */
+}
+
+/* ── Topbar ── */
+.sd-topbar {
+  background: #fff;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.sd-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sd-brand-icon {
+  background: #ea580c; 
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.sd-brand-name { font-weight: 700; font-size: 16px; color: #1e293b; }
+
+.sd-logout-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* ── Page Header ── */
+.sd-page-header {
+  padding: 20px 20px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.sd-page-header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+.sd-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #ea580c; }
+.sd-branch-badge {
+  background: #ffedd5;
+  color: #ea580c;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sd-content { padding: 0 16px 20px; }
+
+/* ── Cards & Profile ── */
+.sd-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+}
+.sd-card-header { margin-bottom: 16px; }
+.sd-card-header h2 { margin: 2px 0 0; font-size: 17px; }
+
+.sd-profile-layout { display: flex; flex-direction: column; gap: 16px; }
+
+.sd-info-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #fff7ed;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.sd-info-avatar {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 16px;
+}
+.sd-info-hero h3 { margin: 0 0 4px; font-size: 15px; }
+.sd-role-badge {
+  background: #ea580c; color: #fff;
+  padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;
+}
+
+.sd-dl { display: flex; flex-direction: column; }
+.sd-info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.sd-info-row:last-child { border: none; }
+.sd-info-row dt { font-size: 12px; color: #64748b; }
+.sd-info-row dd { font-size: 13px; font-weight: 600; color: #1e293b; margin: 0; }
+
+/* ── Forms & Buttons ── */
+.sd-pw-form { display: flex; flex-direction: column; gap: 12px; }
+.sd-field label { font-size: 12px; font-weight: 600; color: #475569; }
+.sd-field input { padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 14px; }
+.sd-field input:focus { border-color: #ea580c; outline: none; }
+
+.sd-btn-primary {
+  background: #ea580c; color: #fff; border: none; padding: 12px; border-radius: 10px;
+  font-weight: 600; width: 100%; margin-top: 8px;
+}
+.sd-btn-ghost {
+  background: transparent; border: 1.5px solid #e2e8f0; color: #64748b; padding: 12px;
+  border-radius: 10px; font-weight: 600; width: 100%;
+}
+
+/* ── Shifts Grid (Tối ưu vuốt chạm) ── */
+.sd-shift-legend { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
+.sd-shift-legend-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 12px; min-width: 120px; display: flex; gap: 6px; align-items: center; }
+.sd-shift-legend-item strong { font-size: 12px; display: block;}
+.sd-shift-legend-item small { font-size: 10px; color: #64748b; }
+
+.sd-shift-grid { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
+.sd-grid-col { display: flex; flex-direction: column; gap: 6px; min-width: 60px; }
+.sd-grid-header-col { min-width: 90px; position: sticky; left: 0; background: #fff; z-index: 10; box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+
+.sd-grid-corner { height: 44px; }
+.sd-grid-shift-label { height: 48px; display: flex; flex-direction: column; justify-content: center; font-size: 11px; font-weight: 600; color: #475569; }
+
+.sd-grid-day-label { height: 44px; background: #f1f5f9; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.sd-grid-day-label strong { font-size: 12px; }
+.sd-grid-day-label small { font-size: 9px; color: #64748b; }
+
+.sd-shift-cell { height: 48px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #ea580c; font-weight: 700; font-size: 16px; }
+.sd-shift-cell.selected { background: #ea580c; color: #fff; border-color: #ea580c; box-shadow: 0 4px 10px rgba(234,88,12,0.3); }
+
+.sd-shift-actions { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Bottom Navigation ── */
+.sd-bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #fff;
+  display: flex;
+  border-top: 1px solid #e2e8f0;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+.sd-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  border: none; background: transparent;
+  color: #94a3b8;
+  transition: color 0.2s;
+}
+.sd-nav-item.active { color: #ea580c; }
+.sd-nav-icon { font-size: 20px; margin-bottom: 2px; }
+.sd-nav-label { font-size: 10px; font-weight: 600; }
+
+/* ── Desktop Fallback ── */
+@media (min-width: 768px) {
+  .sd-root { align-items: center; padding: 20px; }
+  .sd-topbar, .sd-main, .sd-bottom-nav { width: 100%; max-width: 600px; border-radius: 16px; margin-bottom: 12px; }
+  .sd-bottom-nav { position: static; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+}

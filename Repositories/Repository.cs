@@ -30,10 +30,10 @@
             }
             public async Task Delete(int id)
             {
-                var user = await _dbSet.FindAsync(id);
-                if(user!=null)
+                var entity = await _dbSet.FindAsync(id);
+                if(entity!=null)
                 {
-                _dbSet.Remove(user);
+                _dbSet.Remove(entity);
                     await Context.SaveChangesAsync();
                 }
             

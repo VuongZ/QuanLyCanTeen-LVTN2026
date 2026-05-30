@@ -26,6 +26,8 @@ builder.Services.AddScoped<RoleRepo>();
 builder.Services.AddScoped<RoleService>();  
 builder.Services.AddScoped<BranchRepo>();
 builder.Services.AddScoped<BranchService>();
+builder.Services.AddScoped<ShiftRepo>();
+builder.Services.AddScoped<ShiftService>();
 
 var app = builder.Build();
 
@@ -39,20 +41,20 @@ using (var scope = app.Services.CreateScope())
         if (context.Database.CanConnect())
         {
             Console.WriteLine("==================================================");
-            Console.WriteLine("🎉 CHÚC MỪNG: ĐÃ KẾT NỐI THÀNH CÔNG VỚI AIVEN MYSQL!");
+            Console.WriteLine(" CHÚC MỪNG: ĐÃ KẾT NỐI THÀNH CÔNG VỚI WAMPSERVER !");
             Console.WriteLine("==================================================");
         }
         else 
         {
             Console.WriteLine("==================================================");
-            Console.WriteLine("❌ THẤT BẠI: KHÔNG THỂ KẾT NỐI TỚI DATABASE.");
+            Console.WriteLine(" THẤT BẠI: KHÔNG THỂ KẾT NỐI TỚI DATABASE.");
             Console.WriteLine("==================================================");
         }
     }
     catch (Exception ex)
     {
         Console.WriteLine($"==================================================");
-        Console.WriteLine($"❌ LỖI KẾT NỐI: {ex.Message}");
+        Console.WriteLine($" LỖI KẾT NỐI: {ex.Message}");
         Console.WriteLine($"==================================================");
     }
 }
