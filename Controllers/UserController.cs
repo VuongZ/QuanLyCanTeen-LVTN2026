@@ -16,6 +16,7 @@ public class UserController (UserService userService,
     {
         var users    = await userService.GetAllUser();
         var roles    = await roleService.GetAllRole();
+        var branch= await branchService.GettAllBranchAsync();
        var result = new UserPageDataDto
     {
         Users = users.Select(u => new UserDto
@@ -31,6 +32,7 @@ public class UserController (UserService userService,
             Password=u.Password
             
         }),
+        
         Roles    = roles.Select(r => new RoleDto
         {
             Id          = r.Id,

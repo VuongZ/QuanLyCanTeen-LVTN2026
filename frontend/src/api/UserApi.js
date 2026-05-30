@@ -1,35 +1,22 @@
+import axios from 'axios'
+
 const BASE_URL = '/api/User'
+const URL_Bracnh='/api/Branch'
 
 export async function getUserPageData() {
-  const response = await fetch(BASE_URL)
-
-  if (!response.ok) {
-    throw new Error(`Khong the lay du lieu User: ${response.status}`)
-  }
-
-  return response.json()
+  const response = await axios.get(BASE_URL)
+  return response.data
 }
 
 export async function getUserById(id) {
-  const response = await fetch(`${BASE_URL}/${id}`)
-
-  if (!response.ok) {
-    throw new Error(`Khong the lay User id ${id}: ${response.status}`)
-  }
-
-  return response.json()
+  const response = await axios.get(`${BASE_URL}/${id}`)
+  return response.data
 }
 
 export async function updateUser(id, user) {
-  const response = await fetch(`${BASE_URL}/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(user),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Khong the cap nhat User id ${id}: ${response.status}`)
-  }
+  await axios.put(`${BASE_URL}/${id}`, user)
+}
+export async function GetALLBranh() {
+    const response = await axios.get(URL_Bracnh)
+  return response.data
 }
