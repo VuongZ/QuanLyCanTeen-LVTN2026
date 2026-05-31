@@ -33,9 +33,9 @@ public partial class CaBranchShiftConfig
 
     [ForeignKey("BranchId")]
     [InverseProperty("CaBranchShiftConfigs")]
-    public virtual DmBranch Branch { get; set; } = null!;
+    public virtual DmBranch? Branch { get; set; }
 
     [ForeignKey("ShiftId")]
     [InverseProperty("CaBranchShiftConfigs")]
-    public virtual CaShift Shift { get; set; } = null!;
+    public virtual CaShift? Shift { get; set; } 
 }

@@ -28,4 +28,7 @@ public partial class CaSchedulePeriod
 
     [Column("created_at", TypeName = "timestamp")]
     public DateTime? CreatedAt { get; set; }
+
+    [ForeignKey("BranchId")]
+    public virtual DmBranch? Branch { get; set; }
 }

@@ -28,10 +28,14 @@ builder.Services.AddScoped<BranchRepo>();
 builder.Services.AddScoped<BranchService>();
 builder.Services.AddScoped<ShiftRepo>();
 builder.Services.AddScoped<ShiftService>();
+builder.Services.AddScoped<SchedulePeriodRepo>();
+builder.Services.AddScoped<SchedulePeriodService>();
+builder.Services.AddScoped<BranchShiftConfigRepo>();
+builder.Services.AddScoped<BranchShiftConfigService>();
 
 var app = builder.Build();
 
-// --- ĐOẠN TEST KẾT NỐI DATABASE TRÊN AIVEN ---
+// --- ĐOẠN TEST KẾT NỐI DATABASE TRÊN WAMP ---
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
