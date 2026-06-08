@@ -1,0 +1,654 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+
+/* ── BASE ── */
+.sd-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  padding-bottom: 70px; /* Chừa chỗ cho Bottom Nav */
+}
+
+/* Root override cho layout left nav */
+.sd-root--left-nav {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+/* Ẩn bottom nav khi dùng left nav layout */
+.sd-root--left-nav .sd-bottom-nav {
+  display: none;
+}
+
+/* Layout wrapper: left sidebar + main */
+.sd-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Left Sidebar ── */
+.sd-left-nav {
+  width: 220px;
+  min-width: 220px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.sd-left-nav-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+}
+
+.sd-left-nav-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-left-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sd-left-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  transition: background 0.15s, color 0.15s;
+  width: 100%;
+}
+
+.sd-left-nav-item:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.sd-left-nav-item.active {
+  background: #1e293b;
+  color: #fff;
+}
+
+.sd-left-nav-item .sd-nav-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.sd-left-nav-item .sd-nav-label {
+  font-size: 13px;
+}
+
+.sd-left-nav-logout {
+  margin-top: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sd-left-nav-logout:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* Main scrolls independently */
+.sd-root--left-nav .sd-main {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+/* Ẩn logout button trên topbar khi có sidebar */
+.sd-root--left-nav .sd-logout-btn {
+  display: none;
+}
+
+/* ── Topbar ── */
+.sd-topbar {
+  background: #fff;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.sd-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-brand-icon {
+  background: #ea580c;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.sd-brand-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.sd-logout-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* ── Page Header ── */
+.sd-page-header {
+  padding: 20px 20px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.sd-page-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sd-eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #ea580c;
+}
+
+.sd-branch-badge {
+  background: #ffedd5;
+  color: #ea580c;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sd-content {
+  padding: 0 16px 20px;
+}
+
+/* ── Cards & Profile ── */
+.sd-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+}
+
+.sd-card-header {
+  margin-bottom: 16px;
+}
+
+.sd-card-header h2 {
+  margin: 2px 0 0;
+  font-size: 17px;
+}
+
+.sd-profile-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sd-info-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #fff7ed;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.sd-info-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sd-avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.sd-info-hero h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.sd-role-badge {
+  background: #ea580c;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.sd-dl {
+  display: flex;
+  flex-direction: column;
+}
+
+.sd-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sd-info-row:last-child {
+  border: none;
+}
+
+.sd-info-row dt {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.sd-info-row dd {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  text-align: right;
+}
+
+/* ── Forms & Buttons ── */
+.sd-pw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.sd-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.sd-field input,
+.sd-field select {
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.sd-field input:focus,
+.sd-field select:focus {
+  border-color: #ea580c;
+  outline: none;
+}
+
+.sd-status {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.sd-status-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.sd-status-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.sd-btn-primary {
+  background: #ea580c;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  width: 100%;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.sd-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.sd-btn-ghost {
+  background: transparent;
+  border: 1.5px solid #e2e8f0;
+  color: #64748b;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* ── Shifts Grid ── */
+.sd-shift-legend {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sd-shift-legend-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 120px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sd-shift-legend-item strong {
+  font-size: 12px;
+  display: block;
+}
+
+.sd-shift-legend-item small {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.sd-shift-grid {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sd-grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 60px;
+}
+
+.sd-grid-header-col {
+  min-width: 90px;
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 10;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.02);
+}
+
+.sd-grid-corner {
+  height: 44px;
+}
+
+.sd-grid-shift-label {
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.sd-grid-day-label {
+  height: 44px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.sd-grid-day-label strong {
+  font-size: 12px;
+}
+
+.sd-grid-day-label small {
+  font-size: 9px;
+  color: #64748b;
+}
+
+.sd-shift-cell {
+  height: 48px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #ea580c;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.sd-shift-cell.selected {
+  background: #ea580c;
+  color: #fff;
+  border-color: #ea580c;
+  box-shadow: 0 4px 10px rgba(234,88,12,0.3);
+}
+
+.sd-shift-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Bottom Navigation ── */
+.sd-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  display: flex;
+  border-top: 1px solid #e2e8f0;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+.sd-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.sd-nav-item.active {
+  color: #ea580c;
+}
+
+.sd-nav-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.sd-nav-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── DESKTOP (PC) — Full screen, no width cap ── */
+@media (min-width: 768px) {
+  /* Reset base padding */
+  .sd-root {
+    padding-bottom: 0;
+    align-items: stretch;
+  }
+
+  /* Left-nav layout chiếm toàn màn hình */
+  .sd-root--left-nav {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+  }
+
+  /* Topbar full width */
+  .sd-topbar {
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+    margin-bottom: 0;
+  }
+
+  /* Main content không bị giới hạn */
+  .sd-root--left-nav .sd-main {
+    flex: 1;
+    max-width: none;
+    border-radius: 0;
+    margin-bottom: 0;
+  }
+
+  /* Content bên trong có max-width để dễ đọc, căn trái */
+  .sd-content {
+    padding: 0 32px 32px;
+    max-width: 960px;
+  }
+
+  .sd-page-header {
+    padding: 24px 32px 12px;
+    max-width: 960px;
+  }
+
+  /* Profile layout 2 cột trên PC */
+  .sd-profile-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* Card chiếm full width khi là con duy nhất */
+  .sd-profile-layout > .sd-card:only-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Shift grid không bị overflow ẩn trên desktop */
+  .sd-shift-grid {
+    overflow-x: auto;
+  }
+
+  /* Bottom nav ẩn trên PC */
+  .sd-bottom-nav {
+    display: none;
+  }
+
+  /* Sidebar rộng hơn trên desktop */
+  .sd-left-nav {
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .sd-left-nav-item {
+    padding: 11px 14px;
+  }
+
+  .sd-left-nav-item .sd-nav-label {
+    font-size: 14px;
+  }
+}
+
+/* ── LARGE DESKTOP ── */
+@media (min-width: 1280px) {
+  .sd-left-nav {
+    width: 260px;
+    min-width: 260px;
+    padding: 24px 16px;
+  }
+
+  .sd-content {
+    max-width: 1100px;
+    padding: 0 40px 40px;
+  }
+
+  .sd-page-header {
+    max-width: 1100px;
+    padding: 28px 40px 12px;
+  }
+}

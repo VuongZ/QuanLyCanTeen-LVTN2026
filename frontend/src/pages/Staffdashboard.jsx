@@ -1,25 +1,15 @@
 import { useState } from 'react'
 import { updateUser } from '../api/UserApi'
-import './dashboard.css'
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
+import './css/dashboard.css'
 
 function getInitials(name = '') {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(-2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
+  return name.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()
 }
 
 function formatDate(value) {
   if (!value) return 'Chưa có'
   return new Intl.DateTimeFormat('vi-VN').format(new Date(value))
 }
-
-// ─── Shift Config ────────────────────────────────────────────────────────────
 
 const SHIFTS = [
   { id: 'morning', label: 'Ca Sáng', time: '06:00 – 14:00', icon: '' },
@@ -30,26 +20,29 @@ const SHIFTS = [
 const DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
 const DAY_LABELS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
 
-// ─── Main Component (Giao diện Mobile - 3 Tabs) ──────────────────────────────
-
 export function StaffDashboard({ branches, onLogout, onUserUpdated, roles, user, users }) {
   const [activeTab, setActiveTab] = useState('profile')
   const branch = branches?.find((b) => b.id === user.branchId)
 
-  // Đổi tiêu đề dựa trên Tab đang chọn
   const getHeaderInfo = () => {
-    switch(activeTab) {
-      case 'profile': return { eyebrow: 'Tài khoản', title: 'Hồ sơ của tôi' };
-      case 'shifts': return { eyebrow: 'Lịch làm việc', title: 'Đăng ký ca' };
-      case 'security': return { eyebrow: 'Cài đặt', title: 'Bảo mật tài khoản' };
-      default: return { eyebrow: '', title: '' };
+    switch (activeTab) {
+      case 'profile': return { eyebrow: 'Tài khoản', title: 'Hồ sơ của tôi' }
+      case 'shifts': return { eyebrow: 'Lịch làm việc', title: 'Đăng ký ca' }
+      case 'security': return { eyebrow: 'Cài đặt', title: 'Bảo mật tài khoản' }
+      default: return { eyebrow: '', title: '' }
     }
   }
-  const headerInfo = getHeaderInfo();
+  const headerInfo = getHeaderInfo()
+
+  const NAV_ITEMS = [
+    { id: 'profile', icon: '◎', label: 'Tài khoản' },
+    { id: 'shifts', icon: '⊞', label: 'Đăng ký ca' },
+    { id: 'security', icon: '🔒', label: 'Bảo mật' },
+  ]
 
   return (
-    <div className="sd-root">
-      {/* Topbar chuẩn Mobile */}
+    <div className="sd-root sd-root--left-nav">
+      {/* Topbar */}
       <header className="sd-topbar">
         <div className="sd-brand">
           <span className="sd-brand-icon">CT</span>
@@ -60,59 +53,63 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, roles, user,
         </button>
       </header>
 
-      {/* Nội dung chính */}
-      <main className="sd-main">
-        <div className="sd-page-header">
-          <div>
-            <p className="sd-eyebrow">{headerInfo.eyebrow}</p>
-            <h1>{headerInfo.title}</h1>
-          </div>
-          <div className="sd-branch-badge">
-            📍 {branch?.name || user.branchName || 'Chưa gán'}
-          </div>
-        </div>
+      {/* Layout: left sidebar + main content */}
+      <div className="sd-layout">
 
-        <div className="sd-content">
-          {activeTab === 'profile' && (
-            <ProfileTab branch={branch} user={user} />
-          )}
-          {activeTab === 'shifts' && (
-            <ShiftsTab user={user} />
-          )}
-          {activeTab === 'security' && (
-            <SecurityTab onUserUpdated={onUserUpdated} user={user} />
-          )}
-        </div>
-      </main>
+        {/* ── LEFT SIDE NAV ── */}
+        <nav className="sd-left-nav">
+          <div className="sd-left-nav-user">
+            <div className="sd-info-avatar sd-avatar-sm">
+              {getInitials(user.fullName || user.username)}
+            </div>
+            <span className="sd-left-nav-name">{user.fullName || user.username}</span>
+          </div>
 
-      {/* Thanh Điều Hướng Dưới Đáy (Thêm Tab Bảo mật) */}
-      <nav className="sd-bottom-nav">
-        {[
-          { id: 'profile', icon: '◎', label: 'Tài khoản' },
-          { id: 'shifts', icon: '⊞', label: 'Đăng ký ca' },
-          { id: 'security', icon: 'sc', label: 'Bảo mật' }, 
-        ].map((item) => (
-          <button
-            key={item.id}
-            className={`sd-nav-item ${activeTab === item.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(item.id)}
-            type="button"
-          >
-            <span className="sd-nav-icon">{item.icon}</span>
-            <span className="sd-nav-label">{item.label}</span>
+          <div className="sd-left-nav-items">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                className={`sd-left-nav-item ${activeTab === item.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(item.id)}
+                type="button"
+              >
+                <span className="sd-nav-icon">{item.icon}</span>
+                <span className="sd-nav-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <button className="sd-left-nav-logout" onClick={onLogout}>
+            ↩ Đăng xuất
           </button>
-        ))}
-      </nav>
+        </nav>
+
+        {/* Main content */}
+        <main className="sd-main">
+          <div className="sd-page-header">
+            <div>
+              <p className="sd-eyebrow">{headerInfo.eyebrow}</p>
+              <h1>{headerInfo.title}</h1>
+            </div>
+            <div className="sd-branch-badge">
+              📍 {branch?.name || user.branchName || 'Chưa gán'}
+            </div>
+          </div>
+
+          <div className="sd-content">
+            {activeTab === 'profile' && <ProfileTab branch={branch} user={user} />}
+            {activeTab === 'shifts' && <ShiftsTab user={user} />}
+            {activeTab === 'security' && <SecurityTab onUserUpdated={onUserUpdated} user={user} />}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
 
-// ─── Profile Tab (Chỉ còn thông tin cá nhân) ──────────────────────────────────
-
 function ProfileTab({ branch, user }) {
   return (
     <div className="sd-profile-layout">
-      {/* Info card */}
       <div className="sd-card">
         <div className="sd-card-header">
           <p className="sd-eyebrow">Chi tiết</p>
@@ -147,8 +144,6 @@ function InfoRow({ label, value }) {
   )
 }
 
-// ─── Security Tab (Tab mới dành riêng cho Đổi mật khẩu) ────────────────────────
-
 function SecurityTab({ onUserUpdated, user }) {
   return (
     <div className="sd-profile-layout">
@@ -163,8 +158,6 @@ function SecurityTab({ onUserUpdated, user }) {
   )
 }
 
-// ─── Shifts Tab ──────────────────────────────────────────────────────────────
-
 function ShiftsTab({ user }) {
   const [registered, setRegistered] = useState({})
   const [saved, setSaved] = useState(false)
@@ -174,7 +167,7 @@ function ShiftsTab({ user }) {
     setSaved(false)
     setRegistered((prev) => {
       const day = prev[dayIdx] || {}
-      return { ...prev, [dayIdx]: { ...day, [shiftId]: !day[shiftId] }  }
+      return { ...prev, [dayIdx]: { ...day, [shiftId]: !day[shiftId] } }
     })
   }
 
@@ -217,7 +210,6 @@ function ShiftsTab({ user }) {
       </div>
 
       <div className="sd-shift-grid">
-        {/* Header row */}
         <div className="sd-grid-col sd-grid-header-col">
           <div className="sd-grid-corner" />
           {SHIFTS.map((s) => (
@@ -227,8 +219,6 @@ function ShiftsTab({ user }) {
             </div>
           ))}
         </div>
-
-        {/* Day columns */}
         {DAYS.map((day, dayIdx) => (
           <div key={day} className="sd-grid-col">
             <div className="sd-grid-day-label">
@@ -255,9 +245,7 @@ function ShiftsTab({ user }) {
       </div>
 
       <div className="sd-shift-actions">
-        <button className="sd-btn-ghost" onClick={handleReset} type="button">
-          Xóa tất cả
-        </button>
+        <button className="sd-btn-ghost" onClick={handleReset} type="button">Xóa tất cả</button>
         <button
           className="sd-btn-primary"
           disabled={saving || countSelected() === 0}
@@ -277,8 +265,6 @@ function ShiftsTab({ user }) {
   )
 }
 
-// ─── Password Form ────────────────────────────────────────────────────────────
-
 function PasswordForm({ onUserUpdated, user }) {
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [status, setStatus] = useState(null)
@@ -292,20 +278,15 @@ function PasswordForm({ onUserUpdated, user }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setStatus(null)
-
     if (form.currentPassword !== user.password) {
-      setStatus({ type: 'error', msg: 'Mật khẩu hiện tại không đúng' })
-      return
+      setStatus({ type: 'error', msg: 'Mật khẩu hiện tại không đúng' }); return
     }
     if (form.newPassword.length < 4) {
-      setStatus({ type: 'error', msg: 'Mật khẩu mới cần tối thiểu 4 ký tự' })
-      return
+      setStatus({ type: 'error', msg: 'Mật khẩu mới cần tối thiểu 4 ký tự' }); return
     }
     if (form.newPassword !== form.confirmPassword) {
-      setStatus({ type: 'error', msg: 'Nhập lại mật khẩu chưa khớp' })
-      return
+      setStatus({ type: 'error', msg: 'Nhập lại mật khẩu chưa khớp' }); return
     }
-
     try {
       setIsSaving(true)
       const updatedUser = { ...user, password: form.newPassword }
@@ -315,9 +296,7 @@ function PasswordForm({ onUserUpdated, user }) {
       setStatus({ type: 'success', msg: 'Đã cập nhật mật khẩu thành công' })
     } catch (err) {
       setStatus({ type: 'error', msg: err.message || 'Không thể cập nhật mật khẩu' })
-    } finally {
-      setIsSaving(false)
-    }
+    } finally { setIsSaving(false) }
   }
 
   return (
@@ -325,10 +304,8 @@ function PasswordForm({ onUserUpdated, user }) {
       {['currentPassword', 'newPassword', 'confirmPassword'].map((field) => (
         <div key={field} className="sd-field">
           <label>
-            {field === 'currentPassword'
-              ? 'Mật khẩu hiện tại'
-              : field === 'newPassword'
-              ? 'Mật khẩu mới'
+            {field === 'currentPassword' ? 'Mật khẩu hiện tại'
+              : field === 'newPassword' ? 'Mật khẩu mới'
               : 'Nhập lại mật khẩu mới'}
           </label>
           <input
@@ -340,9 +317,7 @@ function PasswordForm({ onUserUpdated, user }) {
           />
         </div>
       ))}
-      {status && (
-        <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>
-      )}
+      {status && <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>}
       <button className="sd-btn-primary" disabled={isSaving} type="submit">
         {isSaving ? 'Đang lưu…' : 'Cập nhật mật khẩu'}
       </button>

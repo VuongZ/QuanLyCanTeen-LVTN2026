@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react'
 import { updateUser, GetALLBranh } from '../api/UserApi'
 import axios from 'axios'
-
-// Gọi CSS file vào đây
-import './admindashboard.css'
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
+import './css/admindashboard.css'
 
 function getInitials(name = '') {
   return name.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()
@@ -21,23 +17,27 @@ const EMPTY_FORM = {
   branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '',
 }
 
-// ─── Main Component (Giao diện Mobile - 3 Tabs) ──────────────────────────────
+const ROLE_COLORS = {
+  ADMIN:   { bg: '#fef3c7', color: '#92400e' },
+  MANAGER: { bg: '#dbeafe', color: '#1e40af' },
+  STAFF:   { bg: '#dcfce7', color: '#166534' },
+}
 
 export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: initUsers }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [users, setUsers] = useState(initUsers)
   const [branches, setBranches] = useState([])
 
-  // Modal state
   const [modal, setModal] = useState(null)
   const [modalUser, setModalUser] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formErr, setFormErr] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Search/Filter
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState('ALL')
+  const [sortCol, setSortCol] = useState('fullName')
+  const [sortDir, setSortDir] = useState('asc')
 
   useEffect(() => {
     GetALLBranh()
@@ -47,15 +47,29 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 
   const branch = branches.find((b) => b.id === user.branchId)
 
-  // Filter users
-  const displayed = users.filter((u) => {
-    const matchSearch = [u.fullName, u.username, u.branchName].some((v) =>
-      v?.toLowerCase().includes(search.toLowerCase()))
-    const matchRole = filterRole === 'ALL' || u.roleName?.toUpperCase() === filterRole
-    return matchSearch && matchRole
-  })
+  const displayed = users
+    .filter((u) => {
+      const matchSearch = [u.fullName, u.username, u.branchName].some((v) =>
+        v?.toLowerCase().includes(search.toLowerCase()))
+      const matchRole = filterRole === 'ALL' || u.roleName?.toUpperCase() === filterRole
+      return matchSearch && matchRole
+    })
+    .sort((a, b) => {
+      const va = (a[sortCol] || '').toString().toLowerCase()
+      const vb = (b[sortCol] || '').toString().toLowerCase()
+      return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+    })
 
-  // Modal helpers
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  function SortIcon({ col }) {
+    if (sortCol !== col) return <span className="sd-sort-icon sd-sort-none">↕</span>
+    return <span className="sd-sort-icon">{sortDir === 'asc' ? '↑' : '↓'}</span>
+  }
+
   function openAdd() { setForm(EMPTY_FORM); setFormErr(''); setModal('add') }
   function openEdit(u) { setForm({ ...u }); setFormErr(''); setModalUser(u); setModal('edit') }
   function openDelete(u) { setModalUser(u); setFormErr(''); setModal('delete') }
@@ -116,20 +130,25 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 
   const countByRole = (r) => users.filter((u) => u.roleName?.toUpperCase() === r).length
 
-  // Header Info
   const getHeaderInfo = () => {
     switch (activeTab) {
-      case 'overview': return { eyebrow: 'Hệ thống', title: 'Tổng quan' };
-      case 'users': return { eyebrow: 'Quản lý', title: 'Nhân sự' };
-      case 'account': return { eyebrow: 'Cài đặt', title: 'Tài khoản' };
-      default: return { eyebrow: '', title: '' };
+      case 'overview': return { eyebrow: 'Hệ thống', title: 'Tổng quan' }
+      case 'users':    return { eyebrow: 'Quản lý', title: 'Nhân sự' }
+      case 'account':  return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
+      default:         return { eyebrow: '', title: '' }
     }
   }
-  const headerInfo = getHeaderInfo();
+  const headerInfo = getHeaderInfo()
+
+  const NAV_ITEMS = [
+    { id: 'overview', icon: '⬡', label: 'Tổng quan' },
+    { id: 'users',    icon: '◈', label: 'Nhân viên' },
+    { id: 'account',  icon: '◎', label: 'Tài khoản' },
+  ]
 
   return (
-    <div className="sd-root">
-      {/* Topbar chuẩn Mobile */}
+    <div className="sd-root sd-root--left-nav">
+      {/* Topbar */}
       <header className="sd-topbar">
         <div className="sd-brand">
           <span className="sd-brand-icon">CT</span>
@@ -140,166 +159,249 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
         </button>
       </header>
 
-      {/* Nội dung chính */}
-      <main className="sd-main">
-        <div className="sd-page-header">
-          <div>
-            <p className="sd-eyebrow">{headerInfo.eyebrow}</p>
-            <h1>{headerInfo.title}</h1>
-          </div>
-          <div className="sd-branch-badge">
-             Quyền Quản Trị
-          </div>
-        </div>
-
-        <div className="sd-content">
-          {/* ── OVERVIEW TAB ── */}
-          {activeTab === 'overview' && (
-            <div className="sd-profile-layout">
-              <div className="sd-stat-grid">
-                <div className="sd-stat-card">
-                  <span className="sd-stat-icon">◈</span>
-                  <h3>{users.length}</h3>
-                  <p>Tổng nhân viên</p>
-                </div>
-                <div className="sd-stat-card">
-                  <span className="sd-stat-icon">⊞</span>
-                  <h3>{branches.length}</h3>
-                  <p>Chi nhánh</p>
-                </div>
-              </div>
-
-              <div className="sd-card">
-                <div className="sd-card-header">
-                  <p className="sd-eyebrow">Thống kê</p>
-                  <h2>Phân bổ chức vụ</h2>
-                </div>
-                {roles.filter((r) => r.roleName !== 'ADMIN').map((r) => {
-                  const cnt = countByRole(r.roleName)
-                  const pct = users.length ? Math.round((cnt / users.length) * 100) : 0
-                  return (
-                    <div key={r.id} className="sd-role-bar">
-                      <div className="sd-role-bar-head">
-                        <strong>{r.roleName}</strong>
-                        <span>{cnt} người · {pct}%</span>
-                      </div>
-                      <div className="sd-bar-track">
-                        <div className="sd-bar-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+      <div className="sd-layout">
+        {/* LEFT SIDE NAV */}
+        <nav className="sd-left-nav">
+          <div className="sd-left-nav-user">
+            <div className="sd-info-avatar sd-avatar-sm">
+              {getInitials(user.fullName || user.username)}
             </div>
-          )}
-
-          {/* ── USERS TAB ── */}
-          {activeTab === 'users' && (
-            <div className="sd-profile-layout">
-              <button className="sd-btn-primary" onClick={openAdd} style={{ marginBottom: '8px' }}>
-                + Thêm nhân viên mới
+            <span className="sd-left-nav-name">{user.fullName || user.username}</span>
+          </div>
+          <div className="sd-left-nav-items">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                className={`sd-left-nav-item ${activeTab === item.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(item.id)}
+                type="button"
+              >
+                <span className="sd-nav-icon">{item.icon}</span>
+                <span className="sd-nav-label">{item.label}</span>
               </button>
+            ))}
+          </div>
+          <button className="sd-left-nav-logout" onClick={onLogout}>↩ Đăng xuất</button>
+        </nav>
 
-              <div className="sd-card">
-                <input
-                  className="sd-input-search"
-                  placeholder=" Tìm tên, username..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <div className="sd-filter-scroll">
-                  {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
-                    <button
-                      key={r}
-                      className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`}
-                      onClick={() => setFilterRole(r)}
-                    >
-                      {r === 'ALL' ? 'Tất cả' : r}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="sd-user-list">
-                  {displayed.length === 0 && (
-                    <p className="sd-empty-state">Không tìm thấy nhân sự phù hợp.</p>
-                  )}
-                  {displayed.map((u) => (
-                    <div key={u.id} className="sd-user-item">
-                      <div className="sd-info-avatar sd-avatar-sm">
-                        {getInitials(u.fullName || u.username)}
-                      </div>
-                      <div className="sd-user-details">
-                        <strong>{u.fullName || u.username}</strong>
-                        <small>@{u.username} • {u.roleName}</small>
-                        <small>{u.branchName || 'Chưa gán CN'}</small>
-                      </div>
-                      <div className="sd-user-actions">
-                        <button onClick={() => openEdit(u)}>✎</button>
-                        {u.id !== user.id && (
-                          <button className="delete" onClick={() => openDelete(u)}>✕</button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+        {/* Main content */}
+        <main className="sd-main">
+          <div className="sd-page-header">
+            <div>
+              <p className="sd-eyebrow">{headerInfo.eyebrow}</p>
+              <h1>{headerInfo.title}</h1>
             </div>
-          )}
+            <div className="sd-branch-badge">Quyền Quản Trị</div>
+          </div>
 
-          {/* ── ACCOUNT TAB ── */}
-          {activeTab === 'account' && (
-            <div className="sd-profile-layout">
-              <div className="sd-card">
-                <div className="sd-card-header">
-                  <p className="sd-eyebrow">Chi tiết</p>
-                  <h2>Hồ sơ Admin</h2>
-                </div>
-                <div className="sd-info-hero">
-                  <div className="sd-info-avatar">{getInitials(user.fullName || user.username)}</div>
-                  <div>
-                    <h3>{user.fullName || user.username}</h3>
-                    <span className="sd-role-badge">{user.roleName}</span>
+          <div className="sd-content">
+
+            {/* ── OVERVIEW ── */}
+            {activeTab === 'overview' && (
+              <div className="sd-profile-layout">
+                <div className="sd-stat-grid">
+                  <div className="sd-stat-card">
+                    <span className="sd-stat-icon">◈</span>
+                    <h3>{users.length}</h3>
+                    <p>Tổng nhân viên</p>
+                  </div>
+                  <div className="sd-stat-card">
+                    <span className="sd-stat-icon">⊞</span>
+                    <h3>{branches.length}</h3>
+                    <p>Chi nhánh</p>
                   </div>
                 </div>
-                <dl className="sd-dl">
-                  <InfoRow label="Tên đăng nhập" value={user.username} />
-                  <InfoRow label="Chi nhánh" value={branch?.name || user.branchName || 'Chưa có'} />
-                  <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
-                </dl>
-              </div>
-
-              <div className="sd-card">
-                <div className="sd-card-header">
-                  <p className="sd-eyebrow">Bảo mật</p>
-                  <h2>Đổi mật khẩu</h2>
+                <div className="sd-card">
+                  <div className="sd-card-header">
+                    <p className="sd-eyebrow">Thống kê</p>
+                    <h2>Phân bổ chức vụ</h2>
+                  </div>
+                  {roles.filter((r) => r.roleName !== 'ADMIN').map((r) => {
+                    const cnt = countByRole(r.roleName)
+                    const pct = users.length ? Math.round((cnt / users.length) * 100) : 0
+                    return (
+                      <div key={r.id} className="sd-role-bar">
+                        <div className="sd-role-bar-head">
+                          <strong>{r.roleName}</strong>
+                          <span>{cnt} người · {pct}%</span>
+                        </div>
+                        <div className="sd-bar-track">
+                          <div className="sd-bar-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <PasswordForm onUserUpdated={onUserUpdated} user={user} />
               </div>
-            </div>
-          )}
-        </div>
-      </main>
+            )}
 
-      {/* Thanh Điều Hướng Dưới Đáy */}
-      <nav className="sd-bottom-nav">
-        {[
-          { id: 'overview', icon: '⬡', label: 'Tổng quan' },
-          { id: 'users', icon: '◈', label: 'Nhân viên' },
-          { id: 'account', icon: '◎', label: 'Tài khoản' },
-        ].map((item) => (
-          <button
-            key={item.id}
-            className={`sd-nav-item ${activeTab === item.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(item.id)}
-            type="button"
-          >
-            <span className="sd-nav-icon">{item.icon}</span>
-            <span className="sd-nav-label">{item.label}</span>
-          </button>
-        ))}
-      </nav>
+            {/* ── USERS — Full-width table ── */}
+            {activeTab === 'users' && (
+              <div className="sd-users-page">
+                {/* Toolbar */}
+                <div className="sd-users-toolbar">
+                  <div className="sd-users-toolbar-left">
+                    <div className="sd-search-wrap">
+                      <span className="sd-search-icon">⌕</span>
+                      <input
+                        className="sd-input-search"
+                        placeholder="Tìm tên, username, chi nhánh..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                      {search && (
+                        <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>
+                      )}
+                    </div>
+                    <div className="sd-filter-chips">
+                      {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
+                        <button
+                          key={r}
+                          className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`}
+                          onClick={() => setFilterRole(r)}
+                        >
+                          {r === 'ALL' ? 'Tất cả' : r}
+                          {r !== 'ALL' && (
+                            <span className="sd-chip-count">{countByRole(r)}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="sd-users-toolbar-right">
+                    <span className="sd-result-count">{displayed.length} nhân viên</span>
+                    <button className="sd-btn-add" onClick={openAdd}>
+                      <span>＋</span> Thêm nhân viên
+                    </button>
+                  </div>
+                </div>
 
-      {/* ── MODALS (Thiết kế lại cho Mobile) ── */}
+                {/* Table */}
+                <div className="sd-table-wrap">
+                  <table className="sd-table">
+                    <thead>
+                      <tr>
+                        <th className="sd-th sd-th-avatar" style={{ width: 48 }}></th>
+                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('fullName')}>
+                          Họ và tên <SortIcon col="fullName" />
+                        </th>
+                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('username')}>
+                          Username <SortIcon col="username" />
+                        </th>
+                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('roleName')}>
+                          Chức vụ <SortIcon col="roleName" />
+                        </th>
+                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('branchName')}>
+                          Chi nhánh <SortIcon col="branchName" />
+                        </th>
+                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('hireDate')}>
+                          Ngày vào làm <SortIcon col="hireDate" />
+                        </th>
+                        <th className="sd-th sd-th-actions">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayed.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="sd-td-empty">
+                            <div className="sd-empty-state">
+                              <span className="sd-empty-icon">◈</span>
+                              <p>Không tìm thấy nhân sự phù hợp</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {displayed.map((u, idx) => {
+                        const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
+                        return (
+                          <tr key={u.id} className="sd-tr" style={{ animationDelay: `${idx * 30}ms` }}>
+                            <td className="sd-td sd-td-avatar">
+                              <div className="sd-info-avatar sd-avatar-sm">
+                                {getInitials(u.fullName || u.username)}
+                              </div>
+                            </td>
+                            <td className="sd-td">
+                              <span className="sd-td-name">{u.fullName || '—'}</span>
+                            </td>
+                            <td className="sd-td">
+                              <span className="sd-td-username">@{u.username}</span>
+                            </td>
+                            <td className="sd-td">
+                              <span
+                                className="sd-role-pill"
+                                style={{ background: roleColor.bg, color: roleColor.color }}
+                              >
+                                {u.roleName || '—'}
+                              </span>
+                            </td>
+                            <td className="sd-td">
+                              <span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span>
+                            </td>
+                            <td className="sd-td">
+                              <span className="sd-td-date">{formatDate(u.hireDate)}</span>
+                            </td>
+                            <td className="sd-td sd-td-actions">
+                              <button
+                                className="sd-action-btn sd-action-edit"
+                                onClick={() => openEdit(u)}
+                                title="Chỉnh sửa"
+                              >
+                                ✎
+                              </button>
+                              {u.id !== user.id && (
+                                <button
+                                  className="sd-action-btn sd-action-delete"
+                                  onClick={() => openDelete(u)}
+                                  title="Xoá"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── ACCOUNT ── */}
+            {activeTab === 'account' && (
+              <div className="sd-profile-layout">
+                <div className="sd-card">
+                  <div className="sd-card-header">
+                    <p className="sd-eyebrow">Chi tiết</p>
+                    <h2>Hồ sơ Admin</h2>
+                  </div>
+                  <div className="sd-info-hero">
+                    <div className="sd-info-avatar">{getInitials(user.fullName || user.username)}</div>
+                    <div>
+                      <h3>{user.fullName || user.username}</h3>
+                      <span className="sd-role-badge">{user.roleName}</span>
+                    </div>
+                  </div>
+                  <dl className="sd-dl">
+                    <InfoRow label="Tên đăng nhập" value={user.username} />
+                    <InfoRow label="Chi nhánh" value={branch?.name || user.branchName || 'Chưa có'} />
+                    <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
+                  </dl>
+                </div>
+                <div className="sd-card">
+                  <div className="sd-card-header">
+                    <p className="sd-eyebrow">Bảo mật</p>
+                    <h2>Đổi mật khẩu</h2>
+                  </div>
+                  <PasswordForm onUserUpdated={onUserUpdated} user={user} />
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* MODALS */}
       {(modal === 'add' || modal === 'edit') && (
         <div className="sd-overlay" onClick={closeModal}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
@@ -308,35 +410,37 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
               <button onClick={closeModal}>✕</button>
             </div>
             <div className="sd-modal-body">
-              <div className="sd-field">
-                <label>Họ và tên *</label>
-                <input name="fullName" value={form.fullName} onChange={handleFormChange} placeholder="Nguyễn Văn A" />
-              </div>
-              <div className="sd-field">
-                <label>Username *</label>
-                <input name="username" value={form.username} onChange={handleFormChange} placeholder="nguyenvana" />
-              </div>
-              <div className="sd-field">
-                <label>Password *</label>
-                <input type="password" name="password" value={form.password} onChange={handleFormChange} placeholder="••••••" />
-              </div>
-              <div className="sd-field">
-                <label>Ngày vào làm</label>
-                <input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} />
-              </div>
-              <div className="sd-field">
-                <label>Role</label>
-                <select name="roleId" value={form.roleId || ''} onChange={handleFormChange}>
-                  <option value="">-- Chọn role --</option>
-                  {roles.map((r) => <option key={r.id} value={r.id}>{r.roleName}</option>)}
-                </select>
-              </div>
-              <div className="sd-field">
-                <label>Chi nhánh</label>
-                <select name="branchId" value={form.branchId || ''} onChange={handleFormChange}>
-                  <option value="">-- Chọn chi nhánh --</option>
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name || b.branchName}</option>)}
-                </select>
+              <div className="sd-modal-grid">
+                <div className="sd-field">
+                  <label>Họ và tên *</label>
+                  <input name="fullName" value={form.fullName} onChange={handleFormChange} placeholder="Nguyễn Văn A" />
+                </div>
+                <div className="sd-field">
+                  <label>Username *</label>
+                  <input name="username" value={form.username} onChange={handleFormChange} placeholder="nguyenvana" />
+                </div>
+                <div className="sd-field">
+                  <label>Password *</label>
+                  <input type="password" name="password" value={form.password} onChange={handleFormChange} placeholder="••••••" />
+                </div>
+                <div className="sd-field">
+                  <label>Ngày vào làm</label>
+                  <input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} />
+                </div>
+                <div className="sd-field">
+                  <label>Role</label>
+                  <select name="roleId" value={form.roleId || ''} onChange={handleFormChange}>
+                    <option value="">-- Chọn role --</option>
+                    {roles.map((r) => <option key={r.id} value={r.id}>{r.roleName}</option>)}
+                  </select>
+                </div>
+                <div className="sd-field">
+                  <label>Chi nhánh</label>
+                  <select name="branchId" value={form.branchId || ''} onChange={handleFormChange}>
+                    <option value="">-- Chọn chi nhánh --</option>
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name || b.branchName}</option>)}
+                  </select>
+                </div>
               </div>
               {formErr && <p className="sd-status sd-status-error">{formErr}</p>}
             </div>
@@ -358,14 +462,20 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
               <button onClick={closeModal}>✕</button>
             </div>
             <div className="sd-modal-body">
-              <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
-                Bạn có chắc muốn xoá nhân viên <strong>{modalUser?.fullName}</strong>? Hành động này không thể hoàn tác.
+              <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
+                Bạn có chắc muốn xoá nhân viên <strong>{modalUser?.fullName}</strong>?
+                Hành động này không thể hoàn tác.
               </p>
               {formErr && <p className="sd-status sd-status-error">{formErr}</p>}
             </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={closeModal}>Huỷ</button>
-              <button className="sd-btn-primary" style={{ background: '#ef4444' }} disabled={saving} onClick={handleDelete}>
+              <button
+                className="sd-btn-primary"
+                style={{ background: '#ef4444' }}
+                disabled={saving}
+                onClick={handleDelete}
+              >
                 {saving ? 'Đang xoá...' : 'Xoá ngay'}
               </button>
             </div>
@@ -398,7 +508,6 @@ function PasswordForm({ onUserUpdated, user }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setStatus(null)
-
     if (form.currentPassword !== user.password) {
       setStatus({ type: 'error', msg: 'Mật khẩu hiện tại không đúng' }); return
     }
@@ -408,7 +517,6 @@ function PasswordForm({ onUserUpdated, user }) {
     if (form.newPassword !== form.confirmPassword) {
       setStatus({ type: 'error', msg: 'Nhập lại mật khẩu chưa khớp' }); return
     }
-
     try {
       setIsSaving(true)
       const updatedUser = { ...user, password: form.newPassword }
@@ -426,7 +534,9 @@ function PasswordForm({ onUserUpdated, user }) {
       {['currentPassword', 'newPassword', 'confirmPassword'].map((field) => (
         <div key={field} className="sd-field">
           <label>
-            {field === 'currentPassword' ? 'Mật khẩu hiện tại' : field === 'newPassword' ? 'Mật khẩu mới' : 'Nhập lại mật khẩu'}
+            {field === 'currentPassword' ? 'Mật khẩu hiện tại'
+              : field === 'newPassword' ? 'Mật khẩu mới'
+              : 'Nhập lại mật khẩu'}
           </label>
           <input name={field} onChange={handleChange} type="password" value={form[field]} />
         </div>

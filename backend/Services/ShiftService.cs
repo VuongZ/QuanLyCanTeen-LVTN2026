@@ -5,22 +5,17 @@ using LuanVanTotNghiep.Models.Entities;
 namespace LuanVanTotNghiep.Services;
 public class ShiftService
 {
-    private readonly ShiftRepo? _repo;
+    private readonly ShiftRepo _repo;
 
     // 1. Thêm dòng khai báo thủ kho Cấu hình vào đây:
     private readonly BranchShiftConfigRepo _configRepo; 
 
     // 2. Chèn configRepo vào Constructor:
-    public ShiftService(ShiftRepo repo, BranchShiftConfigRepo configRepo)
+    public  ShiftService(ShiftRepo repo, BranchShiftConfigRepo configRepo)
     {
         _repo = repo;
         _configRepo = configRepo;
     }
-    public ShiftService(ShiftRepo repo)
-    {
-        _repo=repo;
-    }
-
     public async Task<IEnumerable<ShiftDto>> GetAllShiftsAsync()
     {
         var shifts = await _repo.GetAll();
