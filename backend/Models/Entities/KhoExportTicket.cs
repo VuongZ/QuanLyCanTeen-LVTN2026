@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace LuanVanTotNghiep.backend.Models.Entities;
+namespace LuanVanTotNghiep.Models.Entities;
 
 public partial class KhoExportTicket
 {

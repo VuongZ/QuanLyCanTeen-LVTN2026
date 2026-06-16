@@ -34,7 +34,7 @@ public class SchedulePeriodService
         {
             Id = p.Id,
             BranchId = p.BranchId,
-            BranchName = p?.Branch?.Name,
+           // BranchName = p?.Branch?.Name,
             StartDate = p.StartDate,
             EndDate = p.EndDate,
             Status = p?.Status
