@@ -1,5 +1,5 @@
-using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.DTOs;
+using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.Repositories;
 
 namespace LuanVanTotNghiep.Services;
@@ -19,38 +19,43 @@ public class BranchShiftConfigService
         return configs.Select(c => new BranchShiftConfigDto
         {
             Id = c.Id,
-            BranchId = c.BranchId,
             ShiftId = c.ShiftId,
+            DayOfWeek = c.DayOfWeek,
             MaxStaff = c.MaxStaff,
-            BranchName = c.Branch?.Name, 
             ShiftName = c.Shift?.ShiftName
         }).ToList();
     }
 
-    // Hàm này sẽ được React gọi khi admin bấm nút "Lưu cấu hình" trên ma trận
-    public async Task BulkSaveConfigsAsync(List<CaBranchShiftConfig> incomingConfigs)
+    public async Task AddAsync(SaveShiftConfigDto dto)
     {
-        foreach (var config in incomingConfigs)
+        var newConfig = new CaBranchShiftConfig
         {
-            // Vì dữ liệu đã được tự động khởi tạo bằng 0 lúc tạo Ca, nên giờ ta chỉ cần CẬP NHẬT
-            await _repo.Update(config);
-        }
+            ShiftId = dto.ShiftId,
+            DayOfWeek = dto.DayOfWeek,
+            MaxStaff = dto.MaxStaff
+        };
+        await _repo.Add(newConfig);
     }
 
-    public async Task AddAsync(CaBranchShiftConfig config)
+    public async Task UpdateAsync(int id, SaveShiftConfigDto dto)
     {
-        await _repo.Add(config);
-    }
+        var existing = await _repo.GetbyId(id);
+        if (existing == null) throw new KeyNotFoundException("Không tìm thấy cấu hình");
 
-    public async Task UpdateAsync(CaBranchShiftConfig config)
-    {
-        await _repo.Update(config);
+        existing.ShiftId = dto.ShiftId;
+        existing.DayOfWeek = dto.DayOfWeek;
+        existing.MaxStaff = dto.MaxStaff;
+
+        await _repo.Update(existing);
     }
 
     public async Task DeleteAsync(int id)
     {
+        // Kiểm tra xem cấu hình có tồn tại không trước khi xóa
+        var existing = await _repo.GetbyId(id);
+        if (existing == null) 
+            throw new KeyNotFoundException("Không tìm thấy cấu hình để xóa.");
+
         await _repo.Delete(id);
     }
-
-    
 }

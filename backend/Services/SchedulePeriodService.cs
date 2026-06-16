@@ -41,16 +41,40 @@ public class SchedulePeriodService
         }).ToList();
     }
 
-    public async Task AddAsync(CaSchedulePeriod period)
+  public async Task AddAsync(CreatePeriodDto dto)
     {
-        // Mặc định tạo đợt mới thì trạng thái là OPEN
-        period.Status = "OPEN"; 
+        if (dto.EndDate < dto.StartDate) 
+            throw new ArgumentException("Ngày kết thúc không hợp lệ.");
+
+        // Chuyển DTO thành Entity
+        var period = new CaSchedulePeriod
+        {
+            BranchId = dto.BranchId,
+            StartDate = dto.StartDate,
+            EndDate = dto.EndDate,
+            Status = "OPEN", // Ép cứng mặc định là OPEN an toàn
+            CreatedAt = DateTime.Now
+        };
+
         await _repo.Add(period);
     }
 
-    public async Task UpdateAsync(CaSchedulePeriod period)
+  public async Task UpdateAsync(int id, UpdatePeriodDto dto)
     {
-        await _repo.Update(period);
+        if (dto.EndDate < dto.StartDate) 
+            throw new ArgumentException("Ngày kết thúc không hợp lệ.");
+
+        // 1. Phải tìm đợt đăng ký cũ dưới DB lên trước
+        var existingPeriod = await _repo.GetbyId(id);
+        if (existingPeriod == null) 
+            throw new KeyNotFoundException("Không tìm thấy đợt đăng ký.");
+
+        // 2. Chỉ cập nhật những trường được phép
+        existingPeriod.StartDate = dto.StartDate;
+        existingPeriod.EndDate = dto.EndDate;
+        existingPeriod.Status = dto.Status;
+
+        await _repo.Update(existingPeriod);
     }
 
     public async Task DeleteAsync(int id)

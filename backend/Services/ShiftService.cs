@@ -64,7 +64,7 @@ public class ShiftService
         {
             var config = new CaBranchShiftConfig
             {
-                BranchId = shift.BranchId ?? 0, // Lấy ID chi nhánh của ca đó
+               // BranchId = shift.BranchId ?? 0
                 ShiftId = shift.Id,        // Lấy ID ca làm vừa mới được tạo ra
                 DayOfWeek = day,
                 MaxStaff = 0               // Mặc định bằng 0 theo đúng ý bạn

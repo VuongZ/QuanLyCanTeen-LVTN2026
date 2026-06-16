@@ -1,4 +1,4 @@
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,35 +6,65 @@ namespace LuanVanTotNghiep.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-// Đã đổi tên Class và Inject đúng BranchShiftConfigService
-public class BranchShiftConfigController(BranchShiftConfigService service) : ControllerBase
+public class BranchShiftConfigController : ControllerBase
 {
+    private readonly BranchShiftConfigService _service;
+
+    public BranchShiftConfigController(BranchShiftConfigService service)
+    {
+        _service = service;
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var configs = await service.GetAllAsync();
+        var configs = await _service.GetAllAsync();
         return Ok(configs);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CaBranchShiftConfig config)
+    public async Task<IActionResult> Create([FromBody] SaveShiftConfigDto dto)
     {
-        await service.AddAsync(config);
-        return Ok(new { message = "Đã tạo cấu hình định mức ca thành công!" });
+        try
+        {
+            await _service.AddAsync(dto);
+            return Ok(new { message = "Đã tạo cấu hình ca thành công!" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] CaBranchShiftConfig config)
+    public async Task<IActionResult> Update(int id, [FromBody] SaveShiftConfigDto dto)
     {
-        if (id != config.Id) return BadRequest(new { message = "ID không khớp!" });
-        await service.UpdateAsync(config);
-        return Ok(new { message = "Cập nhật cấu hình thành công!" });
+        try
+        {
+            await _service.UpdateAsync(id, dto);
+            return Ok(new { message = "Cập nhật cấu hình thành công!" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        await service.DeleteAsync(id);
-        return Ok(new { message = "Xóa cấu hình thành công!" });
+        try
+        {
+            await _service.DeleteAsync(id);
+            return Ok(new { message = "Xóa cấu hình thành công!" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "Lỗi khi xóa: " + ex.Message });
+        }
     }
 }

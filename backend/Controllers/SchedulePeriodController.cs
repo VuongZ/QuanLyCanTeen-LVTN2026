@@ -1,5 +1,6 @@
 using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.Services;
+using LuanVanTotNghiep.DTOs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LuanVanTotNghiep.Controllers;
@@ -23,19 +24,32 @@ public class SchedulePeriodController(SchedulePeriodService service) : Controlle
         return Ok(periods);
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CaSchedulePeriod period)
+  [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreatePeriodDto dto)
     {
-        await service.AddAsync(period);
-        return Ok(new { message = "Đã tạo đợt đăng ký mới!" });
+        try
+        {
+            await service.AddAsync(dto);
+            return Ok(new { message = "Đã tạo đợt đăng ký mới!" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] CaSchedulePeriod period)
+   [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdatePeriodDto dto)
     {
-        if (id != period.Id) return BadRequest(new { message = "ID không khớp!" });
-        await service.UpdateAsync(period);
-        return Ok(new { message = "Cập nhật thành công!" });
+        try
+        {
+            await service.UpdateAsync(id, dto);
+            return Ok(new { message = "Cập nhật thành công!" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id}")]
