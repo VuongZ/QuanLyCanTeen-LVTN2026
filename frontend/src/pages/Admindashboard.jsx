@@ -38,6 +38,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const [filterRole, setFilterRole] = useState('ALL')
   const [sortCol, setSortCol] = useState('fullName')
   const [sortDir, setSortDir] = useState('asc')
+  
+  // Biến điều khiển ẩn/hiện menu trượt trên điện thoại
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // 👉 STATE MỚI: Dùng để lưu trữ nhân viên đang được click xem chi tiết
+  const [selectedUser, setSelectedUser] = useState(null)
 
   useEffect(() => {
     GetALLBranh()
@@ -70,9 +76,11 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     return <span className="sd-sort-icon">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
+  // Các hàm điều khiển trạng thái Hộp thoại (Modal)
   function openAdd() { setForm(EMPTY_FORM); setFormErr(''); setModal('add') }
   function openEdit(u) { setForm({ ...u }); setFormErr(''); setModalUser(u); setModal('edit') }
   function openDelete(u) { setModalUser(u); setFormErr(''); setModal('delete') }
+  // (Đã xóa openView vì mình dùng Trang Chi Tiết riêng, không dùng Modal nữa)
   function closeModal() { setModal(null); setModalUser(null) }
 
   function handleFormChange(e) {
@@ -112,6 +120,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     try {
       await updateUser(form.id, form)
       setUsers((prev) => prev.map((u) => (u.id === form.id ? { ...u, ...form } : u)))
+      
+      // 👉 Nếu sửa thành công, và người đang xem chi tiết chính là người vừa sửa, thì update trang chi tiết luôn
+      if (selectedUser && selectedUser.id === form.id) {
+        setSelectedUser({ ...selectedUser, ...form })
+      }
+
       if (form.id === user.id) onUserUpdated({ ...user, ...form })
       closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể cập nhật') }
@@ -123,6 +137,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     try {
       await axios.delete(`/api/User/${modalUser.id}`)
       setUsers((prev) => prev.filter((u) => u.id !== modalUser.id))
+      
+      // 👉 Nếu xóa thành công, tự động quay trở về danh sách
+      if (selectedUser && selectedUser.id === modalUser.id) {
+        setSelectedUser(null)
+      }
+
       closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể xóa') }
     finally { setSaving(false) }
@@ -133,7 +153,8 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const getHeaderInfo = () => {
     switch (activeTab) {
       case 'overview': return { eyebrow: 'Hệ thống', title: 'Tổng quan' }
-      case 'users':    return { eyebrow: 'Quản lý', title: 'Nhân sự' }
+      // 👉 Nếu đang xem chi tiết thì đổi title
+      case 'users':    return { eyebrow: 'Quản lý', title: selectedUser ? 'Hồ sơ nhân viên' : 'Nhân sự' }
       case 'account':  return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
       default:         return { eyebrow: '', title: '' }
     }
@@ -147,10 +168,13 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   ]
 
   return (
+    /* CONTAINER GỐC: Bao bọc toàn bộ trang web từ đầu đến chân */
     <div className="sd-root sd-root--left-nav">
-      {/* Topbar */}
+      
+      {/* THANH TOPBAR: Thanh ngang trên cùng chứa Logo và Nút Đăng xuất */}
       <header className="sd-topbar">
         <div className="sd-brand">
+          <button className="sd-hamburger" onClick={() => setIsMenuOpen(true)}>☰</button>
           <span className="sd-brand-icon">CT</span>
           <span className="sd-brand-name">Canteen Admin</span>
         </div>
@@ -159,21 +183,31 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
         </button>
       </header>
 
+      {/* KHUNG LAYOUT CHÍNH: Chia trang web làm 2 phần (Trái: Menu, Phải: Nội dung) */}
       <div className="sd-layout">
-        {/* LEFT SIDE NAV */}
-        <nav className="sd-left-nav">
+        
+        {/* LỚP PHỦ ĐEN MỜ: Chỉ hiện trên Mobile để làm mờ nền khi bật Menu trượt */}
+        {isMenuOpen && <div className="sd-menu-overlay" onClick={() => setIsMenuOpen(false)}></div>}
+
+        {/* THANH MENU TRÁI (LEFT NAV) */}
+        <nav className={`sd-left-nav ${isMenuOpen ? 'open' : ''}`}>
           <div className="sd-left-nav-user">
             <div className="sd-info-avatar sd-avatar-sm">
               {getInitials(user.fullName || user.username)}
             </div>
             <span className="sd-left-nav-name">{user.fullName || user.username}</span>
           </div>
+          
           <div className="sd-left-nav-items">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
                 className={`sd-left-nav-item ${activeTab === item.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => { 
+                  setActiveTab(item.id); 
+                  setSelectedUser(null); // 👉 Khi đổi Tab, reset lại Trang chi tiết về Bảng danh sách
+                  setIsMenuOpen(false);
+                }}
                 type="button"
               >
                 <span className="sd-nav-icon">{item.icon}</span>
@@ -184,8 +218,9 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
           <button className="sd-left-nav-logout" onClick={onLogout}>↩ Đăng xuất</button>
         </nav>
 
-        {/* Main content */}
+        {/* CỘT NỘI DUNG CHÍNH (MAIN CONTENT) */}
         <main className="sd-main">
+          
           <div className="sd-page-header">
             <div>
               <p className="sd-eyebrow">{headerInfo.eyebrow}</p>
@@ -196,7 +231,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 
           <div className="sd-content">
 
-            {/* ── OVERVIEW ── */}
+            {/* ── NỘI DUNG TAB TỔNG QUAN ── */}
             {activeTab === 'overview' && (
               <div className="sd-profile-layout">
                 <div className="sd-stat-grid">
@@ -211,6 +246,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                     <p>Chi nhánh</p>
                   </div>
                 </div>
+                
                 <div className="sd-card">
                   <div className="sd-card-header">
                     <p className="sd-eyebrow">Thống kê</p>
@@ -235,139 +271,161 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
               </div>
             )}
 
-            {/* ── USERS — Full-width table ── */}
+            {/* ── NỘI DUNG TAB NHÂN VIÊN ── */}
             {activeTab === 'users' && (
-              <div className="sd-users-page">
-                {/* Toolbar */}
-                <div className="sd-users-toolbar">
-                  <div className="sd-users-toolbar-left">
-                    <div className="sd-search-wrap">
-                      <span className="sd-search-icon">⌕</span>
-                      <input
-                        className="sd-input-search"
-                        placeholder="Tìm tên, username, chi nhánh..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                      {search && (
-                        <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>
-                      )}
-                    </div>
-                    <div className="sd-filter-chips">
-                      {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
-                        <button
-                          key={r}
-                          className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`}
-                          onClick={() => setFilterRole(r)}
-                        >
-                          {r === 'ALL' ? 'Tất cả' : r}
-                          {r !== 'ALL' && (
-                            <span className="sd-chip-count">{countByRole(r)}</span>
+              <>
+                {/* 👉 RẼ NHÁNH: NẾU CHƯA CHỌN AI (!selectedUser) -> HIỆN BẢNG DANH SÁCH */}
+                {!selectedUser ? (
+                  <div className="sd-users-page">
+                    <div className="sd-users-toolbar">
+                      <div className="sd-users-toolbar-left">
+                        <div className="sd-search-wrap">
+                          <span className="sd-search-icon">⌕</span>
+                          <input
+                            className="sd-input-search"
+                            placeholder="Tìm tên, username, chi nhánh..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                          {search && (
+                            <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>
                           )}
+                        </div>
+                        <div className="sd-filter-chips">
+                          {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
+                            <button
+                              key={r}
+                              className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`}
+                              onClick={() => setFilterRole(r)}
+                            >
+                              {r === 'ALL' ? 'Tất cả' : r}
+                              {r !== 'ALL' && (
+                                <span className="sd-chip-count">{countByRole(r)}</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="sd-users-toolbar-right">
+                        <span className="sd-result-count">{displayed.length} nhân viên</span>
+                        <button className="sd-btn-add" onClick={openAdd}>
+                          <span>＋</span> Thêm nhân viên
                         </button>
-                      ))}
+                      </div>
+                    </div>
+
+                    <div className="sd-table-wrap">
+                      <table className="sd-table">
+                        <thead>
+                          <tr>
+                            <th className="sd-th sd-th-avatar" style={{ width: 48 }}></th>
+                            <th className="sd-th sd-th-sortable" onClick={() => toggleSort('fullName')}>Họ và tên <SortIcon col="fullName" /></th>
+                            <th className="sd-th sd-th-sortable" onClick={() => toggleSort('username')}>Username <SortIcon col="username" /></th>
+                            <th className="sd-th sd-th-sortable" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon col="roleName" /></th>
+                            <th className="sd-th sd-th-sortable" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon col="branchName" /></th>
+                            <th className="sd-th sd-th-sortable" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon col="hireDate" /></th>
+                            {/* 👉 Đã xóa tiêu đề cột Thao tác */}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayed.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="sd-td-empty">
+                                <div className="sd-empty-state">
+                                  <span className="sd-empty-icon">◈</span>
+                                  <p>Không tìm thấy nhân sự phù hợp</p>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          
+                          {displayed.map((u, idx) => {
+                            const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
+                            return (
+                              /* 👉 Bấm vào bất kỳ đâu trên Hàng (Row) này sẽ chuyển sang Trang Chi Tiết */
+                              <tr 
+                                key={u.id} 
+                                className="sd-tr" 
+                                style={{ animationDelay: `${idx * 30}ms`, cursor: 'pointer' }}
+                                onClick={() => setSelectedUser(u)}
+                              >
+                                <td className="sd-td sd-td-avatar">
+                                  <div className="sd-info-avatar sd-avatar-sm">{getInitials(u.fullName || u.username)}</div>
+                                </td>
+                                <td className="sd-td"><span className="sd-td-name">{u.fullName || '—'}</span></td>
+                                <td className="sd-td"><span className="sd-td-username">@{u.username}</span></td>
+                                <td className="sd-td">
+                                  <span className="sd-role-pill" style={{ background: roleColor.bg, color: roleColor.color }}>
+                                    {u.roleName || '—'}
+                                  </span>
+                                </td>
+                                <td className="sd-td"><span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span></td>
+                                <td className="sd-td"><span className="sd-td-date">{formatDate(u.hireDate)}</span></td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                  <div className="sd-users-toolbar-right">
-                    <span className="sd-result-count">{displayed.length} nhân viên</span>
-                    <button className="sd-btn-add" onClick={openAdd}>
-                      <span>＋</span> Thêm nhân viên
+                ) : (
+                  
+                  /* 👉 RẼ NHÁNH: NẾU ĐÃ CHỌN NGƯỜI (selectedUser có dữ liệu) -> HIỆN TRANG CHI TIẾT RIÊNG */
+                  <div className="sd-user-detail-page" style={{ animation: 'slideUp 0.2s ease-out' }}>
+                    {/* Nút Quay Lại để gán biến selectedUser = null (về lại bảng danh sách) */}
+                    <button className="sd-btn-back" onClick={() => setSelectedUser(null)}>
+                      ← Quay lại danh sách
                     </button>
-                  </div>
-                </div>
 
-                {/* Table */}
-                <div className="sd-table-wrap">
-                  <table className="sd-table">
-                    <thead>
-                      <tr>
-                        <th className="sd-th sd-th-avatar" style={{ width: 48 }}></th>
-                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('fullName')}>
-                          Họ và tên <SortIcon col="fullName" />
-                        </th>
-                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('username')}>
-                          Username <SortIcon col="username" />
-                        </th>
-                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('roleName')}>
-                          Chức vụ <SortIcon col="roleName" />
-                        </th>
-                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('branchName')}>
-                          Chi nhánh <SortIcon col="branchName" />
-                        </th>
-                        <th className="sd-th sd-th-sortable" onClick={() => toggleSort('hireDate')}>
-                          Ngày vào làm <SortIcon col="hireDate" />
-                        </th>
-                        <th className="sd-th sd-th-actions">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayed.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="sd-td-empty">
-                            <div className="sd-empty-state">
-                              <span className="sd-empty-icon">◈</span>
-                              <p>Không tìm thấy nhân sự phù hợp</p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      {displayed.map((u, idx) => {
-                        const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
-                        return (
-                          <tr key={u.id} className="sd-tr" style={{ animationDelay: `${idx * 30}ms` }}>
-                            <td className="sd-td sd-td-avatar">
-                              <div className="sd-info-avatar sd-avatar-sm">
-                                {getInitials(u.fullName || u.username)}
-                              </div>
-                            </td>
-                            <td className="sd-td">
-                              <span className="sd-td-name">{u.fullName || '—'}</span>
-                            </td>
-                            <td className="sd-td">
-                              <span className="sd-td-username">@{u.username}</span>
-                            </td>
-                            <td className="sd-td">
-                              <span
-                                className="sd-role-pill"
-                                style={{ background: roleColor.bg, color: roleColor.color }}
-                              >
-                                {u.roleName || '—'}
-                              </span>
-                            </td>
-                            <td className="sd-td">
-                              <span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span>
-                            </td>
-                            <td className="sd-td">
-                              <span className="sd-td-date">{formatDate(u.hireDate)}</span>
-                            </td>
-                            <td className="sd-td sd-td-actions">
-                              <button
-                                className="sd-action-btn sd-action-edit"
-                                onClick={() => openEdit(u)}
-                                title="Chỉnh sửa"
-                              >
-                                ✎
-                              </button>
-                              {u.id !== user.id && (
-                                <button
-                                  className="sd-action-btn sd-action-delete"
-                                  onClick={() => openDelete(u)}
-                                  title="Xoá"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    <div className="sd-profile-layout">
+                      <div className="sd-card">
+                        <div className="sd-info-hero">
+                          <div className="sd-info-avatar">{getInitials(selectedUser.fullName || selectedUser.username)}</div>
+                          <div>
+                            <h3>{selectedUser.fullName || selectedUser.username}</h3>
+                            <span className="sd-role-badge" style={{ 
+                                background: ROLE_COLORS[selectedUser.roleName?.toUpperCase()]?.bg || '#ea580c',
+                                color: ROLE_COLORS[selectedUser.roleName?.toUpperCase()]?.color || '#fff'
+                            }}>
+                              {selectedUser.roleName || '—'}
+                            </span>
+                          </div>
+                        </div>
+                        <dl className="sd-dl">
+                          <InfoRow label="Username" value={`@${selectedUser.username}`} />
+                          <InfoRow label="Chi nhánh" value={selectedUser.branchName || 'Chưa gán'} />
+                          <InfoRow label="Ngày vào làm" value={formatDate(selectedUser.hireDate)} />
+                        </dl>
+
+                        {/* 👉 CÁC NÚT THAO TÁC ĐƯỢC CHUYỂN VÀO BÊN TRONG TRANG NÀY */}
+                        <div className="sd-detail-actions">
+                          <button 
+                            className="sd-btn-ghost" 
+                            style={{ flex: 1, color: '#ea580c', borderColor: '#fed7aa' }}
+                            onClick={() => openEdit(selectedUser)}
+                          >
+                            ✎ Chỉnh sửa
+                          </button>
+                          
+                          {/* Ẩn nút xóa nếu người dùng đang bấm vào chính mình */}
+                          {selectedUser.id !== user.id && (
+                            <button 
+                              className="sd-btn-ghost" 
+                              style={{ flex: 1, color: '#ef4444', borderColor: '#fecaca' }}
+                              onClick={() => openDelete(selectedUser)}
+                            >
+                              ✕ Xóa nhân sự
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {/* ── ACCOUNT ── */}
+            {/* ── NỘI DUNG TAB TÀI KHOẢN (CỦA ADMIN) ── */}
             {activeTab === 'account' && (
               <div className="sd-profile-layout">
                 <div className="sd-card">
@@ -388,6 +446,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                     <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
                   </dl>
                 </div>
+                
                 <div className="sd-card">
                   <div className="sd-card-header">
                     <p className="sd-eyebrow">Bảo mật</p>
@@ -401,7 +460,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
         </main>
       </div>
 
-      {/* MODALS */}
+      {/* =========================================================================
+          KHU VỰC CHỨA CÁC MODAL (HỘP THOẠI NỔI TRÊN MÀN HÌNH)
+          Các hộp thoại này mặc định ẩn đi, chỉ hiện khi biến state 'modal' có giá trị
+          ========================================================================= */}
+
+      {/* 1. MODAL THÊM / SỬA NHÂN VIÊN */}
       {(modal === 'add' || modal === 'edit') && (
         <div className="sd-overlay" onClick={closeModal}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
@@ -454,6 +518,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
         </div>
       )}
 
+      {/* 2. MODAL XÁC NHẬN XÓA */}
       {modal === 'delete' && (
         <div className="sd-overlay" onClick={closeModal}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
@@ -482,6 +547,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
           </div>
         </div>
       )}
+
     </div>
   )
 }

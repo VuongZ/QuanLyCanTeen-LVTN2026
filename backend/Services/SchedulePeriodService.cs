@@ -43,20 +43,37 @@ public class SchedulePeriodService
 
   public async Task AddAsync(CreatePeriodDto dto)
     {
-        if (dto.EndDate < dto.StartDate) 
-            throw new ArgumentException("Ngày kết thúc không hợp lệ.");
+       if (dto.EndDate < dto.StartDate) 
+        throw new ArgumentException("Ngày kết thúc không thể nhỏ hơn ngày bắt đầu.");
 
-        // Chuyển DTO thành Entity
-        var period = new CaSchedulePeriod
-        {
-            BranchId = dto.BranchId,
-            StartDate = dto.StartDate,
-            EndDate = dto.EndDate,
-            Status = "OPEN", // Ép cứng mặc định là OPEN an toàn
-            CreatedAt = DateTime.Now
-        };
+    // 1. VŨ KHÍ MỚI: Chặn không cho tạo lịch ở quá khứ
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    if (dto.StartDate < today)
+        throw new ArgumentException("Không thể tạo đợt đăng ký lịch làm việc ở quá khứ.");
 
-        await _repo.Add(period);
+    // 2. RÀO THỨ HAI: Kiểm tra ngày bắt đầu phải là Thứ Hai
+    if (dto.StartDate.DayOfWeek != DayOfWeek.Monday)
+        throw new ArgumentException("Đợt đăng ký ca bắt buộc phải bắt đầu vào ngày Thứ Hai.");
+
+    // 3. RÀO CHỦ NHẬT: Kiểm tra ngày kết thúc phải là Chủ Nhật
+    if (dto.EndDate.DayOfWeek != DayOfWeek.Sunday)
+        throw new ArgumentException("Đợt đăng ký ca bắt buộc phải kết thúc vào ngày Chủ Nhật.");
+
+    // 4. KIỂM TRA TRÒN TUẦN: Đảm bảo đợt đăng ký kéo dài đúng 7 ngày
+    if (dto.EndDate.DayNumber - dto.StartDate.DayNumber != 6)
+        throw new ArgumentException("Một đợt đăng ký ca phải kéo dài trọn vẹn 7 ngày (từ Thứ Hai đến Chủ Nhật).");
+
+    // Chuyển DTO thành Entity và lưu vào DB
+    var period = new CaSchedulePeriod
+    {
+        BranchId = dto.BranchId,
+        StartDate = dto.StartDate,
+        EndDate = dto.EndDate,
+        Status = "OPEN", 
+        CreatedAt = DateTime.Now
+    };
+
+    await _repo.Add(period);
     }
 
   public async Task UpdateAsync(int id, UpdatePeriodDto dto)

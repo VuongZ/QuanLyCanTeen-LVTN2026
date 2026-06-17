@@ -32,6 +32,7 @@ builder.Services.AddScoped<SchedulePeriodRepo>();
 builder.Services.AddScoped<SchedulePeriodService>();
 builder.Services.AddScoped<BranchShiftConfigRepo>();
 builder.Services.AddScoped<BranchShiftConfigService>();
+builder.Services.AddScoped<StaffRegistrationService>();
 
 var app = builder.Build();
 
