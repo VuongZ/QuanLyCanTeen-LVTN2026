@@ -74,4 +74,19 @@ public class StaffRegistrationController : ControllerBase
         var schedule = await _service.GetMyScheduleAsync(userId, periodId);
         return Ok(schedule);
     }
+
+    // Nhân viên hủy ca
+    [HttpDelete("{id}/user/{userId}")]
+    public async Task<IActionResult> CancelRegistration(int id, int userId)
+    {
+        try
+        {
+            await _service.CancelRegistrationAsync(id, userId);
+            return Ok(new { message = "Hủy ca thành công." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

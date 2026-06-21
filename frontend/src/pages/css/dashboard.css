@@ -1,6 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
 
-/* ── BASE ── */
+/* =========================================
+   1. BASE STYLES & LAYOUT
+   ========================================= */
+* {
+  box-sizing: border-box;
+}
+
 .sd-root {
   display: flex;
   flex-direction: column;
@@ -8,10 +14,10 @@
   font-family: 'Be Vietnam Pro', sans-serif;
   background: #f0f2f5;
   color: #1a1a2e;
-  padding-bottom: 70px; /* Chừa chỗ cho Bottom Nav */
+  padding-bottom: 70px; /* Chừa chỗ cho Bottom Nav nếu dùng */
 }
 
-/* Root override cho layout left nav */
+/* Root override cho layout có menu trái */
 .sd-root--left-nav {
   display: flex;
   flex-direction: column;
@@ -20,19 +26,97 @@
   padding-bottom: 0;
 }
 
-/* Ẩn bottom nav khi dùng left nav layout */
+/* Ẩn bottom nav khi dùng menu trái */
 .sd-root--left-nav .sd-bottom-nav {
   display: none;
 }
 
-/* Layout wrapper: left sidebar + main */
+/* Layout wrapper: sidebar trái + nội dung chính */
 .sd-layout {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* ── Left Sidebar ── */
+/* =========================================
+   2. TIỆN ÍCH DÙNG CHUNG (Utility Classes)
+   ========================================= */
+.sd-text-center {
+  text-align: center !important;
+}
+
+.sd-text-right {
+  text-align: right !important;
+}
+
+.sd-text-primary {
+  color: #ea580c !important;
+}
+
+.sd-text-bold {
+  font-weight: 700 !important;
+}
+
+.sd-text-muted {
+  color: #64748b !important;
+}
+
+.sd-text-sm {
+  font-size: 13px !important;
+}
+
+.sd-flex-between {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.sd-flex-start {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+}
+
+.sd-flex-center {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.sd-flex-column {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.sd-badge-time {
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sd-badge-success {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+.sd-badge-neutral {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+.sd-box-bordered {
+  box-shadow: none !important;
+  border: 1px solid #e2e8f0;
+}
+
+/* =========================================
+   3. MENU BÊN TRÁI (SIDEBAR)
+   ========================================= */
 .sd-left-nav {
   width: 220px;
   min-width: 220px;
@@ -126,19 +210,19 @@
   border-color: #fca5a5;
 }
 
-/* Main scrolls independently */
+/* =========================================
+   4. NỘI DUNG CHÍNH (MAIN CONTENT) & TOPBAR
+   ========================================= */
 .sd-root--left-nav .sd-main {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 24px;
 }
 
-/* Ẩn logout button trên topbar khi có sidebar */
 .sd-root--left-nav .sd-logout-btn {
   display: none;
 }
 
-/* ── Topbar ── */
 .sd-topbar {
   background: #fff;
   padding: 14px 20px;
@@ -149,6 +233,17 @@
   top: 0;
   z-index: 50;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.sd-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  margin-right: 12px;
+  color: #1e293b;
+  padding: 0;
 }
 
 .sd-brand {
@@ -184,7 +279,7 @@
   cursor: pointer;
 }
 
-/* ── Page Header ── */
+/* ── Tiêu đề trang ── */
 .sd-page-header {
   padding: 20px 20px 10px;
   display: flex;
@@ -220,7 +315,9 @@
   padding: 0 16px 20px;
 }
 
-/* ── Cards & Profile ── */
+/* =========================================
+   5. CÁC THẺ CARD & HỒ SƠ (PROFILE)
+   ========================================= */
 .sd-card {
   background: #fff;
   border-radius: 16px;
@@ -318,7 +415,36 @@
   text-align: right;
 }
 
-/* ── Forms & Buttons ── */
+.sd-btn-back {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.sd-btn-back:hover {
+  color: #ea580c;
+}
+
+.sd-detail-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* =========================================
+   6. BIỂU MẪU & NÚT BẤM (FORMS & BUTTONS)
+   ========================================= */
 .sd-pw-form {
   display: flex;
   flex-direction: column;
@@ -401,7 +527,9 @@
   cursor: pointer;
 }
 
-/* ── Shifts Grid ── */
+/* =========================================
+   7. LƯỚI ĐĂNG KÝ CA LÀM (ĐẢO CHIỀU DỌC)
+   ========================================= */
 .sd-shift-legend {
   display: flex;
   gap: 8px;
@@ -432,77 +560,87 @@
   color: #64748b;
 }
 
-.sd-shift-grid {
+/* --- KHUNG LƯỚI ĐẢO CHIỀU MỚI --- */
+.sd-shift-grid-vertical {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 12px;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 16px;
-  -webkit-overflow-scrolling: touch;
 }
 
-.sd-grid-col {
+/* Dòng ngang (Chứa 1 ngày và các nút ca) */
+.sd-grid-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 60px;
+  gap: 8px;
+  align-items: stretch;
 }
 
-.sd-grid-header-col {
-  min-width: 90px;
-  position: sticky;
-  left: 0;
-  background: #fff;
-  z-index: 10;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.02);
+/* Dòng tiêu đề trên cùng (Chứa tên các ca) */
+.sd-grid-header-row {
+  margin-bottom: 4px;
+  align-items: flex-end; /* Căn chữ xuống đáy */
 }
 
-.sd-grid-corner {
-  height: 44px;
+/* Góc trống trên cùng bên trái */
+.sd-grid-corner-v {
+  width: 70px; /* Chiều rộng bằng với nhãn Ngày bên dưới */
+  flex-shrink: 0;
 }
 
-.sd-grid-shift-label {
-  height: 48px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
+/* Nhãn tên Ca (Sáng, Trưa, Chiều...) nằm ngang */
+.sd-grid-shift-col-label {
+  flex: 1; /* Chia đều không gian ngang */
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
   color: #475569;
+  padding-bottom: 4px;
 }
 
-.sd-grid-day-label {
-  height: 44px;
+/* Nhãn Ngày (Thứ 2, Thứ 3...) nằm dọc bên trái */
+.sd-grid-day-row-label {
+  width: 70px;
+  flex-shrink: 0;
   background: #f1f5f9;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 8px 0;
+  border: 1px solid #e2e8f0;
 }
 
-.sd-grid-day-label strong {
-  font-size: 12px;
+.sd-grid-day-row-label strong {
+  font-size: 13px;
+  color: #1e293b;
 }
 
-.sd-grid-day-label small {
-  font-size: 9px;
+.sd-grid-day-row-label small {
+  font-size: 10px;
   color: #64748b;
 }
 
-.sd-shift-cell {
-  height: 48px;
+/* Nút chọn Ca (Hình vuông/Chữ nhật) */
+.sd-shift-cell-v {
+  flex: 1; /* Tự động bung rộng chia đều */
+  height: 50px; /* Tăng chiều cao lên chút để dễ bấm */
   border-radius: 8px;
   border: 1.5px solid #e2e8f0;
-  background: #f8fafc;
+  background: #fff;
   color: #ea580c;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 }
 
-.sd-shift-cell.selected {
-  background: #ea580c;
-  color: #fff;
+.sd-shift-cell-v.selected {
+ 
+  color:  #ea580c;
   border-color: #ea580c;
   box-shadow: 0 4px 10px rgba(234,88,12,0.3);
 }
@@ -512,64 +650,21 @@
   flex-direction: column;
   gap: 10px;
 }
-
-/* ── Bottom Navigation ── */
-.sd-bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #fff;
-  display: flex;
-  border-top: 1px solid #e2e8f0;
-  padding-bottom: env(safe-area-inset-bottom);
-  z-index: 100;
-}
-
-.sd-nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 0;
-  border: none;
-  background: transparent;
-  color: #94a3b8;
-  transition: color 0.2s;
-  cursor: pointer;
-}
-
-.sd-nav-item.active {
-  color: #ea580c;
-}
-
-.sd-nav-icon {
-  font-size: 20px;
-  margin-bottom: 2px;
-}
-
-.sd-nav-label {
-  font-size: 10px;
-  font-weight: 600;
-}
-
-/* ── DESKTOP (PC) — Full screen, no width cap ── */
+/* =========================================
+   8. TỐI ƯU MÀN HÌNH MÁY TÍNH (DESKTOP)
+   ========================================= */
 @media (min-width: 768px) {
-  /* Reset base padding */
   .sd-root {
     padding-bottom: 0;
     align-items: stretch;
   }
 
-  /* Left-nav layout chiếm toàn màn hình */
   .sd-root--left-nav {
     width: 100%;
     max-width: none;
     height: 100dvh;
   }
 
-  /* Topbar full width */
   .sd-topbar {
     width: 100%;
     max-width: none;
@@ -577,7 +672,6 @@
     margin-bottom: 0;
   }
 
-  /* Main content không bị giới hạn */
   .sd-root--left-nav .sd-main {
     flex: 1;
     max-width: none;
@@ -585,7 +679,6 @@
     margin-bottom: 0;
   }
 
-  /* Content bên trong có max-width để dễ đọc, căn trái */
   .sd-content {
     padding: 0 32px 32px;
     max-width: 960px;
@@ -596,7 +689,6 @@
     max-width: 960px;
   }
 
-  /* Profile layout 2 cột trên PC */
   .sd-profile-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -604,22 +696,18 @@
     align-items: start;
   }
 
-  /* Card chiếm full width khi là con duy nhất */
   .sd-profile-layout > .sd-card:only-child {
     grid-column: 1 / -1;
   }
 
-  /* Shift grid không bị overflow ẩn trên desktop */
   .sd-shift-grid {
     overflow-x: auto;
   }
 
-  /* Bottom nav ẩn trên PC */
   .sd-bottom-nav {
     display: none;
   }
 
-  /* Sidebar rộng hơn trên desktop */
   .sd-left-nav {
     width: 240px;
     min-width: 240px;
@@ -634,7 +722,6 @@
   }
 }
 
-/* ── LARGE DESKTOP ── */
 @media (min-width: 1280px) {
   .sd-left-nav {
     width: 260px;
@@ -651,4 +738,200 @@
     max-width: 1100px;
     padding: 28px 40px 12px;
   }
+}
+
+/* =========================================
+   9. TỐI ƯU MOBILE 390PX (STAFF DASHBOARD)
+   ========================================= */
+@media (max-width: 767px) {
+  .sd-hamburger {
+    display: block;
+  }
+
+  .sd-layout {
+    flex-direction: column !important;
+  }
+
+  /* --- CẤU HÌNH MENU TRƯỢT --- */
+  .sd-left-nav {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px !important;
+    min-width: 260px !important;
+    height: 100dvh !important;
+    z-index: 300;
+    transition: left 0.3s ease;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #fff;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .sd-left-nav.open {
+    left: 0;
+  }
+
+  .sd-menu-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 250;
+    backdrop-filter: blur(2px);
+  }
+
+  /* --- TINH CHỈNH PROFILE LÊN MOBILE --- */
+  .sd-profile-layout {
+    grid-template-columns: 1fr !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* --- CHÚ THÍCH CA LÀM (Vuốt ngang) --- */
+  .sd-shift-legend {
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 8px;
+  }
+  
+  .sd-shift-legend::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .sd-shift-legend-item {
+    flex: 0 0 auto;
+    min-width: 130px;
+  }
+
+  /* --- LƯỚI ĐĂNG KÝ CA (BÍ QUYẾT STICKY) --- */
+  .sd-shift-grid {
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    scrollbar-width: none; 
+  }
+  
+  .sd-shift-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Cột Tên Ca: Chốt cứng bên trái */
+  .sd-grid-header-col {
+    position: sticky !important;
+    left: 0;
+    z-index: 20;
+    background: #fff;
+    min-width: 90px !important;
+    flex: 0 0 auto !important;
+    border-right: 1px solid #e2e8f0;
+    padding-right: 6px;
+  }
+
+  /* Cột Ngày: Chống bóp méo */
+  .sd-grid-col {
+    flex: 0 0 auto !important;
+    min-width: 65px;
+  }
+
+  .sd-shift-cell {
+    width: 100%;
+    height: 48px;
+    font-size: 18px;
+  }
+
+  /* --- KHỐI NÚT LƯU BÊN DƯỚI --- */
+  .sd-shift-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .sd-shift-actions button {
+    width: 100% !important;
+    padding: 14px !important;
+    font-size: 15px !important;
+  }
+}
+
+/* =========================================
+   11. BẢNG LỊCH CHÍNH THỨC (SCHEDULE BOARD)
+   ========================================= */
+.sd-board-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.sd-schedule-board {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.sd-schedule-board th, 
+.sd-schedule-board td {
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  vertical-align: top;
+}
+
+.sd-schedule-board th {
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+}
+
+.sd-board-date-col {
+  width: 90px;
+  background: #f8fafc;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.sd-board-date-col strong {
+  display: block;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.sd-board-date-col small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.sd-reg-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.sd-reg-card:last-child {
+  margin-bottom: 0;
+}
+
+.sd-reg-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }

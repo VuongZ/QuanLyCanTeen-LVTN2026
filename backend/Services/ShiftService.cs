@@ -28,7 +28,8 @@ public class ShiftService
             StartTime = s.StartTime,
             EndTime = s.EndTime,
             MaxStaff = s.MaxStaff,
-            IsOt = s.IsOt
+            IsOt = s.IsOt,
+            BranchId = s.BranchId
         }).ToList();  
     }
 

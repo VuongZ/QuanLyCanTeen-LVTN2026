@@ -1,7 +1,6 @@
 import axios from 'axios'
 
 const BASE_URL = '/api/User'
-const URL_Bracnh='/api/Branch'
 
 export async function getUserPageData() {
   const response = await axios.get(BASE_URL)
@@ -15,8 +14,4 @@ export async function getUserById(id) {
 
 export async function updateUser(id, user) {
   await axios.put(`${BASE_URL}/${id}`, user)
-}
-export async function GetALLBranh() {
-    const response = await axios.get(URL_Bracnh)
-  return response.data
 }

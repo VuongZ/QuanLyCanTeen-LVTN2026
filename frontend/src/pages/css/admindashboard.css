@@ -3,6 +3,10 @@
 /* =========================================
    1. BASE STYLES & LAYOUT
    ========================================= */
+* {
+  box-sizing: border-box;
+}
+
 .sd-root {
   display: flex;
   flex-direction: column;
@@ -27,7 +31,6 @@
   overflow: hidden;
 }
 
-/* Nút Hamburger mặc định ẩn trên PC */
 .sd-hamburger {
   display: none;
   background: none;
@@ -40,7 +43,83 @@
 }
 
 /* =========================================
-   2. TOPBAR & LEFT NAVIGATION (PC)
+   2. TIỆN ÍCH DÙNG CHUNG (Utility Classes)
+   ========================================= */
+.sd-text-center {
+  text-align: center !important;
+}
+
+.sd-text-right {
+  text-align: right !important;
+}
+
+.sd-text-primary {
+  color: #ea580c !important;
+}
+
+.sd-text-bold {
+  font-weight: 700 !important;
+}
+
+.sd-text-muted {
+  color: #64748b !important;
+}
+
+.sd-text-sm {
+  font-size: 13px !important;
+}
+
+.sd-flex-between {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+}
+
+.sd-flex-start {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+}
+
+.sd-flex-center {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.sd-flex-column {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.sd-badge-time {
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sd-badge-success {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+.sd-badge-neutral {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+.sd-box-bordered {
+  box-shadow: none !important;
+  border: 1px solid #e2e8f0;
+}
+
+/* =========================================
+   3. TOPBAR & MENU BÊN TRÁI
    ========================================= */
 .sd-topbar {
   background: #fff;
@@ -54,11 +133,42 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-.sd-brand { display: flex; align-items: center; gap: 8px; }
-.sd-brand-icon { background: #ea580c; color: white; font-weight: 700; font-size: 12px; padding: 4px 6px; border-radius: 6px; }
-.sd-brand-name { font-weight: 700; font-size: 16px; color: #1e293b; }
-.sd-logout-btn { background: transparent; border: none; color: #ef4444; font-weight: 600; font-size: 13px; display: flex; gap: 4px; align-items: center; cursor: pointer; }
-.sd-root--left-nav .sd-logout-btn { display: none; } /* Ẩn nút đăng xuất trên topbar khi có sidebar */
+.sd-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-brand-icon {
+  background: #ea580c;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.sd-brand-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.sd-logout-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.sd-root--left-nav .sd-logout-btn {
+  display: none;
+}
 
 .sd-left-nav {
   width: 220px;
@@ -72,146 +182,805 @@
   overflow-y: auto;
 }
 
-.sd-left-nav-user { display: flex; align-items: center; gap: 10px; padding: 10px 8px 16px; border-bottom: 1px solid #e2e8f0; margin-bottom: 8px; }
-.sd-left-nav-name { font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sd-left-nav-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+}
 
-.sd-left-nav-items { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.sd-left-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; border: none; background: transparent; cursor: pointer; text-align: left; font-size: 14px; font-weight: 500; color: #64748b; transition: background 0.15s, color 0.15s; width: 100%; }
-.sd-left-nav-item:hover { background: #e2e8f0; color: #1e293b; }
-.sd-left-nav-item.active { background: #1e293b; color: #fff; }
-.sd-left-nav-item .sd-nav-icon { font-size: 16px; width: 20px; text-align: center; }
-.sd-left-nav-item .sd-nav-label { font-size: 13px; }
+.sd-left-nav-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.sd-left-nav-logout { margin-top: auto; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: transparent; color: #64748b; font-size: 13px; cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s; }
-.sd-left-nav-logout:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+.sd-left-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sd-left-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  transition: background 0.15s, color 0.15s;
+  width: 100%;
+}
+
+.sd-left-nav-item:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.sd-left-nav-item.active {
+  background: #1e293b;
+  color: #fff;
+}
+
+.sd-left-nav-item .sd-nav-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.sd-left-nav-item .sd-nav-label {
+  font-size: 13px;
+}
+
+.sd-left-nav-logout {
+  margin-top: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sd-left-nav-logout:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
 
 /* =========================================
-   3. MAIN CONTENT AREA
+   4. NỘI DUNG CHÍNH & CARDS
    ========================================= */
-.sd-root--left-nav .sd-main { flex: 1; overflow-y: auto; padding-bottom: 24px; }
-.sd-content { padding: 0 24px 20px; }
+.sd-root--left-nav .sd-main {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
 
-.sd-page-header { padding: 20px 24px 10px; display: flex; justify-content: space-between; align-items: flex-end; }
-.sd-page-header h1 { margin: 0; font-size: 22px; font-weight: 700; }
-.sd-eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #ea580c; }
-.sd-branch-badge { background: #ffedd5; color: #ea580c; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sd-content {
+  padding: 0 24px 20px;
+}
+
+.sd-page-header {
+  padding: 20px 24px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.sd-page-header h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sd-eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #ea580c;
+}
+
+.sd-branch-badge {
+  background: #ffedd5;
+  color: #ea580c;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sd-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+}
+
+.sd-card-header {
+  margin-bottom: 16px;
+}
+
+.sd-card-header h2 {
+  margin: 2px 0 0;
+  font-size: 17px;
+}
+
+.sd-profile-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sd-info-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #fff7ed;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.sd-info-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sd-avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.sd-info-hero h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.sd-role-badge {
+  background: #ea580c;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.sd-dl {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.sd-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sd-info-row:last-child {
+  border: none;
+}
+
+.sd-info-row dt {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.sd-info-row dd {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  text-align: right;
+}
+
+.sd-btn-back {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.sd-btn-back:hover {
+  color: #ea580c;
+}
+
+.sd-detail-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
 
 /* =========================================
-   4. CARDS & PROFILE INFO
+   5. THỐNG KÊ & TOOLBAR TÌM KIẾM
    ========================================= */
-.sd-card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); margin-bottom: 16px; }
-.sd-card-header { margin-bottom: 16px; }
-.sd-card-header h2 { margin: 2px 0 0; font-size: 17px; }
-.sd-profile-layout { display: flex; flex-direction: column; gap: 16px; }
+.sd-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 
-.sd-info-hero { display: flex; align-items: center; gap: 14px; padding: 16px; background: #fff7ed; border-radius: 12px; margin-bottom: 16px; }
-.sd-info-avatar { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f97316, #ea580c); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0; }
-.sd-avatar-sm { width: 40px; height: 40px; font-size: 14px; border-radius: 10px; }
-.sd-info-hero h3 { margin: 0 0 4px; font-size: 15px; }
-.sd-role-badge { background: #ea580c; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+.sd-stat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-.sd-dl { display: flex; flex-direction: column; }
-.sd-info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-.sd-info-row:last-child { border: none; }
-.sd-info-row dt { font-size: 12px; color: #64748b; }
-.sd-info-row dd { font-size: 13px; font-weight: 600; color: #1e293b; margin: 0; text-align: right; }
+.sd-stat-icon {
+  background: #fff7ed;
+  color: #ea580c;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-size: 16px;
+}
 
-/* TRANG CHI TIẾT NHÂN VIÊN MỚI */
-.sd-btn-back { background: transparent; border: none; color: #64748b; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; margin-bottom: 16px; padding: 0; transition: color 0.2s; }
-.sd-btn-back:hover { color: #ea580c; }
-.sd-detail-actions { display: flex; gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #f1f5f9; }
+.sd-stat-card h3 {
+  font-size: 24px;
+  margin: 0;
+  color: #1e293b;
+}
+
+.sd-stat-card p {
+  font-size: 12px;
+  margin: 0;
+  color: #64748b;
+}
+
+.sd-role-bar {
+  margin-bottom: 14px;
+}
+
+.sd-role-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: #475569;
+}
+
+.sd-bar-track {
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.sd-bar-fill {
+  height: 100%;
+  background: #ea580c;
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}
+
+.sd-users-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* THANH CÔNG CỤ (PC) */
+.sd-users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.sd-users-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sd-users-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.sd-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 220px;
+  max-width: 400px;
+  flex: 1;
+}
+
+.sd-search-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 16px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.sd-search-wrap .sd-input-search {
+  width: 100%;
+  padding: 9px 32px 9px 32px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #f8fafc;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.sd-search-wrap .sd-input-search:focus {
+  border-color: #ea580c;
+  background: #fff;
+  outline: none;
+}
+
+.sd-search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+}
+
+.sd-filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sd-filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sd-filter-chip:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.sd-filter-chip.active {
+  background: #ea580c;
+  color: #fff;
+  border-color: #ea580c;
+}
+
+.sd-chip-count {
+  background: rgba(255,255,255,0.25);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sd-filter-chip:not(.active) .sd-chip-count {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.sd-result-count {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
 
 /* =========================================
-   5. OVERVIEW STATS
+   6. BẢNG DỮ LIỆU & NÚT
    ========================================= */
-.sd-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.sd-stat-card { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 8px; }
-.sd-stat-icon { background: #fff7ed; color: #ea580c; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; font-size: 16px; }
-.sd-stat-card h3 { font-size: 24px; margin: 0; color: #1e293b; }
-.sd-stat-card p { font-size: 12px; margin: 0; color: #64748b; }
+.sd-table-wrap {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  overflow: auto;
+  width: 100%;
+}
 
-.sd-role-bar { margin-bottom: 14px; }
-.sd-role-bar-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #475569; }
-.sd-bar-track { height: 6px; background: #f1f5f9; border-radius: 10px; overflow: hidden; }
-.sd-bar-fill { height: 100%; background: #ea580c; border-radius: 10px; transition: width 0.5s ease; }
+.sd-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+  font-size: 13px;
+}
 
-/* =========================================
-   6. USER TABLE & TOOLBAR
-   ========================================= */
-.sd-users-page { display: flex; flex-direction: column; gap: 12px; }
-.sd-users-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #fff; border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-.sd-users-toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
-.sd-users-toolbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.sd-th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  background: #f8fafc;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
+  user-select: none;
+}
 
-.sd-search-wrap { position: relative; display: flex; align-items: center; min-width: 220px; max-width: 320px; flex: 1; }
-.sd-search-icon { position: absolute; left: 10px; font-size: 16px; color: #94a3b8; pointer-events: none; line-height: 1; }
-.sd-search-wrap .sd-input-search { width: 100%; padding: 9px 32px 9px 32px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13px; font-family: inherit; background: #f8fafc; transition: border-color 0.15s, background 0.15s; box-sizing: border-box; }
-.sd-search-wrap .sd-input-search:focus { border-color: #ea580c; background: #fff; outline: none; }
-.sd-search-clear { position: absolute; right: 8px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 12px; padding: 2px; }
+.sd-th-sortable {
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
 
-.sd-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.sd-filter-chip { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border: 1.5px solid #e2e8f0; border-radius: 20px; background: #fff; font-size: 12px; font-weight: 600; color: #64748b; white-space: nowrap; cursor: pointer; transition: all 0.15s; }
-.sd-filter-chip:hover { border-color: #cbd5e1; background: #f8fafc; }
-.sd-filter-chip.active { background: #ea580c; color: #fff; border-color: #ea580c; }
-.sd-chip-count { background: rgba(255,255,255,0.25); padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; }
-.sd-filter-chip:not(.active) .sd-chip-count { background: #f1f5f9; color: #64748b; }
+.sd-th-sortable:hover {
+  color: #475569;
+  background: #f1f5f9;
+}
 
-.sd-result-count { font-size: 13px; color: #94a3b8; font-weight: 500; }
-.sd-btn-add { display: flex; align-items: center; gap: 6px; background: #ea580c; color: #fff; border: none; padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap; transition: background 0.15s, transform 0.1s; }
-.sd-btn-add:hover { background: #c2410c; }
-.sd-btn-add:active { transform: scale(0.97); }
+.sd-sort-icon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 11px;
+  color: #ea580c;
+}
 
-.sd-table-wrap { background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: auto; width: 100%; }
-.sd-table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 13px; }
-.sd-th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; background: #f8fafc; border-bottom: 1px solid #f1f5f9; white-space: nowrap; user-select: none; }
-.sd-th-sortable { cursor: pointer; transition: color 0.15s, background 0.15s; }
-.sd-th-sortable:hover { color: #475569; background: #f1f5f9; }
-.sd-sort-icon { display: inline-block; margin-left: 4px; font-size: 11px; color: #ea580c; }
-.sd-sort-none { color: #cbd5e1; }
+.sd-sort-none {
+  color: #cbd5e1;
+}
 
-.sd-tr { border-bottom: 1px solid #f8fafc; transition: background 0.12s; animation: rowFadeIn 0.25s ease both; }
-@keyframes rowFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.sd-tr:hover { background: #fff7ed; }
-.sd-td { padding: 13px 16px; vertical-align: middle; color: #1e293b; }
-.sd-td-avatar { width: 56px; padding-right: 0; }
-.sd-td-name { font-weight: 600; font-size: 14px; color: #1e293b; }
-.sd-td-username, .sd-td-date { font-size: 12px; color: #64748b; }
-.sd-td-branch { font-size: 13px; color: #475569; }
-.sd-role-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-.sd-muted { color: #cbd5e1; font-style: normal; }
+.sd-tr {
+  border-bottom: 1px solid #f8fafc;
+  transition: background 0.12s;
+  animation: rowFadeIn 0.25s ease both;
+}
 
-.sd-td-empty { padding: 48px 20px; }
-.sd-empty-state { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #94a3b8; }
-.sd-empty-icon { font-size: 32px; opacity: 0.3; }
+@keyframes rowFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sd-tr:hover {
+  background: #fff7ed;
+}
+
+.sd-td {
+  padding: 13px 16px;
+  vertical-align: middle;
+  color: #1e293b;
+}
+
+.sd-td-avatar {
+  width: 56px;
+  padding-right: 0;
+}
+
+.sd-td-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.sd-td-username, .sd-td-date {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.sd-td-branch {
+  font-size: 13px;
+  color: #475569;
+}
+
+.sd-role-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sd-muted {
+  color: #cbd5e1;
+  font-style: normal;
+}
+
+.sd-td-empty {
+  padding: 48px 20px;
+}
+
+.sd-td-empty-sm {
+  padding: 30px 20px;
+}
+
+.sd-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #94a3b8;
+}
+
+.sd-empty-icon {
+  font-size: 32px;
+  opacity: 0.3;
+}
+
+.sd-td-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sd-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: 4px;
+}
+
+.sd-action-edit {
+  color: #ea580c;
+}
+
+.sd-action-edit:hover {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.sd-action-delete {
+  color: #ef4444;
+}
+
+.sd-action-delete:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
 
 /* =========================================
    7. FORMS & MODALS
    ========================================= */
-.sd-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.sd-field label { font-size: 12px; font-weight: 600; color: #475569; }
-.sd-field input, .sd-field select { padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; }
-.sd-field input:focus, .sd-field select:focus { border-color: #ea580c; outline: none; }
+.sd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
 
-.sd-status { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-top: 5px; font-weight: 500; }
-.sd-status-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-.sd-status-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.sd-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
 
-.sd-btn-primary { background: #ea580c; color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: 600; width: 100%; cursor: pointer; transition: 0.2s; }
-.sd-btn-primary:active { transform: scale(0.98); }
-.sd-btn-ghost { background: transparent; border: 1.5px solid #e2e8f0; color: #64748b; padding: 12px; border-radius: 10px; font-weight: 600; width: 100%; cursor: pointer; }
+.sd-field input, .sd-field select {
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
 
-.sd-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
-.sd-modal { background: #fff; width: 100%; max-width: 600px; max-height: 90vh; border-radius: 20px 20px 0 0; display: flex; flex-direction: column; animation: slideUp 0.2s ease-out; }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.sd-modal-header { padding: 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-.sd-modal-header h2 { margin: 0; font-size: 18px; font-weight: 700; }
-.sd-modal-header button { background: none; border: none; font-size: 18px; color: #94a3b8; cursor: pointer; }
-.sd-modal-body { padding: 20px; overflow-y: auto; }
-.sd-modal-footer { padding: 16px 20px; border-top: 1px solid #f1f5f9; display: flex; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 20px); }
-.sd-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.sd-field input:focus, .sd-field select:focus {
+  border-color: #ea580c;
+  outline: none;
+}
+
+.sd-status {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 5px;
+  font-weight: 500;
+}
+
+.sd-status-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.sd-status-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.sd-btn-primary {
+  background: #ea580c;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.sd-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.sd-btn-primary.btn-danger {
+  background: #ef4444 !important;
+}
+
+.sd-btn-ghost {
+  background: transparent;
+  border: 1.5px solid #e2e8f0;
+  color: #64748b;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+}
+
+.sd-btn-ghost.btn-edit {
+  color: #ea580c;
+  border-color: #fed7aa;
+}
+
+.sd-btn-ghost.btn-delete {
+  color: #ef4444;
+  border-color: #fecaca;
+}
+
+.sd-btn-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #ea580c;
+  color: #fff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.1s;
+  width: auto;
+}
+
+.sd-btn-add:hover {
+  background: #c2410c;
+}
+
+.sd-btn-add:active {
+  transform: scale(0.97);
+}
+
+.sd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.sd-modal {
+  background: #fff;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sd-modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sd-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.sd-modal-header button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.sd-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.sd-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  gap: 10px;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+.sd-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
 
 /* =========================================
-   8. DESKTOP OPTIMIZATION (PC & LARGE SCREENS)
+   8. TỐI ƯU DESKTOP
    ========================================= */
 @media (min-width: 768px) {
   .sd-root { padding-bottom: 0; align-items: stretch; }
@@ -221,15 +990,12 @@
   .sd-root--left-nav .sd-main { flex: 1; max-width: none; border-radius: 0; margin-bottom: 0; }
   .sd-content { padding: 0 32px 32px; max-width: 960px; }
   .sd-page-header { padding: 24px 32px 12px; max-width: 960px; }
-  
   .sd-profile-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
   .sd-stat-grid { grid-template-columns: repeat(4, 1fr); grid-column: 1 / -1; }
   .sd-profile-layout > .sd-card:only-child { grid-column: 1 / -1; }
-  
   .sd-overlay { align-items: center; padding: 20px; }
   .sd-modal { border-radius: 20px; max-height: 85vh; width: 520px; animation: fadeScaleIn 0.2s ease-out; }
   @keyframes fadeScaleIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-  
   .sd-left-nav-item { padding: 11px 14px; font-size: 14px; }
   .sd-left-nav-item .sd-nav-label { font-size: 14px; }
 }
@@ -242,119 +1008,367 @@
 }
 
 /* =========================================
-   9. MOBILE RESPONSIVE (Tối ưu tuyệt đối với Menu Trượt)
+   9. TỐI ƯU MOBILE (CHO MÀN HÌNH 390px)
    ========================================= */
 @media (max-width: 767px) {
-  /* Hiện nút 3 gạch */
-  .sd-hamburger { display: block; }
-  
-  /* Layout chính vẫn là cột */
-  .sd-layout { flex-direction: column !important; }
+  .sd-hamburger {
+    display: block;
+  }
 
-  /* GIAO DIỆN MENU TRƯỢT TỪ TRÁI SANG */
+  .sd-layout {
+    flex-direction: column !important;
+  }
+
+  /* Drawer Menu */
   .sd-left-nav {
     position: fixed;
     top: 0;
-    left: -280px; /* Mặc định giấu hẳn sang bên trái màn hình */
+    left: -280px;
     width: 260px !important;
     min-width: 260px !important;
     height: 100dvh !important;
     z-index: 300;
-    transition: left 0.3s ease; /* Hiệu ứng trượt mượt mà */
+    transition: left 0.3s ease;
     display: flex !important;
     flex-direction: column !important;
     background: #fff;
-    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
   }
 
-  /* Khi class 'open' được thêm vào bằng React, kéo menu ra */
   .sd-left-nav.open {
     left: 0;
   }
 
-  /* Lớp phủ đen mờ đằng sau menu */
   .sd-menu-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 250;
     backdrop-filter: blur(2px);
   }
 
-  /* Khôi phục lại menu dọc bên trong Drawer */
-  .sd-left-nav-items { flex-direction: column !important; width: 100% !important; gap: 4px !important; }
-  .sd-left-nav-user { display: flex !important; }
-
-  /* ====================================
-     SỬA LỖI MẤT CHỮ VÀ THANH TRƯỢT NGANG
-     ==================================== */
-  .sd-table-wrap { 
-    overflow-x: hidden !important; /* CHỐNG THANH TRƯỢT NGANG TUYỆT ĐỐI */
-    width: 100% !important; 
+  .sd-left-nav-items {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 4px !important;
   }
 
-  .sd-table thead { display: none !important; }
-  .sd-table, .sd-table tbody, .sd-tr { display: block; width: 100%; box-sizing: border-box; }
-
-  .sd-tr {
-    padding: 14px 16px !important;
-    border-bottom: 1px solid #f1f5f9 !important;
+  .sd-left-nav-user {
     display: flex !important;
-    align-items: center !important;
+  }
+
+  /* Toolbar & Search Bar trên 390px */
+  .sd-users-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+
+  .sd-users-toolbar-left {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 12px !important;
+  }
+
+  .sd-search-wrap {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* 👉 ĐÂY LÀ ĐOẠN FIX BỘ LỌC CƠ SỞ CHO ADMIN */
+  .sd-users-toolbar-left select.sd-input-search {
+    width: 100% !important;
+    max-width: none !important;
+    margin-top: 4px !important; 
+  }
+
+  .sd-users-toolbar-right {
+    width: 100% !important;
     justify-content: space-between !important;
-    gap: 12px !important; /* Khoảng cách an toàn giữa Avatar - Tên - Chi nhánh */
   }
 
-  /* Chặn việc các cột tự động phình to 100% gây tràn màn hình */
-  .sd-td { 
-    display: block !important; 
-    width: auto !important; 
-    padding: 0 !important; 
-    border: none !important; 
+  /* =======================================
+     SỬA LỖI MẤT NÚT Ở ĐÂY 
+     ======================================= */
+  .sd-table-wrap {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
-  /* Ẩn Username (3), Role (4), Ngày làm (6) */
-  .sd-td:nth-child(3), 
-  .sd-td:nth-child(4), 
-  .sd-td:nth-child(6) {
+  /* HỦY CHIỀU DÀI 640PX CỦA PC, ÉP BẢNG VỪA KHÍT 390PX */
+  .sd-table {
+    min-width: 100% !important; 
+  }
+
+  .sd-table thead {
     display: none !important;
   }
 
-  /* Cột 1: Avatar */
-  .sd-td-avatar { flex-shrink: 0 !important; margin-right: 0 !important; }
-  
-  /* Cột 2: Tên nhân viên (Ép chiếm phần khoảng trống giữa và có dấu ... nếu quá dài) */
-  .sd-td:nth-child(2) { 
-    flex: 1 1 auto !important; 
-    min-width: 0 !important; /* Cực kỳ quan trọng để chữ chịu cắt */
-  }
-  .sd-td-name { 
-    font-size: 15px !important; 
-    display: block !important; 
-    white-space: nowrap !important; 
-    overflow: hidden !important; 
-    text-overflow: ellipsis !important; 
+  .sd-table,
+  .sd-table tbody,
+  .sd-tr {
+    display: block;
+    width: 100%;
   }
 
-  /* Cột 5: Tên chi nhánh (Ghim sát mép phải) */
-  .sd-td:nth-child(5) {
-    flex-shrink: 0 !important;
-    max-width: 45% !important; /* Không cho tên chi nhánh lấn chiếm chỗ của tên nhân viên */
-    text-align: right !important;
+  /* Ép từng hàng (Row) vừa vặn với 390px */
+  .sd-tr {
+    padding: 12px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    background: #fff;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
-  .sd-td-branch {
-    font-size: 12px !important;
-    color: #94a3b8 !important;
+
+  .sd-td {
+    display: block !important;
+    width: auto !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .sd-hide-mobile {
+    display: none !important;
+  }
+
+  .sd-td-name-col {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .sd-td-name {
+    font-size: 14px !important;
     display: block !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
-  
-  /* DÀN LẠI TOOLBAR TÌM KIẾM */
-  .sd-users-toolbar { flex-direction: column !important; align-items: stretch !important; box-sizing: border-box !important; }
-  .sd-users-toolbar-left { flex-direction: column !important; }
-  .sd-search-wrap { max-width: 100% !important; }
-  .sd-users-toolbar-right { justify-content: space-between !important; }
-  .sd-modal-grid { grid-template-columns: 1fr !important; }
+
+  .sd-td-info-col {
+    flex: 0 0 auto !important;
+  }
+
+  .sd-td-actions {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    gap: 4px !important;
+    min-width: 72px !important;
+  }
+
+  .sd-modal-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Nhãn khi đợt đăng ký đang MỞ */
+.sd-status-pill--open {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0; /* Viền xanh nhạt sắc nét */
+   border-radius: 5px;  
+}
+
+/* Nhãn khi đợt đăng ký đã ĐÓNG */
+.sd-status-pill--closed {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca; /* Viền đỏ nhạt sắc nét */
+  border-radius: 5px;
+}
+.sd-input-search{
+  border-color: #c2410c;
+  border-radius: 5px;  
+  height: 25px;
+}
+
+/* =========================================
+   12. BẢNG LỊCH DUYỆT CA (SCHEDULE BOARD)
+   ========================================= */
+.sd-board-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.sd-schedule-board {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px; /* Chống co rúm trên mobile, cho phép vuốt ngang */
+}
+
+.sd-schedule-board th, 
+.sd-schedule-board td {
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  vertical-align: top;
+}
+
+.sd-schedule-board th {
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+}
+
+.sd-board-date-col {
+  width: 90px;
+  background: #f8fafc;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.sd-board-date-col strong {
+  display: block;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.sd-board-date-col small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Thẻ tên nhân viên bên trong ô lịch */
+.sd-reg-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.sd-reg-card:last-child {
+  margin-bottom: 0;
+}
+
+/* Các trạng thái màu sắc */
+.sd-reg-card.pending { background: #fef08a; border-color: #fde047; color: #854d0e; }
+.sd-reg-card.approved { background: #dcfce7; border-color: #bbf7d0; color: #166534; }
+.sd-reg-card.rejected { background: #fee2e2; border-color: #fecaca; color: #b91c1c; opacity: 0.6; }
+
+.sd-reg-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+/* Nút thao tác nhanh của Manager */
+.sd-reg-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sd-reg-btn {
+  width: 24px; 
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  cursor: pointer; 
+  font-size: 12px; 
+  font-weight: bold;
+  opacity: 0.8;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.sd-reg-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.sd-reg-btn-ok { background: #166534; color: #fff; }
+.sd-reg-btn-no { background: #b91c1c; color: #fff; }
+.sd-reg-btn-undo { background: #94a3b8; color: #fff; } /* Nút hoàn tác về chờ duyệt */
+
+/* Banner báo trạng thái chốt lịch */
+.sd-publish-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* =========================================
+   13. DROPDOWN ĐỔI NHÂN VIÊN DỰ BỊ
+   ========================================= */
+.sd-swap-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 100%;
+  min-width: 170px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  z-index: 100;
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sd-swap-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.sd-swap-empty {
+  padding: 12px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.sd-swap-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1e293b;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s;
+}
+
+.sd-swap-item:last-child {
+  border-bottom: none;
+}
+
+.sd-swap-item:hover {
+  background: #fff7ed;
+  color: #ea580c;
 }

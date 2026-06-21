@@ -10,4 +10,5 @@ public class ShiftDto
     public int? MaxStaff{get;set;}
     public bool? IsOt{get;set;}
     public string? BranchName{get;set;}
+    public int? BranchId{get;set;}
 }

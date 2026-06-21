@@ -56,14 +56,13 @@ public class StaffRegistrationService
         return registration;
     }
 
-    // 4. NHÂN VIÊN: Xem lịch làm việc cá nhân (Chỉ lấy những ca "Đã Duyệt")
+   // 4. NHÂN VIÊN: Xem lịch làm việc cá nhân (Lấy toàn bộ trạng thái)
     public async Task<IEnumerable<CaStaffRegistration>> GetMyScheduleAsync(int userId, int periodId)
     {
         return await _context.CaStaffRegistrations
-            .Include(r => r.Shift) // Để lấy tên ca, giờ giấc
+            .Include(r => r.Shift) 
             .Where(r => r.UserId == userId 
-                     && r.PeriodId == periodId 
-                     && r.Status == "Đã Duyệt") // Chỉ lấy lịch đã chốt hạ thành công
+                     && r.PeriodId == periodId) // 👉 ĐÃ XÓA ĐIỀU KIỆN "Đã Duyệt" Ở ĐÂY
             .OrderBy(r => r.WorkDate)
             .ToListAsync();
     }
@@ -125,6 +124,22 @@ public class StaffRegistrationService
         }
 
         // Lưu toàn bộ thay đổi (Cập nhật Status của Period và Registration cùng lúc)
+        await _context.SaveChangesAsync();
+    }
+    // 5. NHÂN VIÊN: Hủy ca đã đăng ký (Chỉ được hủy khi chưa duyệt)
+    public async Task CancelRegistrationAsync(int id, int userId)
+    {
+        var reg = await _context.CaStaffRegistrations.FindAsync(id);
+        if (reg == null) 
+            throw new Exception("Không tìm thấy phiếu đăng ký này.");
+            
+        if (reg.UserId != userId) 
+            throw new Exception("Bạn không có quyền xóa ca của người khác.");
+            
+        if (reg.Status != "Chờ Duyệt") 
+            throw new Exception("Ca này đã được quản lý xử lý, không thể hủy.");
+
+        _context.CaStaffRegistrations.Remove(reg);
         await _context.SaveChangesAsync();
     }
 }
