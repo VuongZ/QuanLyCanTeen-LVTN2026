@@ -1,6 +1,8 @@
 using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.DTOs;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
 
 namespace LuanVanTotNghiep.Services;
 
@@ -11,6 +13,19 @@ public class StaffRegistrationService
     public StaffRegistrationService(AppDbContext context)
     {
         _context = context;
+    }
+
+    private static string NormalizeText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder();
+        foreach (var c in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                builder.Append(c);
+        }
+        return builder.ToString().Normalize(NormalizationForm.FormC).ToUpperInvariant();
     }
 
     public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
@@ -126,6 +141,100 @@ public class StaffRegistrationService
         // Lưu toàn bộ thay đổi (Cập nhật Status của Period và Registration cùng lúc)
         await _context.SaveChangesAsync();
     }
+    // Manager quet QR nhan vien de ghi vao ca_final_schedule va ca_attendance.
+    public async Task<object> ScanAttendanceAsync(ScanAttendanceDto dto)
+    {
+        var manager = await _context.NsUsers
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == dto.ManagerId);
+        if (manager == null)
+            throw new Exception("Khong tim thay quan ly.");
+
+        var managerRole = NormalizeText(manager.Role?.RoleName);
+        if (!managerRole.Contains("MANAGER") && !managerRole.Contains("QUAN LY"))
+            throw new Exception("Chi Manager moi duoc quet QR cham cong.");
+
+        var employee = await _context.NsUsers
+            .Include(u => u.Role)
+            .Include(u => u.Branch)
+            .FirstOrDefaultAsync(u => u.Id == dto.EmployeeId);
+        if (employee == null)
+            throw new Exception("Khong tim thay nhan vien tu ma QR.");
+
+        if (manager.BranchId == null || employee.BranchId == null || manager.BranchId != employee.BranchId)
+            throw new Exception("Nhan vien khong thuoc co so cua Manager.");
+
+        var shift = await _context.CaShifts.FirstOrDefaultAsync(s => s.Id == dto.ShiftId);
+        if (shift == null)
+            throw new Exception("Khong tim thay ca lam.");
+
+        if (shift.BranchId != null && shift.BranchId != manager.BranchId)
+            throw new Exception("Ca lam khong thuoc co so cua Manager.");
+
+        var schedule = await _context.CaFinalSchedules
+            .FirstOrDefaultAsync(s =>
+                s.UserId == dto.EmployeeId &&
+                s.ShiftId == dto.ShiftId &&
+                s.WorkDate == dto.WorkDate);
+
+        if (schedule == null)
+        {
+            schedule = new CaFinalSchedule
+            {
+                UserId = dto.EmployeeId,
+                ShiftId = dto.ShiftId,
+                WorkDate = dto.WorkDate,
+                Status = "PUBLISHED"
+            };
+            _context.CaFinalSchedules.Add(schedule);
+            await _context.SaveChangesAsync();
+        }
+
+        var attendance = await _context.CaAttendances
+            .FirstOrDefaultAsync(a => a.ScheduleId == schedule.Id);
+        if (attendance == null)
+        {
+            attendance = new CaAttendance
+            {
+                ScheduleId = schedule.Id,
+                CheckInTime = dto.CheckInTime ?? DateTime.Now,
+                Status = "Da check-in"
+            };
+            _context.CaAttendances.Add(attendance);
+        }
+        else if (attendance.CheckInTime == null)
+        {
+            attendance.CheckInTime = dto.CheckInTime ?? DateTime.Now;
+            attendance.Status = "Da check-in";
+        }
+
+        await _context.SaveChangesAsync();
+
+        return new
+        {
+            scheduleId = schedule.Id,
+            attendanceId = attendance.Id,
+            employee = new
+            {
+                employee.Id,
+                employee.Username,
+                employee.FullName,
+                BranchName = employee.Branch?.Name,
+                RoleName = employee.Role?.RoleName
+            },
+            shift = new
+            {
+                shift.Id,
+                shift.ShiftName,
+                shift.StartTime,
+                shift.EndTime
+            },
+            workDate = schedule.WorkDate,
+            checkInTime = attendance.CheckInTime,
+            attendance.Status
+        };
+    }
+
     // 5. NHÂN VIÊN: Hủy ca đã đăng ký (Chỉ được hủy khi chưa duyệt)
     public async Task CancelRegistrationAsync(int id, int userId)
     {

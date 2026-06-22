@@ -67,7 +67,21 @@ public class StaffRegistrationController : ControllerBase
         }
     }
 
-    // Nhân viên xem lịch cá nhân trong 1 đợt
+    // Manager quet QR nhan vien de ghi lich chinh thuc va cham cong
+    [HttpPost("scan-attendance")]
+    public async Task<IActionResult> ScanAttendance([FromBody] ScanAttendanceDto dto)
+    {
+        try
+        {
+            var result = await _service.ScanAttendanceAsync(dto);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("my-schedule/{userId}/{periodId}")]
     public async Task<IActionResult> GetMySchedule(int userId, int periodId)
     {

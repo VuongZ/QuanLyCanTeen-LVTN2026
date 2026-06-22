@@ -3,6 +3,8 @@ import { updateUser } from '../api/UserApi'
 import { getAllBranches, createBranch, updateBranch, deleteBranch } from '../api/BranchApi'
 import { getAllShifts, createShift, updateShift, deleteShift } from '../api/ShiftApi'
 import { getAllPeriods, createPeriod, updatePeriod, deletePeriod } from '../api/PeriodApi'
+import { EmployeeQrCard, UnifiedScheduleTab } from './Staffdashboard'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 import axios from 'axios'
 import './css/admindashboard.css'
 
@@ -22,6 +24,10 @@ function getInitials(name = '') {
 function formatDate(value) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('vi-VN').format(new Date(value))
+}
+
+function normalizeText(value = '') {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
 }
 
 const EMPTY_FORM = {
@@ -46,10 +52,21 @@ const ROLE_COLORS = {
 // ==========================================
 export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: initUsers }) {
   // --- KIỂM TRA QUYỀN ĐĂNG NHẬP ---
-  const isManager = user.roleName?.toUpperCase() === 'MANAGER'
+  const rawRoleName = normalizeText(user.roleName || '')
+  const roleName = rawRoleName.includes('ADMIN') || rawRoleName.includes('QUAN TRI')
+    ? 'ADMIN'
+    : rawRoleName.includes('MANAGER') || rawRoleName.includes('QUAN LY')
+      ? 'MANAGER'
+      : rawRoleName.includes('STAFF') || rawRoleName.includes('NHAN VIEN')
+        ? 'STAFF'
+        : rawRoleName
+  const isAdmin = roleName === 'ADMIN'
+  const isManager = roleName === 'MANAGER'
+  const isStaff = roleName === 'STAFF'
+  const defaultTab = isStaff ? 'staffSchedule' : isManager ? 'periods' : 'overview'
 
   // Mặc định: Manager vào thẳng tab periods, Admin vào Tổng quan overview
-  const [activeTab, setActiveTab] = useState(isManager ? 'periods' : 'overview')
+  const [activeTab, setActiveTab] = useState(defaultTab)
   const [users, setUsers] = useState(initUsers)
   const [branches, setBranches] = useState([])
 
@@ -78,6 +95,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   }, [])
 
   const branch = branches.find((b) => b.id === user.branchId)
+  const allowedTabs = isAdmin
+    ? ['overview', 'users', 'branches', 'systemSchedule', 'account']
+    : isManager
+      ? ['periods', 'scanQr', 'account']
+      : isStaff
+        ? ['staffSchedule', 'account']
+        : ['account']
+  const activeRoleTab = allowedTabs.includes(activeTab) ? activeTab : allowedTabs[0]
 
   const displayed = users
     .filter((u) => {
@@ -208,17 +233,21 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const countByRole = (r) => users.filter((u) => u.roleName?.toUpperCase() === r).length
 
   const getHeaderInfo = () => {
-    switch (activeTab) {
+    switch (activeRoleTab) {
       case 'overview':
         return { eyebrow: 'Hệ thống', title: 'Tổng quan' }
       case 'users':
         return { eyebrow: 'Quản lý', title: selectedUser ? 'Hồ sơ nhân viên' : 'Nhân sự' }
       case 'account':
         return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
+      case 'staffSchedule':
+        return { eyebrow: 'Cong viec', title: 'Lich & Dang ky ca' }
       case 'branches':
         return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
       case 'periods':
         return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
+      case 'scanQr':
+        return { eyebrow: 'Cham cong', title: 'Quet QR nhan vien' }
       case 'systemSchedule':
         return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       default:
@@ -235,7 +264,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       icon: '⬡',
       label: 'Tổng quan',
     },
-    ...(!isManager
+    ...(isAdmin
       ? [
           // ── DANH SÁCH TAB DÀNH RIÊNG CHO ADMIN ──
           {
@@ -263,11 +292,23 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
           },
         ]),
     {
+      id: 'scanQr',
+      icon: 'Q',
+      label: 'Quet QR',
+    },
+    {
+      id: 'staffSchedule',
+      icon: 'S',
+      label: 'Lich & Dang ky',
+    },
+    {
       id: 'account',
       icon: '◎',
       label: 'Tài khoản',
     },
   ]
+
+  const allowedNavItems = NAV_ITEMS.filter((item) => allowedTabs.includes(item.id))
 
   return (
     <div className="sd-root sd-root--left-nav">
@@ -303,10 +344,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
           </div>
 
           <div className="sd-left-nav-items">
-            {NAV_ITEMS.map((item) => (
+            {allowedNavItems.map((item) => (
               <button
                 key={item.id}
-                className={`sd-left-nav-item ${activeTab === item.id ? 'active' : ''}`}
+                className={`sd-left-nav-item ${activeRoleTab === item.id ? 'active' : ''}`}
                 onClick={() => {
                   setActiveTab(item.id)
                   setSelectedUser(null)
@@ -334,7 +375,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 
           <div className="sd-content">
             {/* ── 1. TỔNG QUAN ── */}
-            {activeTab === 'overview' && (
+            {activeRoleTab === 'overview' && isAdmin && (
               <div className="sd-profile-layout">
                 <div className="sd-stat-grid">
                   <div className="sd-stat-card">
@@ -378,7 +419,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             )}
 
             {/* ── 2. NHÂN VIÊN (Chỉ Admin thấy) ── */}
-            {activeTab === 'users' && !isManager && (
+            {activeRoleTab === 'users' && isAdmin && (
               <>
                 {!selectedUser ? (
                   <div className="sd-users-page">
@@ -544,22 +585,33 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             )}
 
             {/* ── 3. CƠ SỞ & CA LÀM (Chỉ Admin thấy) ── */}
-            {activeTab === 'branches' && !isManager && (
+            {activeRoleTab === 'branches' && isAdmin && (
               <AdminBranchTab branches={branches} setBranches={setBranches} />
             )}
 
             {/* ── 4. ĐỢT ĐĂNG KÝ (Chỉ Manager thấy để tự động xếp lịch và duyệt) ── */}
-            {activeTab === 'periods' && isManager && (
+            {activeRoleTab === 'periods' && isManager && (
               <AdminPeriodTab user={user} isManager={isManager} branches={branches} />
             )}
 
             {/* ── 👉 5. TAB MỚI: XEM LỊCH CHÍNH THỨC CÁC CƠ SỞ (Chỉ ADMIN thấy) ── */}
-            {activeTab === 'systemSchedule' && !isManager && (
+            {activeRoleTab === 'scanQr' && isManager && (
+              <ManagerQrAttendanceTab user={user} />
+            )}
+
+            {activeRoleTab === 'systemSchedule' && isAdmin && (
               <AdminSystemScheduleTab branches={branches} />
             )}
 
+            {activeRoleTab === 'staffSchedule' && isStaff && (
+              <>
+                <EmployeeQrCard user={user} />
+                <UnifiedScheduleTab user={user} />
+              </>
+            )}
+
             {/* ── 6. TÀI KHOẢN CÁ NHÂN ── */}
-            {activeTab === 'account' && (
+            {activeRoleTab === 'account' && (
               <div className="sd-profile-layout">
                 <div className="sd-card">
                   <div className="sd-card-header">
@@ -727,6 +779,150 @@ function PasswordForm({ onUserUpdated, user }) {
       {status && <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>}
       <button className="sd-btn-primary" disabled={isSaving} type="submit">{isSaving ? 'Đang lưu…' : 'Cập nhật mật khẩu'}</button>
     </form>
+  )
+}
+
+function ManagerQrAttendanceTab({ user }) {
+  const [shifts, setShifts] = useState([])
+  const [shiftId, setShiftId] = useState('')
+  const [workDate, setWorkDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [manualQr, setManualQr] = useState('')
+  const [status, setStatus] = useState(null)
+  const [scanResult, setScanResult] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [lastQrText, setLastQrText] = useState('')
+
+  useEffect(() => {
+    getAllShifts()
+      .then((data) => {
+        const branchShifts = (Array.isArray(data) ? data : []).filter((s) => String(s.branchId) === String(user.branchId))
+        setShifts(branchShifts)
+        setShiftId((current) => current || branchShifts[0]?.id?.toString() || '')
+      })
+      .catch(() => {
+        setShifts([])
+      })
+  }, [user.branchId])
+
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner(
+      'manager-qr-reader',
+      { fps: 8, qrbox: { width: 240, height: 240 } },
+      false
+    )
+
+    scanner.render(
+      (decodedText) => {
+        if (decodedText && decodedText !== lastQrText) {
+          setLastQrText(decodedText)
+          handleQrText(decodedText)
+        }
+      },
+      () => {}
+    )
+
+    return () => {
+      scanner.clear().catch(() => {})
+    }
+  }, [lastQrText, shiftId, workDate])
+
+  function parseEmployeeQr(text) {
+    const parsed = JSON.parse(text)
+    const employeeId = parsed.id || parsed.employeeId || parsed.userId
+    if (!employeeId) throw new Error('QR khong co ma nhan vien')
+    return { ...parsed, employeeId: Number(employeeId) }
+  }
+
+  async function handleQrText(text) {
+    if (!shiftId || !workDate) {
+      setStatus({ type: 'error', msg: 'Vui long chon ngay va ca truoc khi quet QR.' })
+      return
+    }
+
+    setIsSubmitting(true)
+    setStatus(null)
+    try {
+      const employeeQr = parseEmployeeQr(text)
+      const res = await axios.post('/api/StaffRegistration/scan-attendance', {
+        managerId: user.id,
+        employeeId: employeeQr.employeeId,
+        shiftId: Number(shiftId),
+        workDate,
+        checkInTime: new Date().toISOString(),
+      })
+      setScanResult(res.data)
+      setStatus({ type: 'success', msg: 'Da luu vao CaFinalSchedule va CaAttendance.' })
+    } catch (err) {
+      setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Khong doc duoc ma QR.' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  function handleManualSubmit(e) {
+    e.preventDefault()
+    if (!manualQr.trim()) return
+    setLastQrText(manualQr.trim())
+    handleQrText(manualQr.trim())
+  }
+
+  return (
+    <div className="sd-users-page">
+      <div className="sd-card sd-qr-scan-card">
+        <div className="sd-card-header">
+          <p className="sd-eyebrow">Cham cong</p>
+          <h2>Quet QR nhan vien</h2>
+        </div>
+
+        <div className="sd-modal-grid">
+          <div className="sd-field">
+            <label>Ngay lam viec</label>
+            <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+          </div>
+          <div className="sd-field">
+            <label>Ca lam</label>
+            <select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
+              <option value="">-- Chon ca --</option>
+              {shifts.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.shiftName} ({s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div id="manager-qr-reader" className="sd-qr-reader"></div>
+
+        <form className="sd-qr-manual" onSubmit={handleManualSubmit}>
+          <div className="sd-field">
+            <label>Nhap du lieu QR neu khong mo duoc camera</label>
+            <textarea value={manualQr} onChange={(e) => setManualQr(e.target.value)} placeholder='{"type":"EMPLOYEE","id":1,...}' />
+          </div>
+          <button className="sd-btn-primary" disabled={isSubmitting || !shiftId || !workDate} type="submit">
+            {isSubmitting ? 'Dang luu...' : 'Luu du lieu QR'}
+          </button>
+        </form>
+
+        {status && <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>}
+      </div>
+
+      {scanResult && (
+        <div className="sd-card">
+          <div className="sd-card-header">
+            <p className="sd-eyebrow">Ket qua moi nhat</p>
+            <h2>{scanResult.employee?.fullName || scanResult.employee?.username}</h2>
+          </div>
+          <dl className="sd-dl">
+            <InfoRow label="Schedule ID" value={scanResult.scheduleId} />
+            <InfoRow label="Attendance ID" value={scanResult.attendanceId} />
+            <InfoRow label="Ca" value={scanResult.shift?.shiftName || '---'} />
+            <InfoRow label="Ngay" value={formatDate(scanResult.workDate)} />
+            <InfoRow label="Check-in" value={scanResult.checkInTime ? new Date(scanResult.checkInTime).toLocaleString('vi-VN') : '---'} />
+          </dl>
+        </div>
+      )}
+    </div>
   )
 }
 

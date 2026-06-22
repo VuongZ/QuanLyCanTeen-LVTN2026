@@ -824,6 +824,43 @@
   outline: none;
 }
 
+.sd-field textarea {
+  min-height: 96px;
+  resize: vertical;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.sd-field textarea:focus {
+  border-color: #ea580c;
+  outline: none;
+}
+
+.sd-qr-scan-card {
+  overflow: hidden;
+}
+
+.sd-qr-reader {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin: 8px 0 16px;
+  background: #f8fafc;
+}
+
+.sd-qr-reader video {
+  border-radius: 10px;
+}
+
+.sd-qr-manual {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .sd-status {
   font-size: 12px;
   padding: 8px 12px;

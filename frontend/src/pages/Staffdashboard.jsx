@@ -3,6 +3,7 @@ import { updateUser } from '../api/UserApi'
 import { getAllPeriods } from '../api/PeriodApi'
 import { getAllShifts } from '../api/ShiftApi'
 import axios from 'axios'
+import QRCode from 'qrcode'
 import './css/dashboard.css'
 
 // ==========================================
@@ -22,6 +23,83 @@ const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', '
 // ==========================================
 // COMPONENT CHÍNH: STAFF DASHBOARD
 // ==========================================
+function buildEmployeeQrPayload(user) {
+  return JSON.stringify({
+    type: 'EMPLOYEE',
+    id: user.id,
+    username: user.username,
+    fullName: user.fullName,
+    roleName: user.roleName,
+    branchId: user.branchId,
+    branchName: user.branchName,
+    hireDate: user.hireDate,
+  })
+}
+
+export function EmployeeQrCard({ user }) {
+  const [qrUrl, setQrUrl] = useState('')
+  const qrPayload = buildEmployeeQrPayload(user)
+
+  useEffect(() => {
+    let isMounted = true
+    QRCode.toDataURL(qrPayload, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 220,
+      color: {
+        dark: '#1e293b',
+        light: '#ffffff',
+      },
+    })
+      .then((url) => {
+        if (isMounted) setQrUrl(url)
+      })
+      .catch(() => {
+        if (isMounted) setQrUrl('')
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [qrPayload])
+
+  function downloadQr() {
+    if (!qrUrl) return
+    const link = document.createElement('a')
+    link.href = qrUrl
+    link.download = `employee-${user.username || user.id}-qr.png`
+    link.click()
+  }
+
+  return (
+    <div className="sd-card sd-employee-qr-card">
+      <div className="sd-employee-qr-info">
+        <div className="sd-info-avatar">{getInitials(user.fullName || user.username)}</div>
+        <div>
+          <p className="sd-eyebrow">Ma QR nhan vien</p>
+          <h2>{user.fullName || user.username}</h2>
+          <dl className="sd-employee-qr-list">
+            <InfoRow label="Username" value={user.username || '---'} />
+            <InfoRow label="Chuc vu" value={user.roleName || '---'} />
+            <InfoRow label="Chi nhanh" value={user.branchName || 'Chua gan'} />
+          </dl>
+        </div>
+      </div>
+
+      <div className="sd-employee-qr-box">
+        {qrUrl ? (
+          <img alt="Ma QR nhan vien" src={qrUrl} />
+        ) : (
+          <div className="sd-employee-qr-placeholder">Dang tao QR...</div>
+        )}
+        <button className="sd-btn-primary sd-employee-qr-download" disabled={!qrUrl} onClick={downloadQr} type="button">
+          Tai QR
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
   const [activeTab, setActiveTab] = useState('schedule')
   const [isMenuOpen, setIsMenuOpen] = useState(false) 
@@ -109,7 +187,7 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
 // ==========================================
 // 👉 COMPONENT MỚI: MÀN HÌNH GỘP (LỊCH & ĐĂNG KÝ)
 // ==========================================
-function UnifiedScheduleTab({ user }) {
+export function UnifiedScheduleTab({ user }) {
   const [periods, setPeriods] = useState([])
   const [selectedPeriodId, setSelectedPeriodId] = useState('')
   const [loading, setLoading] = useState(true)
