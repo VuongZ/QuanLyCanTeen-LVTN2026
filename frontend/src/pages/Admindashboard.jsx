@@ -1,24 +1,15 @@
+
 import { useState, useEffect } from 'react'
 import { updateUser } from '../api/UserApi'
 import { getAllBranches, createBranch, updateBranch, deleteBranch } from '../api/BranchApi'
 import { getAllShifts, createShift, updateShift, deleteShift } from '../api/ShiftApi'
 import { getAllPeriods, createPeriod, updatePeriod, deletePeriod } from '../api/PeriodApi'
-import { EmployeeQrCard, UnifiedScheduleTab } from './Staffdashboard'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import axios from 'axios'
 import './css/admindashboard.css'
 
-// ==========================================
-// CÁC HÀM TIỆN ÍCH DÙNG CHUNG
-// ==========================================
 function getInitials(name = '') {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(-2)
-    .map((p) => p[0])
-    .join('')
-    .toUpperCase()
+  return name.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase()
 }
 
 function formatDate(value) {
@@ -31,14 +22,7 @@ function normalizeText(value = '') {
 }
 
 const EMPTY_FORM = {
-  username: '',
-  fullName: '',
-  password: '',
-  branchId: '',
-  branchName: '',
-  roleId: '',
-  roleName: '',
-  hireDate: '',
+  username: '', fullName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '',
 }
 
 const ROLE_COLORS = {
@@ -47,68 +31,35 @@ const ROLE_COLORS = {
   STAFF: { bg: '#dcfce7', color: '#166534' },
 }
 
-// ==========================================
-// COMPONENT CHÍNH: ADMIN DASHBOARD
-// ==========================================
 export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: initUsers }) {
-  // --- KIỂM TRA QUYỀN ĐĂNG NHẬP ---
   const rawRoleName = normalizeText(user.roleName || '')
-  const roleName = rawRoleName.includes('ADMIN') || rawRoleName.includes('QUAN TRI')
-    ? 'ADMIN'
-    : rawRoleName.includes('MANAGER') || rawRoleName.includes('QUAN LY')
-      ? 'MANAGER'
-      : rawRoleName.includes('STAFF') || rawRoleName.includes('NHAN VIEN')
-        ? 'STAFF'
-        : rawRoleName
-  const isAdmin = roleName === 'ADMIN'
-  const isManager = roleName === 'MANAGER'
-  const isStaff = roleName === 'STAFF'
-  const defaultTab = isStaff ? 'staffSchedule' : isManager ? 'periods' : 'overview'
+  const isAdmin = rawRoleName.includes('ADMIN') || rawRoleName.includes('QUAN TRI')
+  const isManager = rawRoleName.includes('MANAGER') || rawRoleName.includes('QUAN LY')
 
-  // Mặc định: Manager vào thẳng tab periods, Admin vào Tổng quan overview
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'overview' : 'periods')
   const [users, setUsers] = useState(initUsers)
   const [branches, setBranches] = useState([])
-
   const [modal, setModal] = useState(null)
   const [modalUser, setModalUser] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formErr, setFormErr] = useState('')
   const [saving, setSaving] = useState(false)
-
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState('ALL')
   const [sortCol, setSortCol] = useState('fullName')
   const [sortDir, setSortDir] = useState('asc')
-
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
 
   useEffect(() => {
-    getAllBranches()
-      .then((data) => {
-        setBranches(Array.isArray(data) ? data : [])
-      })
-      .catch(() => {
-        setBranches([])
-      })
+    getAllBranches().then((data) => setBranches(Array.isArray(data) ? data : [])).catch(() => setBranches([]))
   }, [])
 
   const branch = branches.find((b) => b.id === user.branchId)
-  const allowedTabs = isAdmin
-    ? ['overview', 'users', 'branches', 'systemSchedule', 'account']
-    : isManager
-      ? ['periods', 'scanQr', 'account']
-      : isStaff
-        ? ['staffSchedule', 'account']
-        : ['account']
-  const activeRoleTab = allowedTabs.includes(activeTab) ? activeTab : allowedTabs[0]
 
   const displayed = users
     .filter((u) => {
-      const matchSearch = [u.fullName, u.username, u.branchName].some((v) =>
-        v?.toLowerCase().includes(search.toLowerCase())
-      )
+      const matchSearch = [u.fullName, u.username, u.branchName].some((v) => v?.toLowerCase().includes(search.toLowerCase()))
       const matchRole = filterRole === 'ALL' || u.roleName?.toUpperCase() === filterRole
       return matchSearch && matchRole
     })
@@ -119,99 +70,49 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     })
 
   function toggleSort(col) {
-    if (sortCol === col) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortCol(col)
-      setSortDir('asc')
-    }
+    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortCol(col); setSortDir('asc') }
   }
 
   function SortIcon({ col }) {
-    if (sortCol !== col) {
-      return <span className="sd-sort-icon sd-sort-none">↕</span>
-    }
+    if (sortCol !== col) return <span className="sd-sort-icon sd-sort-none">↕</span>
     return <span className="sd-sort-icon">{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  function openAdd() {
-    setForm(EMPTY_FORM)
-    setFormErr('')
-    setModal('add')
-  }
-
-  function openEdit(u) {
-    setForm({ ...u })
-    setFormErr('')
-    setModalUser(u)
-    setModal('edit')
-  }
-
-  function openDelete(u) {
-    setModalUser(u)
-    setFormErr('')
-    setModal('delete')
-  }
-
-  function closeModal() {
-    setModal(null)
-    setModalUser(null)
-  }
+  function openAdd() { setForm(EMPTY_FORM); setFormErr(''); setModal('add') }
+  function openEdit(u) { setForm({ ...u }); setFormErr(''); setModalUser(u); setModal('edit') }
+  function openDelete(u) { setModalUser(u); setFormErr(''); setModal('delete') }
+  function closeModal() { setModal(null); setModalUser(null) }
 
   function handleFormChange(e) {
     const { name, value } = e.target
     setForm((f) => {
       const next = { ...f, [name]: value }
-      if (name === 'branchId') {
-        const b = branches.find((b) => String(b.id) === value)
-        next.branchName = b?.name || b?.branchName || ''
-      }
-      if (name === 'roleId') {
-        const r = roles.find((r) => String(r.id) === value)
-        next.roleName = r?.roleName || ''
-      }
+      if (name === 'branchId') { const b = branches.find((b) => String(b.id) === value); next.branchName = b?.name || b?.branchName || '' }
+      if (name === 'roleId') { const r = roles.find((r) => String(r.id) === value); next.roleName = r?.roleName || '' }
       return next
     })
   }
 
   async function handleSaveAdd() {
-    if (!form.username || !form.fullName || !form.password) {
-      return setFormErr('Vui lòng điền đầy đủ username, họ tên, password')
-    }
-    setSaving(true)
-    setFormErr('')
+    if (!form.username || !form.fullName || !form.password) return setFormErr('Vui lòng điền đầy đủ username, họ tên, password')
+    setSaving(true); setFormErr('')
     try {
       const res = await axios.post('/api/User', form)
-      setUsers((prev) => [...prev, res.data])
-      closeModal()
-    } catch (err) {
-      setFormErr(err.message || 'Không thể thêm nhân viên')
-    } finally {
-      setSaving(false)
-    }
+      setUsers((prev) => [...prev, res.data]); closeModal()
+    } catch (err) { setFormErr(err.message || 'Không thể thêm nhân viên') } finally { setSaving(false) }
   }
 
   async function handleSaveEdit() {
-    if (!form.username || !form.fullName) {
-      return setFormErr('Username và họ tên không được để trống')
-    }
-    setSaving(true)
-    setFormErr('')
+    if (!form.username || !form.fullName) return setFormErr('Username và họ tên không được để trống')
+    setSaving(true); setFormErr('')
     try {
       await updateUser(form.id, form)
       setUsers((prev) => prev.map((u) => (u.id === form.id ? { ...u, ...form } : u)))
-      if (selectedUser && selectedUser.id === form.id) {
-        setSelectedUser({ ...selectedUser, ...form })
-      }
-      if (form.id === user.id) {
-        onUserUpdated({ ...user, ...form })
-      }
+      if (selectedUser && selectedUser.id === form.id) setSelectedUser({ ...selectedUser, ...form })
+      if (form.id === user.id) onUserUpdated({ ...user, ...form })
       closeModal()
-    } catch (err) {
-      setFormErr(err.message || 'Không thể cập nhật')
-    } finally {
-      setSaving(false)
-    }
+    } catch (err) { setFormErr(err.message || 'Không thể cập nhật') } finally { setSaving(false) }
   }
 
   async function handleDelete() {
@@ -219,140 +120,70 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     try {
       await axios.delete(`/api/User/${modalUser.id}`)
       setUsers((prev) => prev.filter((u) => u.id !== modalUser.id))
-      if (selectedUser && selectedUser.id === modalUser.id) {
-        setSelectedUser(null)
-      }
+      if (selectedUser && selectedUser.id === modalUser.id) setSelectedUser(null)
       closeModal()
-    } catch (err) {
-      setFormErr(err.message || 'Không thể xóa')
-    } finally {
-      setSaving(false)
-    }
+    } catch (err) { setFormErr(err.message || 'Không thể xóa') } finally { setSaving(false) }
   }
 
   const countByRole = (r) => users.filter((u) => u.roleName?.toUpperCase() === r).length
 
   const getHeaderInfo = () => {
-    switch (activeRoleTab) {
-      case 'overview':
-        return { eyebrow: 'Hệ thống', title: 'Tổng quan' }
-      case 'users':
-        return { eyebrow: 'Quản lý', title: selectedUser ? 'Hồ sơ nhân viên' : 'Nhân sự' }
-      case 'account':
-        return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
-      case 'staffSchedule':
-        return { eyebrow: 'Công việc', title: 'Lịch & Đăng ký ca' }
-      case 'branches':
-        return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
-      case 'periods':
-        return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
-      case 'scanQr':
-        return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
-      case 'systemSchedule':
-        return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
-      default:
-        return { eyebrow: '', title: '' }
+    switch (activeTab) {
+      case 'overview': return { eyebrow: 'Hệ thống', title: 'Tổng quan' }
+      case 'users': return { eyebrow: 'Quản lý', title: selectedUser ? 'Hồ sơ nhân viên' : 'Nhân sự' }
+      case 'account': return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
+      case 'branches': return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
+      case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
+      case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
+      case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
+      default: return { eyebrow: '', title: '' }
     }
   }
 
   const headerInfo = getHeaderInfo()
 
-  // 👉 DANH SÁCH MENU ĐÃ PHÂN CHIA QUYỀN RẠCH RÒI THEO Ý BẠN:
-  const NAV_ITEMS = [
-    {
-      id: 'overview',
-      icon: '⬡',
-      label: 'Tổng quan',
-    },
-    ...(isAdmin
-      ? [
-          // ── DANH SÁCH TAB DÀNH RIÊNG CHO ADMIN ──
-          {
-            id: 'users',
-            icon: '◈',
-            label: 'Nhân viên',
-          },
-          {
-            id: 'branches',
-            icon: '🏢',
-            label: 'Cơ sở',
-          },
-          {
-            id: 'systemSchedule',
-            icon: '🗓️',
-            label: 'Lịch các cơ sở', // Tab độc quyền để Admin đi xem lịch chốt
-          },
-        ]
-      : [
-          // ── DANH SÁCH TAB DÀNH RIÊNG CHO MANAGER ──
-          {
-            id: 'periods',
-            icon: '📅',
-            label: 'Đợt đăng ký', // Manager độc quyền mở đợt và duyệt ca
-          },
-        ]),
-    {
-      id: 'scanQr',
-      icon: 'Q',
-      label: 'Quét QR',
-    },
-    {
-      id: 'staffSchedule',
-      icon: 'S',
-      label: 'Lịch & Đăng ký',
-    },
-    {
-      id: 'account',
-      icon: '◎',
-      label: 'Tài khoản',
-    },
-  ]
-
-  const allowedNavItems = NAV_ITEMS.filter((item) => allowedTabs.includes(item.id))
+  // Xây dựng Menu Động: Ai có quyền gì thì thấy cái đó
+  const NAV_ITEMS = []
+  if (isAdmin) {
+    NAV_ITEMS.push({ id: 'overview', icon: '⬡', label: 'Tổng quan' })
+    NAV_ITEMS.push({ id: 'users', icon: '◈', label: 'Nhân viên' })
+    NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
+    NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+  }
+  if (isManager) {
+    NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
+    NAV_ITEMS.push({ id: 'scanQr', icon: 'Q', label: 'Quét QR' })
+  }
+  NAV_ITEMS.push({ id: 'account', icon: '◎', label: 'Tài khoản' })
 
   return (
     <div className="sd-root sd-root--left-nav">
       <header className="sd-topbar">
         <div className="sd-brand">
-          <button className="sd-hamburger" onClick={() => setIsMenuOpen(true)}>
-            ☰
-          </button>
+          <button className="sd-hamburger" onClick={() => setIsMenuOpen(true)}>☰</button>
           <span className="sd-brand-icon">CT</span>
           <span className="sd-brand-name">Canteen Admin</span>
         </div>
         <div className="sd-flex-center">
-          <div className="sd-branch-badge" style={{ marginRight: 12 }}>
-            {user.roleName}
-          </div>
-          <button className="sd-logout-btn" onClick={onLogout}>
-            <span>Đăng xuất</span> ↩
-          </button>
+          <div className="sd-branch-badge" style={{ marginRight: 12 }}>{user.roleName}</div>
+          <button className="sd-logout-btn" onClick={onLogout}><span>Đăng xuất</span> ↩</button>
         </div>
       </header>
 
       <div className="sd-layout">
-        {isMenuOpen && (
-          <div className="sd-menu-overlay" onClick={() => setIsMenuOpen(false)}></div>
-        )}
+        {isMenuOpen && <div className="sd-menu-overlay" onClick={() => setIsMenuOpen(false)}></div>}
 
         <nav className={`sd-left-nav ${isMenuOpen ? 'open' : ''}`}>
           <div className="sd-left-nav-user">
-            <div className="sd-info-avatar sd-avatar-sm">
-              {getInitials(user.fullName || user.username)}
-            </div>
+            <div className="sd-info-avatar sd-avatar-sm">{getInitials(user.fullName || user.username)}</div>
             <span className="sd-left-nav-name">{user.fullName || user.username}</span>
           </div>
-
           <div className="sd-left-nav-items">
-            {allowedNavItems.map((item) => (
+            {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
-                className={`sd-left-nav-item ${activeRoleTab === item.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveTab(item.id)
-                  setSelectedUser(null)
-                  setIsMenuOpen(false)
-                }}
+                className={`sd-left-nav-item ${activeTab === item.id ? 'active' : ''}`}
+                onClick={() => { setActiveTab(item.id); setSelectedUser(null); setIsMenuOpen(false) }}
                 type="button"
               >
                 <span className="sd-nav-icon">{item.icon}</span>
@@ -360,9 +191,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
               </button>
             ))}
           </div>
-          <button className="sd-left-nav-logout" onClick={onLogout}>
-            ↩ Đăng xuất
-          </button>
+          <button className="sd-left-nav-logout" onClick={onLogout}>↩ Đăng xuất</button>
         </nav>
 
         <main className="sd-main">
@@ -374,52 +203,29 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
           </div>
 
           <div className="sd-content">
-            {/* ── 1. TỔNG QUAN ── */}
-            {activeRoleTab === 'overview' && isAdmin && (
+            {activeTab === 'overview' && isAdmin && (
               <div className="sd-profile-layout">
                 <div className="sd-stat-grid">
-                  <div className="sd-stat-card">
-                    <span className="sd-stat-icon">◈</span>
-                    <h3>{users.length}</h3>
-                    <p>Tổng nhân viên</p>
-                  </div>
-                  <div className="sd-stat-card">
-                    <span className="sd-stat-icon">⊞</span>
-                    <h3>{branches.length}</h3>
-                    <p>Chi nhánh</p>
-                  </div>
+                  <div className="sd-stat-card"><span className="sd-stat-icon">◈</span><h3>{users.length}</h3><p>Tổng nhân viên</p></div>
+                  <div className="sd-stat-card"><span className="sd-stat-icon">⊞</span><h3>{branches.length}</h3><p>Chi nhánh</p></div>
                 </div>
-
                 <div className="sd-card">
-                  <div className="sd-card-header">
-                    <p className="sd-eyebrow">Thống kê</p>
-                    <h2>Phân bổ chức vụ</h2>
-                  </div>
-                  {roles
-                    .filter((r) => r.roleName !== 'ADMIN')
-                    .map((r) => {
-                      const cnt = countByRole(r.roleName)
-                      const pct = users.length ? Math.round((cnt / users.length) * 100) : 0
-                      return (
-                        <div key={r.id} className="sd-role-bar">
-                          <div className="sd-role-bar-head">
-                            <strong>{r.roleName}</strong>
-                            <span>
-                              {cnt} người · {pct}%
-                            </span>
-                          </div>
-                          <div className="sd-bar-track">
-                            <div className="sd-bar-fill" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div className="sd-card-header"><p className="sd-eyebrow">Thống kê</p><h2>Phân bổ chức vụ</h2></div>
+                  {roles.filter((r) => r.roleName !== 'ADMIN').map((r) => {
+                    const cnt = countByRole(r.roleName)
+                    const pct = users.length ? Math.round((cnt / users.length) * 100) : 0
+                    return (
+                      <div key={r.id} className="sd-role-bar">
+                        <div className="sd-role-bar-head"><strong>{r.roleName}</strong><span>{cnt} người · {pct}%</span></div>
+                        <div className="sd-bar-track"><div className="sd-bar-fill" style={{ width: `${pct}%` }} /></div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
 
-            {/* ── 2. NHÂN VIÊN (Chỉ Admin thấy) ── */}
-            {activeRoleTab === 'users' && isAdmin && (
+            {activeTab === 'users' && isAdmin && (
               <>
                 {!selectedUser ? (
                   <div className="sd-users-page">
@@ -427,25 +233,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                       <div className="sd-users-toolbar-left">
                         <div className="sd-search-wrap">
                           <span className="sd-search-icon">⌕</span>
-                          <input
-                            className="sd-input-search"
-                            placeholder="Tìm tên, username, chi nhánh..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                          />
-                          {search && (
-                            <button className="sd-search-clear" onClick={() => setSearch('')}>
-                              ✕
-                            </button>
-                          )}
+                          <input className="sd-input-search" placeholder="Tìm tên, username, chi nhánh..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                          {search && <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>}
                         </div>
                         <div className="sd-filter-chips">
                           {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
-                            <button
-                              key={r}
-                              className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`}
-                              onClick={() => setFilterRole(r)}
-                            >
+                            <button key={r} className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`} onClick={() => setFilterRole(r)}>
                               {r === 'ALL' ? 'Tất cả' : r}
                               {r !== 'ALL' && <span className="sd-chip-count">{countByRole(r)}</span>}
                             </button>
@@ -454,81 +247,35 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                       </div>
                       <div className="sd-users-toolbar-right">
                         <span className="sd-result-count">{displayed.length} nhân viên</span>
-                        <button className="sd-btn-add" onClick={openAdd}>
-                          <span>＋</span> Thêm nhân viên
-                        </button>
+                        <button className="sd-btn-add" onClick={openAdd}><span>＋</span> Thêm nhân viên</button>
                       </div>
                     </div>
-
                     <div className="sd-table-wrap">
                       <table className="sd-table">
                         <thead>
                           <tr>
                             <th className="sd-th sd-th-avatar" style={{ width: 48 }}></th>
-                            <th className="sd-th sd-th-sortable sd-td-name-col" onClick={() => toggleSort('fullName')}>
-                              Họ và tên <SortIcon col="fullName" />
-                            </th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('username')}>
-                              Username <SortIcon col="username" />
-                            </th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>
-                              Chức vụ <SortIcon col="roleName" />
-                            </th>
-                            <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>
-                              Chi nhánh <SortIcon col="branchName" />
-                            </th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>
-                              Ngày vào làm <SortIcon col="hireDate" />
-                            </th>
+                            <th className="sd-th sd-th-sortable sd-td-name-col" onClick={() => toggleSort('fullName')}>Họ và tên <SortIcon col="fullName" /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('username')}>Username <SortIcon col="username" /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon col="roleName" /></th>
+                            <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon col="branchName" /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon col="hireDate" /></th>
                           </tr>
                         </thead>
                         <tbody>
                           {displayed.length === 0 && (
-                            <tr>
-                              <td colSpan={6} className="sd-td-empty">
-                                <div className="sd-empty-state">
-                                  <span className="sd-empty-icon">◈</span>
-                                  <p>Không tìm thấy nhân sự</p>
-                                </div>
-                              </td>
-                            </tr>
+                            <tr><td colSpan={6} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">◈</span><p>Không tìm thấy nhân sự</p></div></td></tr>
                           )}
                           {displayed.map((u, idx) => {
                             const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
                             return (
-                              <tr
-                                key={u.id}
-                                className="sd-tr"
-                                style={{ animationDelay: `${idx * 30}ms`, cursor: 'pointer' }}
-                                onClick={() => setSelectedUser(u)}
-                              >
-                                <td className="sd-td sd-td-avatar sd-hide-mobile">
-                                  <div className="sd-info-avatar sd-avatar-sm">
-                                    {getInitials(u.fullName || u.username)}
-                                  </div>
-                                </td>
-                                <td className="sd-td sd-td-name-col">
-                                  <span className="sd-td-name">{u.fullName || '—'}</span>
-                                </td>
-                                <td className="sd-td sd-hide-mobile">
-                                  <span className="sd-td-username">@{u.username}</span>
-                                </td>
-                                <td className="sd-td sd-hide-mobile">
-                                  <span
-                                    className="sd-role-pill"
-                                    style={{ background: roleColor.bg, color: roleColor.color }}
-                                  >
-                                    {u.roleName || '—'}
-                                  </span>
-                                </td>
-                                <td className="sd-td sd-td-info-col">
-                                  <span className="sd-td-branch">
-                                    {u.branchName || <em className="sd-muted">Chưa gán</em>}
-                                  </span>
-                                </td>
-                                <td className="sd-td sd-hide-mobile">
-                                  <span className="sd-td-date">{formatDate(u.hireDate)}</span>
-                                </td>
+                              <tr key={u.id} className="sd-tr" style={{ animationDelay: `${idx * 30}ms`, cursor: 'pointer' }} onClick={() => setSelectedUser(u)}>
+                                <td className="sd-td sd-td-avatar sd-hide-mobile"><div className="sd-info-avatar sd-avatar-sm">{getInitials(u.fullName || u.username)}</div></td>
+                                <td className="sd-td sd-td-name-col"><span className="sd-td-name">{u.fullName || '—'}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span className="sd-td-username">@{u.username}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span className="sd-role-pill" style={{ background: roleColor.bg, color: roleColor.color }}>{u.roleName || '—'}</span></td>
+                                <td className="sd-td sd-td-info-col"><span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span className="sd-td-date">{formatDate(u.hireDate)}</span></td>
                               </tr>
                             )
                           })}
@@ -538,25 +285,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                   </div>
                 ) : (
                   <div className="sd-user-detail-page">
-                    <button className="sd-btn-back" onClick={() => setSelectedUser(null)}>
-                      ← Quay lại danh sách
-                    </button>
-
+                    <button className="sd-btn-back" onClick={() => setSelectedUser(null)}>← Quay lại danh sách</button>
                     <div className="sd-profile-layout">
                       <div className="sd-card">
                         <div className="sd-info-hero">
-                          <div className="sd-info-avatar">
-                            {getInitials(selectedUser.fullName || selectedUser.username)}
-                          </div>
+                          <div className="sd-info-avatar">{getInitials(selectedUser.fullName || selectedUser.username)}</div>
                           <div>
                             <h3>{selectedUser.fullName || selectedUser.username}</h3>
-                            <span
-                              className="sd-role-badge"
-                              style={{
-                                background: ROLE_COLORS[selectedUser.roleName?.toUpperCase()]?.bg || '#ea580c',
-                                color: ROLE_COLORS[selectedUser.roleName?.toUpperCase()]?.color || '#fff',
-                              }}
-                            >
+                            <span className="sd-role-badge" style={{ background: ROLE_COLORS[selectedUser.roleName?.toUpperCase()]?.bg || '#ea580c', color: ROLE_COLORS[selectedUser.roleName?.toUpperCase()]?.color || '#fff' }}>
                               {selectedUser.roleName || '—'}
                             </span>
                           </div>
@@ -566,16 +302,9 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                           <InfoRow label="Chi nhánh" value={selectedUser.branchName || 'Chưa gán'} />
                           <InfoRow label="Ngày vào làm" value={formatDate(selectedUser.hireDate)} />
                         </dl>
-
                         <div className="sd-detail-actions">
-                          <button className="sd-btn-ghost btn-edit" onClick={() => openEdit(selectedUser)}>
-                            ✎ Chỉnh sửa
-                          </button>
-                          {selectedUser.id !== user.id && (
-                            <button className="sd-btn-ghost btn-delete" onClick={() => openDelete(selectedUser)}>
-                              ✕ Xóa nhân sự
-                            </button>
-                          )}
+                          <button className="sd-btn-ghost btn-edit" onClick={() => openEdit(selectedUser)}>✎ Chỉnh sửa</button>
+                          {selectedUser.id !== user.id && <button className="sd-btn-ghost btn-delete" onClick={() => openDelete(selectedUser)}>✕ Xóa nhân sự</button>}
                         </div>
                       </div>
                     </div>
@@ -584,46 +313,18 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
               </>
             )}
 
-            {/* ── 3. CƠ SỞ & CA LÀM (Chỉ Admin thấy) ── */}
-            {activeRoleTab === 'branches' && isAdmin && (
-              <AdminBranchTab branches={branches} setBranches={setBranches} />
-            )}
+            {activeTab === 'branches' && isAdmin && <AdminBranchTab branches={branches} setBranches={setBranches} />}
+            {activeTab === 'periods' && isManager && <AdminPeriodTab user={user} isManager={isManager} branches={branches} />}
+            {activeTab === 'scanQr' && isManager && <ManagerQrAttendanceTab user={user} />}
+            {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
 
-            {/* ── 4. ĐỢT ĐĂNG KÝ (Chỉ Manager thấy để tự động xếp lịch và duyệt) ── */}
-            {activeRoleTab === 'periods' && isManager && (
-              <AdminPeriodTab user={user} isManager={isManager} branches={branches} />
-            )}
-
-            {/* ── 👉 5. TAB MỚI: XEM LỊCH CHÍNH THỨC CÁC CƠ SỞ (Chỉ ADMIN thấy) ── */}
-            {activeRoleTab === 'scanQr' && isManager && (
-              <ManagerQrAttendanceTab user={user} />
-            )}
-
-            {activeRoleTab === 'systemSchedule' && isAdmin && (
-              <AdminSystemScheduleTab branches={branches} />
-            )}
-
-            {activeRoleTab === 'staffSchedule' && isStaff && (
-              <>
-                <EmployeeQrCard user={user} />
-                <UnifiedScheduleTab user={user} />
-              </>
-            )}
-
-            {/* ── 6. TÀI KHOẢN CÁ NHÂN ── */}
-            {activeRoleTab === 'account' && (
+            {activeTab === 'account' && (
               <div className="sd-profile-layout">
                 <div className="sd-card">
-                  <div className="sd-card-header">
-                    <p className="sd-eyebrow">Chi tiết</p>
-                    <h2>Hồ sơ cá nhân</h2>
-                  </div>
+                  <div className="sd-card-header"><p className="sd-eyebrow">Chi tiết</p><h2>Hồ sơ cá nhân</h2></div>
                   <div className="sd-info-hero">
                     <div className="sd-info-avatar">{getInitials(user.fullName || user.username)}</div>
-                    <div>
-                      <h3>{user.fullName || user.username}</h3>
-                      <span className="sd-role-badge">{user.roleName}</span>
-                    </div>
+                    <div><h3>{user.fullName || user.username}</h3><span className="sd-role-badge">{user.roleName}</span></div>
                   </div>
                   <dl className="sd-dl">
                     <InfoRow label="Tên đăng nhập" value={user.username} />
@@ -631,12 +332,8 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                     <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
                   </dl>
                 </div>
-
                 <div className="sd-card">
-                  <div className="sd-card-header">
-                    <p className="sd-eyebrow">Bảo mật</p>
-                    <h2>Đổi mật khẩu</h2>
-                  </div>
+                  <div className="sd-card-header"><p className="sd-eyebrow">Bảo mật</p><h2>Đổi mật khẩu</h2></div>
                   <PasswordForm onUserUpdated={onUserUpdated} user={user} />
                 </div>
               </div>
@@ -645,52 +342,28 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
         </main>
       </div>
 
-      {/* --- MODAL CỦA NHÂN VIÊN --- */}
       {(modal === 'add' || modal === 'edit') && (
         <div className="sd-overlay" onClick={closeModal}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sd-modal-header">
-              <h2>{modal === 'add' ? 'Thêm nhân viên' : 'Chỉnh sửa'}</h2>
-              <button onClick={closeModal}>✕</button>
-            </div>
+            <div className="sd-modal-header"><h2>{modal === 'add' ? 'Thêm nhân viên' : 'Chỉnh sửa'}</h2><button onClick={closeModal}>✕</button></div>
             <div className="sd-modal-body">
               <div className="sd-modal-grid">
-                <div className="sd-field">
-                  <label>Họ và tên *</label>
-                  <input name="fullName" value={form.fullName} onChange={handleFormChange} />
-                </div>
-                <div className="sd-field">
-                  <label>Username *</label>
-                  <input name="username" value={form.username} onChange={handleFormChange} />
-                </div>
-                <div className="sd-field">
-                  <label>Password *</label>
-                  <input type="password" name="password" value={form.password} onChange={handleFormChange} placeholder="••••••" />
-                </div>
-                <div className="sd-field">
-                  <label>Ngày vào làm</label>
-                  <input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} />
-                </div>
+                <div className="sd-field"><label>Họ và tên *</label><input name="fullName" value={form.fullName} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>Username *</label><input name="username" value={form.username} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>Password *</label><input type="password" name="password" value={form.password} onChange={handleFormChange} placeholder="••••••" /></div>
+                <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field">
                   <label>Role</label>
                   <select name="roleId" value={form.roleId || ''} onChange={handleFormChange}>
                     <option value="">-- Chọn role --</option>
-                    {roles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.roleName}
-                      </option>
-                    ))}
+                    {roles.map((r) => <option key={r.id} value={r.id}>{r.roleName}</option>)}
                   </select>
                 </div>
                 <div className="sd-field">
                   <label>Chi nhánh</label>
                   <select name="branchId" value={form.branchId || ''} onChange={handleFormChange}>
                     <option value="">-- Chọn chi nhánh --</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -698,9 +371,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={closeModal}>Huỷ</button>
-              <button className="sd-btn-primary" disabled={saving} onClick={modal === 'add' ? handleSaveAdd : handleSaveEdit}>
-                {saving ? 'Đang lưu...' : 'Lưu lại'}
-              </button>
+              <button className="sd-btn-primary" disabled={saving} onClick={modal === 'add' ? handleSaveAdd : handleSaveEdit}>{saving ? 'Đang lưu...' : 'Lưu lại'}</button>
             </div>
           </div>
         </div>
@@ -709,19 +380,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       {modal === 'delete' && (
         <div className="sd-overlay" onClick={closeModal}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sd-modal-header">
-              <h2>Xác nhận xoá</h2>
-              <button onClick={closeModal}>✕</button>
-            </div>
+            <div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={closeModal}>✕</button></div>
             <div className="sd-modal-body">
               <p>Bạn có chắc muốn xoá nhân viên <strong>{modalUser?.fullName}</strong>?</p>
               {formErr && <p className="sd-status sd-status-error">{formErr}</p>}
             </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={closeModal}>Huỷ</button>
-              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>
-                {saving ? 'Đang xoá...' : 'Xoá ngay'}
-              </button>
+              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>{saving ? 'Đang xoá...' : 'Xoá ngay'}</button>
             </div>
           </div>
         </div>
@@ -731,12 +397,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 }
 
 function InfoRow({ label, value }) {
-  return (
-    <div className="sd-info-row">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  )
+  return <div className="sd-info-row"><dt>{label}</dt><dd>{value}</dd></div>
 }
 
 function PasswordForm({ onUserUpdated, user }) {
@@ -744,13 +405,10 @@ function PasswordForm({ onUserUpdated, user }) {
   const [status, setStatus] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  function handleChange(e) {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
-  }
+  function handleChange(e) { setForm((f) => ({ ...f, [e.target.name]: e.target.value })) }
 
   async function handleSubmit(e) {
-    e.preventDefault()
-    setStatus(null)
+    e.preventDefault(); setStatus(null)
     if (form.currentPassword !== user.password) return setStatus({ type: 'error', msg: 'Mật khẩu hiện tại không đúng' })
     if (form.newPassword.length < 4) return setStatus({ type: 'error', msg: 'Mật khẩu mới cần tối thiểu 4 ký tự' })
     if (form.newPassword !== form.confirmPassword) return setStatus({ type: 'error', msg: 'Nhập lại mật khẩu chưa khớp' })
@@ -761,11 +419,7 @@ function PasswordForm({ onUserUpdated, user }) {
       onUserUpdated(updatedUser)
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setStatus({ type: 'success', msg: 'Đã cập nhật mật khẩu thành công' })
-    } catch (err) {
-      setStatus({ type: 'error', msg: err.message || 'Lỗi cập nhật' })
-    } finally {
-      setIsSaving(false)
-    }
+    } catch (err) { setStatus({ type: 'error', msg: err.message || 'Lỗi cập nhật' }) } finally { setIsSaving(false) }
   }
 
   return (
@@ -794,37 +448,17 @@ function ManagerQrAttendanceTab({ user }) {
   const [lastQrText, setLastQrText] = useState('')
 
   useEffect(() => {
-    getAllShifts()
-      .then((data) => {
-        const branchShifts = (Array.isArray(data) ? data : []).filter((s) => String(s.branchId) === String(user.branchId))
-        setShifts(branchShifts)
-        setShiftId((current) => current || branchShifts[0]?.id?.toString() || '')
-      })
-      .catch(() => {
-        setShifts([])
-      })
+    getAllShifts().then((data) => {
+      const branchShifts = (Array.isArray(data) ? data : []).filter((s) => String(s.branchId) === String(user.branchId))
+      setShifts(branchShifts)
+      setShiftId((current) => current || branchShifts[0]?.id?.toString() || '')
+    }).catch(() => setShifts([]))
   }, [user.branchId])
 
   useEffect(() => {
-    const scanner = new Html5QrcodeScanner(
-      'manager-qr-reader',
-      { fps: 8, qrbox: { width: 240, height: 240 } },
-      false
-    )
-
-    scanner.render(
-      (decodedText) => {
-        if (decodedText && decodedText !== lastQrText) {
-          setLastQrText(decodedText)
-          handleQrText(decodedText)
-        }
-      },
-      () => {}
-    )
-
-    return () => {
-      scanner.clear().catch(() => {})
-    }
+    const scanner = new Html5QrcodeScanner('manager-qr-reader', { fps: 8, qrbox: { width: 240, height: 240 } }, false)
+    scanner.render((decodedText) => { if (decodedText && decodedText !== lastQrText) { setLastQrText(decodedText); handleQrText(decodedText) } }, () => {})
+    return () => { scanner.clear().catch(() => {}) }
   }, [lastQrText, shiftId, workDate, scanAction])
 
   function parseEmployeeQr(text) {
@@ -835,68 +469,37 @@ function ManagerQrAttendanceTab({ user }) {
   }
 
   async function handleQrText(text) {
-    if (!shiftId || !workDate) {
-      setStatus({ type: 'error', msg: 'Vui lòng chọn ngày và ca trước khi quét QR.' })
-      return
-    }
-
-    setIsSubmitting(true)
-    setStatus(null)
+    if (!shiftId || !workDate) { setStatus({ type: 'error', msg: 'Vui lòng chọn ngày và ca trước khi quét QR.' }); return }
+    setIsSubmitting(true); setStatus(null)
     try {
       const employeeQr = parseEmployeeQr(text)
       const now = new Date().toISOString()
       const res = await axios.post('/api/StaffRegistration/scan-attendance', {
-        managerId: user.id,
-        employeeId: employeeQr.employeeId,
-        shiftId: Number(shiftId),
-        workDate,
-        action: scanAction,
-        checkInTime: scanAction === 'CHECKIN' ? now : null,
-        checkOutTime: scanAction === 'CHECKOUT' ? now : null,
+        managerId: user.id, employeeId: employeeQr.employeeId, shiftId: Number(shiftId), workDate, action: scanAction,
+        checkInTime: scanAction === 'CHECKIN' ? now : null, checkOutTime: scanAction === 'CHECKOUT' ? now : null,
       })
       setScanResult(res.data)
-      setStatus({
-        type: 'success',
-        msg: scanAction === 'CHECKIN'
-          ? 'Đã check-in và chuyển trạng thái sang Đang Trong Ca Làm.'
-          : 'Đã check-out, tính giờ làm và cộng vào lương tháng.',
-      })
-    } catch (err) {
-      setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Không đọc được mã QR.' })
-    } finally {
-      setIsSubmitting(false)
-    }
+      setStatus({ type: 'success', msg: 'Đã lưu chấm công thành công.' })
+    } catch (err) { setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Không đọc được mã QR.' }) } finally { setIsSubmitting(false) }
   }
 
   function handleManualSubmit(e) {
     e.preventDefault()
     if (!manualQr.trim()) return
-    setLastQrText(manualQr.trim())
-    handleQrText(manualQr.trim())
+    setLastQrText(manualQr.trim()); handleQrText(manualQr.trim())
   }
 
   return (
     <div className="sd-users-page">
       <div className="sd-card sd-qr-scan-card">
-        <div className="sd-card-header">
-          <p className="sd-eyebrow">Chấm công</p>
-          <h2>Quét QR nhân viên</h2>
-        </div>
-
+        <div className="sd-card-header"><p className="sd-eyebrow">Chấm công</p><h2>Quét QR nhân viên</h2></div>
         <div className="sd-modal-grid">
-          <div className="sd-field">
-            <label>Ngày làm việc</label>
-            <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
-          </div>
+          <div className="sd-field"><label>Ngày làm việc</label><input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} /></div>
           <div className="sd-field">
             <label>Ca làm</label>
             <select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
               <option value="">-- Chọn ca --</option>
-              {shifts.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.shiftName} ({s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)})
-                </option>
-              ))}
+              {shifts.map((s) => <option key={s.id} value={s.id}>{s.shiftName} ({s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)})</option>)}
             </select>
           </div>
           <div className="sd-field">
@@ -907,28 +510,20 @@ function ManagerQrAttendanceTab({ user }) {
             </select>
           </div>
         </div>
-
         <div id="manager-qr-reader" className="sd-qr-reader"></div>
-
         <form className="sd-qr-manual" onSubmit={handleManualSubmit}>
           <div className="sd-field">
             <label>Nhập dữ liệu QR nếu không mở được camera</label>
             <textarea value={manualQr} onChange={(e) => setManualQr(e.target.value)} placeholder='{"type":"EMPLOYEE","id":1,...}' />
           </div>
-          <button className="sd-btn-primary" disabled={isSubmitting || !shiftId || !workDate} type="submit">
-            {isSubmitting ? 'Đang lưu...' : scanAction === 'CHECKIN' ? 'Lưu check-in' : 'Lưu check-out'}
-          </button>
+          <button className="sd-btn-primary" disabled={isSubmitting || !shiftId || !workDate} type="submit">{isSubmitting ? 'Đang lưu...' : 'Lưu dữ liệu QR'}</button>
         </form>
-
         {status && <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>}
       </div>
 
       {scanResult && (
         <div className="sd-card">
-          <div className="sd-card-header">
-            <p className="sd-eyebrow">Kết quả mới nhất</p>
-            <h2>{scanResult.employee?.fullName || scanResult.employee?.username}</h2>
-          </div>
+          <div className="sd-card-header"><p className="sd-eyebrow">Kết quả mới nhất</p><h2>{scanResult.employee?.fullName || scanResult.employee?.username}</h2></div>
           <dl className="sd-dl">
             <InfoRow label="Mã lịch làm" value={scanResult.scheduleId} />
             <InfoRow label="Mã chấm công" value={scanResult.attendanceId} />
@@ -958,15 +553,10 @@ export function AdminBranchTab({ branches, setBranches }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    getAllShifts()
-      .then((data) => setShifts(Array.isArray(data) ? data : []))
-      .catch(() => {})
-  }, [])
+  useEffect(() => { getAllShifts().then((data) => setShifts(Array.isArray(data) ? data : [])).catch(() => {}) }, [])
 
   const displayedBranches = branches.filter((b) =>
-    (b.name?.toLowerCase() || '').includes(search.toLowerCase()) ||
-    (b.address?.toLowerCase() || '').includes(search.toLowerCase())
+    (b.name?.toLowerCase() || '').includes(search.toLowerCase()) || (b.address?.toLowerCase() || '').includes(search.toLowerCase())
   )
 
   function openAddBranch() { setBranchForm({ name: '', address: '', latitude: '', longitude: '' }); setError(''); setBranchModal('add') }
@@ -978,14 +568,15 @@ export function AdminBranchTab({ branches, setBranches }) {
     setSaving(true); setError('')
     try {
       const payload = { ...branchForm, latitude: branchForm.latitude === '' ? null : parseFloat(branchForm.latitude), longitude: branchForm.longitude === '' ? null : parseFloat(branchForm.longitude) }
-      if (branchModal === 'add') { await createBranch(payload) } else { await updateBranch(branchForm.id, payload); if (selectedBranch) { setSelectedBranch({ ...selectedBranch, ...payload }) } }
-      const newData = await getAllBranches(); setBranches(Array.isArray(newData) ? newData : []); setBranchModal(null)
+      if (branchModal === 'add') { await createBranch(payload) } else { await updateBranch(branchForm.id, payload); if (selectedBranch) setSelectedBranch({ ...selectedBranch, ...payload }) }
+      const newData = await getAllBranches()
+      setBranches(Array.isArray(newData) ? newData : []); setBranchModal(null)
     } catch (err) { console.error(err); setError('Lỗi lưu cơ sở!') } finally { setSaving(false) }
   }
 
   async function handleDeleteBranch() {
     setSaving(true); setError('')
-    try { await deleteBranch(selectedBranch.id); setBranches((prev) => prev.filter((b) => b.id !== selectedBranch.id)); setSelectedBranch(null); setBranchModal(null) } 
+    try { await deleteBranch(selectedBranch.id); setBranches((prev) => prev.filter((b) => b.id !== selectedBranch.id)); setSelectedBranch(null); setBranchModal(null) }
     catch (err) { setError('Lỗi xóa cơ sở!') } finally { setSaving(false) }
   }
 
@@ -1001,14 +592,14 @@ export function AdminBranchTab({ branches, setBranches }) {
     try {
       const formatTime = (time) => (time.length === 5 ? `${time}:00` : time)
       const payloadShift = { ...shiftForm, startTime: formatTime(shiftForm.startTime), endTime: formatTime(shiftForm.endTime), maxStaff: shiftForm.maxStaff === '' ? 0 : parseInt(shiftForm.maxStaff, 10) }
-      if (shiftModal === 'add') { const payload = { ...payloadShift, branchId: selectedBranch.id }; await createShift(payload) } else { await updateShift(shiftForm.id, payloadShift) }
+      if (shiftModal === 'add') { await createShift({ ...payloadShift, branchId: selectedBranch.id }) } else { await updateShift(shiftForm.id, payloadShift) }
       const newData = await getAllShifts(); setShifts(Array.isArray(newData) ? newData : []); setShiftModal(null)
     } catch (err) { console.error(err); setError('Dữ liệu không hợp lệ!') } finally { setSaving(false) }
   }
 
   async function handleDeleteShift() {
     setSaving(true); setError('')
-    try { await deleteShift(modalShift.id); setShifts((prev) => prev.filter((s) => s.id !== modalShift.id)); setShiftModal(null) } 
+    try { await deleteShift(modalShift.id); setShifts((prev) => prev.filter((s) => s.id !== modalShift.id)); setShiftModal(null) }
     catch (err) { setError('Lỗi khi xóa ca.') } finally { setSaving(false) }
   }
 
@@ -1031,13 +622,7 @@ export function AdminBranchTab({ branches, setBranches }) {
           </div>
           <div className="sd-table-wrap">
             <table className="sd-table">
-              <thead>
-                <tr>
-                  <th className="sd-th sd-text-center sd-hide-mobile" style={{ width: 60 }}>ID</th>
-                  <th className="sd-th sd-td-name-col">Tên Cơ Sở</th>
-                  <th className="sd-th sd-td-info-col sd-hide-mobile">Địa Chỉ</th>
-                </tr>
-              </thead>
+              <thead><tr><th className="sd-th sd-text-center sd-hide-mobile" style={{ width: 60 }}>ID</th><th className="sd-th sd-td-name-col">Tên Cơ Sở</th><th className="sd-th sd-td-info-col sd-hide-mobile">Địa Chỉ</th></tr></thead>
               <tbody>
                 {displayedBranches.map((b) => (
                   <tr key={b.id} className="sd-tr" onClick={() => setSelectedBranch(b)} style={{ cursor: 'pointer' }}>
@@ -1105,26 +690,85 @@ export function AdminBranchTab({ branches, setBranches }) {
         </div>
       )}
 
-      {/* --- MODALS CƠ SỞ & CA --- */}
       {(branchModal === 'add' || branchModal === 'edit') && (
-        <div className="sd-overlay" onClick={() => setBranchModal(null)}><div className="sd-modal" onClick={e => e.stopPropagation()}><div className="sd-modal-header"><h2>{branchModal === 'add' ? 'Thêm cơ sở' : 'Sửa cơ sở'}</h2><button onClick={() => setBranchModal(null)}>✕</button></div><div className="sd-modal-body"><div className="sd-field"><label>Tên cơ sở *</label><input value={branchForm.name} onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} /></div><div className="sd-field"><label>Địa chỉ *</label><input value={branchForm.address} onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })} /></div><div className="sd-modal-grid"><div className="sd-field"><label>Vĩ độ (Lat)</label><input type="number" value={branchForm.latitude} onChange={(e) => setBranchForm({ ...branchForm, latitude: e.target.value })} /></div><div className="sd-field"><label>Kinh độ (Lng)</label><input type="number" value={branchForm.longitude} onChange={(e) => setBranchForm({ ...branchForm, longitude: e.target.value })} /></div></div>{error && <p className="sd-status sd-status-error">{error}</p>}</div><div className="sd-modal-footer"><button className="sd-btn-ghost" onClick={() => setBranchModal(null)}>Huỷ</button><button className="sd-btn-primary" disabled={saving} onClick={handleSaveBranch}>{saving ? 'Đang lưu...' : 'Lưu lại'}</button></div></div></div>
+        <div className="sd-overlay" onClick={() => setBranchModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>{branchModal === 'add' ? 'Thêm cơ sở' : 'Sửa cơ sở'}</h2><button onClick={() => setBranchModal(null)}>✕</button></div>
+            <div className="sd-modal-body">
+              <div className="sd-field"><label>Tên cơ sở *</label><input value={branchForm.name} onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })} /></div>
+              <div className="sd-field"><label>Địa chỉ *</label><input value={branchForm.address} onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })} /></div>
+              <div className="sd-modal-grid">
+                <div className="sd-field"><label>Vĩ độ (Lat)</label><input type="number" value={branchForm.latitude} onChange={(e) => setBranchForm({ ...branchForm, latitude: e.target.value })} /></div>
+                <div className="sd-field"><label>Kinh độ (Lng)</label><input type="number" value={branchForm.longitude} onChange={(e) => setBranchForm({ ...branchForm, longitude: e.target.value })} /></div>
+              </div>
+              {error && <p className="sd-status sd-status-error">{error}</p>}
+            </div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setBranchModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary" disabled={saving} onClick={handleSaveBranch}>{saving ? 'Đang lưu...' : 'Lưu lại'}</button>
+            </div>
+          </div>
+        </div>
       )}
+
       {branchModal === 'delete' && (
-        <div className="sd-overlay" onClick={() => setBranchModal(null)}><div className="sd-modal" onClick={e => e.stopPropagation()}><div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={() => setBranchModal(null)}>✕</button></div><div className="sd-modal-body"><p>Xoá cơ sở <strong className="sd-text-primary">{selectedBranch?.name}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div><div className="sd-modal-footer"><button className="sd-btn-ghost" onClick={() => setBranchModal(null)}>Huỷ</button><button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeleteBranch}>Xoá ngay</button></div></div></div>
+        <div className="sd-overlay" onClick={() => setBranchModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={() => setBranchModal(null)}>✕</button></div>
+            <div className="sd-modal-body"><p>Xoá cơ sở <strong className="sd-text-primary">{selectedBranch?.name}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setBranchModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeleteBranch}>Xoá ngay</button>
+            </div>
+          </div>
+        </div>
       )}
+
       {(shiftModal === 'add' || shiftModal === 'edit') && (
-        <div className="sd-overlay" onClick={() => setShiftModal(null)}><div className="sd-modal" onClick={e => e.stopPropagation()}><div className="sd-modal-header"><h2>{shiftModal === 'add' ? 'Thêm ca làm' : 'Sửa ca làm'}</h2><button onClick={() => setShiftModal(null)}>✕</button></div><div className="sd-modal-body"><div className="sd-field"><label>Tên ca (VD: Ca Sáng) *</label><input value={shiftForm.shiftName} onChange={(e) => setShiftForm({ ...shiftForm, shiftName: e.target.value })} /></div><div className="sd-modal-grid"><div className="sd-field"><label>Giờ bắt đầu *</label><input type="time" value={shiftForm.startTime?.slice(0, 5)} onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })} /></div><div className="sd-field"><label>Giờ kết thúc *</label><input type="time" value={shiftForm.endTime?.slice(0, 5)} onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })} /></div></div><div className="sd-modal-grid"><div className="sd-field"><label>Số NV tối đa mặc định</label><input type="number" value={shiftForm.maxStaff} onChange={(e) => setShiftForm({ ...shiftForm, maxStaff: e.target.value })} /></div><div className="sd-field sd-flex-center"><label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 24 }}><input type="checkbox" checked={shiftForm.isOt} onChange={(e) => setShiftForm({ ...shiftForm, isOt: e.target.checked })} style={{ width: 18, height: 18 }} />Ca tính Tăng ca (OT)?</label></div></div>{error && <p className="sd-status sd-status-error">{error}</p>}</div><div className="sd-modal-footer"><button className="sd-btn-ghost" onClick={() => setShiftModal(null)}>Huỷ</button><button className="sd-btn-primary" disabled={saving} onClick={handleSaveShift}>{saving ? 'Đang lưu...' : 'Lưu lại'}</button></div></div></div>
+        <div className="sd-overlay" onClick={() => setShiftModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>{shiftModal === 'add' ? 'Thêm ca làm' : 'Sửa ca làm'}</h2><button onClick={() => setShiftModal(null)}>✕</button></div>
+            <div className="sd-modal-body">
+              <div className="sd-field"><label>Tên ca (VD: Ca Sáng) *</label><input value={shiftForm.shiftName} onChange={(e) => setShiftForm({ ...shiftForm, shiftName: e.target.value })} /></div>
+              <div className="sd-modal-grid">
+                <div className="sd-field"><label>Giờ bắt đầu *</label><input type="time" value={shiftForm.startTime?.slice(0, 5)} onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })} /></div>
+                <div className="sd-field"><label>Giờ kết thúc *</label><input type="time" value={shiftForm.endTime?.slice(0, 5)} onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })} /></div>
+              </div>
+              <div className="sd-modal-grid">
+                <div className="sd-field"><label>Số NV tối đa mặc định</label><input type="number" value={shiftForm.maxStaff} onChange={(e) => setShiftForm({ ...shiftForm, maxStaff: e.target.value })} /></div>
+                <div className="sd-field sd-flex-center">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 24 }}>
+                    <input type="checkbox" checked={shiftForm.isOt} onChange={(e) => setShiftForm({ ...shiftForm, isOt: e.target.checked })} style={{ width: 18, height: 18 }} />
+                    Ca tính Tăng ca (OT)?
+                  </label>
+                </div>
+              </div>
+              {error && <p className="sd-status sd-status-error">{error}</p>}
+            </div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setShiftModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary" disabled={saving} onClick={handleSaveShift}>{saving ? 'Đang lưu...' : 'Lưu lại'}</button>
+            </div>
+          </div>
+        </div>
       )}
+
       {shiftModal === 'delete' && (
-        <div className="sd-overlay" onClick={() => setShiftModal(null)}><div className="sd-modal" onClick={e => e.stopPropagation()}><div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={() => setShiftModal(null)}>✕</button></div><div className="sd-modal-body"><p>Xoá ca <strong className="sd-text-primary">{modalShift?.shiftName}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div><div className="sd-modal-footer"><button className="sd-btn-ghost" onClick={() => setShiftModal(null)}>Huỷ</button><button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeleteShift}>Xoá ngay</button></div></div></div>
+        <div className="sd-overlay" onClick={() => setShiftModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={() => setShiftModal(null)}>✕</button></div>
+            <div className="sd-modal-body"><p>Xoá ca <strong className="sd-text-primary">{modalShift?.shiftName}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setShiftModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeleteShift}>Xoá ngay</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-// ==========================================
-// ĐỢT ĐĂNG KÝ (BẢNG DUYỆT CỦA MANAGER)
-// ==========================================
 export function AdminPeriodTab({ user, isManager, branches }) {
   const [periods, setPeriods] = useState([])
   const [modal, setModal] = useState(null)
@@ -1133,24 +777,16 @@ export function AdminPeriodTab({ user, isManager, branches }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [reviewingPeriod, setReviewingPeriod] = useState(null)
-
   const [form, setForm] = useState({ startDate: '', endDate: '', status: 'Mở' })
 
   useEffect(() => { loadPeriods() }, [])
 
   async function loadPeriods() {
-    try {
-      const data = await getAllPeriods()
-      setPeriods(Array.isArray(data) ? data : [])
-    } catch (err) { console.error(err) }
+    try { const data = await getAllPeriods(); setPeriods(Array.isArray(data) ? data : []) } catch (err) { console.error(err) }
   }
 
   const filteredPeriods = periods
-    .filter((p) => {
-      const matchBranch = p.branchId === user.branchId 
-      const dateRangeStr = `${formatDate(p.startDate)} ${formatDate(p.endDate)}`.toLowerCase()
-      return matchBranch && dateRangeStr.includes(search.toLowerCase())
-    })
+    .filter((p) => { const matchBranch = p.branchId === user.branchId; const dateRangeStr = `${formatDate(p.startDate)} ${formatDate(p.endDate)}`.toLowerCase(); return matchBranch && dateRangeStr.includes(search.toLowerCase()) })
     .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
 
   function openAdd() { setForm({ startDate: '', endDate: '', status: 'Mở' }); setError(''); setModal('add') }
@@ -1160,18 +796,13 @@ export function AdminPeriodTab({ user, isManager, branches }) {
   async function handleSave() {
     if (!form.startDate || !form.endDate) return setError('Vui lòng điền ngày bắt đầu và kết thúc')
     setSaving(true); setError('')
-    try {
-      const payload = { ...form, branchId: user.branchId }
-      if (modal === 'add') await createPeriod(payload)
-      else await updatePeriod(form.id, payload)
-      await loadPeriods()
-      setModal(null)
-    } catch (err) { setError('Lỗi khi lưu đợt.') } finally { setSaving(false) }
+    try { const payload = { ...form, branchId: user.branchId }; if (modal === 'add') await createPeriod(payload); else await updatePeriod(form.id, payload); await loadPeriods(); setModal(null) }
+    catch (err) { setError('Lỗi khi lưu đợt.') } finally { setSaving(false) }
   }
 
   async function handleDelete() {
     setSaving(true); setError('')
-    try { await deletePeriod(selectedPeriod.id); await loadPeriods(); setModal(null) } 
+    try { await deletePeriod(selectedPeriod.id); await loadPeriods(); setModal(null) }
     catch (err) { setError('Không thể xóa đợt đăng ký này!') } finally { setSaving(false) }
   }
 
@@ -1197,21 +828,9 @@ export function AdminPeriodTab({ user, isManager, branches }) {
 
       <div className="sd-table-wrap">
         <table className="sd-table">
-          <thead>
-            <tr>
-              <th className="sd-th sd-td-name-col">Thời gian đợt đăng ký</th>
-              <th className="sd-th sd-text-center">Trạng Thái</th>
-              <th className="sd-th sd-text-right">Thao tác</th>
-            </tr>
-          </thead>
+          <thead><tr><th className="sd-th sd-td-name-col">Thời gian đợt đăng ký</th><th className="sd-th sd-text-center">Trạng Thái</th><th className="sd-th sd-text-right">Thao tác</th></tr></thead>
           <tbody>
-            {filteredPeriods.length === 0 && (
-              <tr>
-                <td colSpan={3} className="sd-td-empty">
-                  <div className="sd-empty-state"><span className="sd-empty-icon">📅</span><p>Chưa có đợt đăng ký lịch làm nào</p></div>
-                </td>
-              </tr>
-            )}
+            {filteredPeriods.length === 0 && <tr><td colSpan={3} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">📅</span><p>Chưa có đợt đăng ký lịch làm nào</p></div></td></tr>}
             {filteredPeriods.map((p) => {
               const isOpen = p.status?.toLowerCase() === 'mở' || p.status === 'Open' || p.status === 'OPEN'
               const isPublished = p.status === 'PUBLISHED'
@@ -1219,11 +838,10 @@ export function AdminPeriodTab({ user, isManager, branches }) {
                 <tr key={p.id} className="sd-tr" style={{ cursor: 'pointer' }} onClick={() => setReviewingPeriod(p)}>
                   <td className="sd-td sd-td-name-col"><strong style={{ color: '#1e293b' }}>Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)}</strong></td>
                   <td className="sd-td sd-text-center sd-td-info-col">
-                    {isPublished ? (
-                      <span className="sd-status-pill sd-status-pill--closed" style={{background: '#e0e7ff', color: '#1d4ed8', borderColor: '#bfdbfe'}}>Đã Chốt</span>
-                    ) : (
-                      <span className={`sd-status-pill ${isOpen ? 'sd-status-pill--open' : 'sd-status-pill--closed'}`}>{isOpen ? 'Đang Mở' : 'Đã Đóng'}</span>
-                    )}
+                    {isPublished
+                      ? <span className="sd-status-pill sd-status-pill--closed" style={{ background: '#e0e7ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}>Đã Chốt</span>
+                      : <span className={`sd-status-pill ${isOpen ? 'sd-status-pill--open' : 'sd-status-pill--closed'}`}>{isOpen ? 'Đang Mở' : 'Đã Đóng'}</span>
+                    }
                   </td>
                   <td className="sd-td sd-text-right" style={{ whiteSpace: 'nowrap' }}>
                     <button className="sd-action-btn sd-action-edit" onClick={(e) => { e.stopPropagation(); openEdit(p) }}>✎</button>
@@ -1236,20 +854,48 @@ export function AdminPeriodTab({ user, isManager, branches }) {
         </table>
       </div>
 
-      {/* MODALS MỞ ĐỢT */}
       {(modal === 'add' || modal === 'edit') && (
-        <div className="sd-overlay" onClick={() => setModal(null)}><div className="sd-modal" onClick={(e) => e.stopPropagation()}><div className="sd-modal-header"><h2>{modal === 'add' ? 'Mở đợt đăng ký mới' : 'Chỉnh sửa'}</h2><button onClick={() => setModal(null)}>✕</button></div><div className="sd-modal-body"><div className="sd-modal-grid"><div className="sd-field"><label>Ngày bắt đầu đợt *</label><input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></div><div className="sd-field"><label>Ngày kết thúc đợt *</label><input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></div></div><div className="sd-field"><label>Trạng thái đợt đăng ký</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="Mở">Mở (Cho phép nhân viên đăng ký)</option><option value="Đóng">Đóng (Khóa đăng ký)</option></select></div>{error && <p className="sd-status sd-status-error">{error}</p>}</div><div className="sd-modal-footer"><button className="sd-btn-ghost" onClick={() => setModal(null)}>Huỷ</button><button className="sd-btn-primary" disabled={saving} onClick={handleSave}>Lưu đợt</button></div></div></div>
+        <div className="sd-overlay" onClick={() => setModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>{modal === 'add' ? 'Mở đợt đăng ký mới' : 'Chỉnh sửa'}</h2><button onClick={() => setModal(null)}>✕</button></div>
+            <div className="sd-modal-body">
+              <div className="sd-modal-grid">
+                <div className="sd-field"><label>Ngày bắt đầu đợt *</label><input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></div>
+                <div className="sd-field"><label>Ngày kết thúc đợt *</label><input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></div>
+              </div>
+              <div className="sd-field">
+                <label>Trạng thái đợt đăng ký</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <option value="Mở">Mở (Cho phép nhân viên đăng ký)</option>
+                  <option value="Đóng">Đóng (Khóa đăng ký)</option>
+                </select>
+              </div>
+              {error && <p className="sd-status sd-status-error">{error}</p>}
+            </div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary" disabled={saving} onClick={handleSave}>Lưu đợt</button>
+            </div>
+          </div>
+        </div>
       )}
+
       {modal === 'delete' && (
-        <div className="sd-overlay" onClick={() => setModal(null)}><div className="sd-modal" onClick={(e) => e.stopPropagation()}><div className="sd-modal-header"><h2>Xác nhận xoá đợt</h2><button onClick={() => setModal(null)}>✕</button></div><div className="sd-modal-body"><p>Bạn có chắc chắn muốn xoá đợt từ <strong>{formatDate(selectedPeriod?.startDate)}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div><div className="sd-modal-footer"><button className="sd-btn-ghost" onClick={() => setModal(null)}>Huỷ</button><button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>Xoá ngay</button></div></div></div>
+        <div className="sd-overlay" onClick={() => setModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>Xác nhận xoá đợt</h2><button onClick={() => setModal(null)}>✕</button></div>
+            <div className="sd-modal-body"><p>Bạn có chắc chắn muốn xoá đợt từ <strong>{formatDate(selectedPeriod?.startDate)}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>Xoá ngay</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-// ==========================================
-// MÀN HÌNH DUYỆT MA TRẬN CHO MANAGER
-// ==========================================
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
 
 function PeriodReviewScreen({ period, onBack, user }) {
@@ -1258,41 +904,31 @@ function PeriodReviewScreen({ period, onBack, user }) {
   const [dates, setDates] = useState([])
   const [loading, setLoading] = useState(true)
   const [draftApproved, setDraftApproved] = useState(new Set())
-  const [activeSwapId, setActiveSwapId] = useState(null) 
+  const [activeSwapId, setActiveSwapId] = useState(null)
 
   useEffect(() => {
     async function loadBoardData() {
       setLoading(true)
       try {
-        const [regRes, shiftRes] = await Promise.all([
-          axios.get(`/api/StaffRegistration/period/${period.id}`),
-          getAllShifts()
-        ])
+        const [regRes, shiftRes] = await Promise.all([axios.get(`/api/StaffRegistration/period/${period.id}`), getAllShifts()])
         const allRegs = regRes.data || []
-        const branchShifts = shiftRes.filter(s => s.branchId === period.branchId)
-        setRegistrations(allRegs)
-        setShifts(branchShifts)
-
+        const branchShifts = shiftRes.filter((s) => s.branchId === period.branchId)
+        setRegistrations(allRegs); setShifts(branchShifts)
         const dArray = []
-        let curr = new Date(period.startDate); const end = new Date(period.endDate)
+        let curr = new Date(period.startDate)
+        const end = new Date(period.endDate)
         while (curr <= end) { dArray.push(new Date(curr)); curr.setDate(curr.getDate() + 1) }
         setDates(dArray)
-
         const newDraft = new Set()
         const grouped = {}
-        allRegs.forEach(r => {
-          const key = r.workDate.slice(0, 10) + '_' + r.shiftId
-          if (!grouped[key]) grouped[key] = []
-          grouped[key].push(r)
-        })
-
-        Object.keys(grouped).forEach(key => {
+        allRegs.forEach((r) => { const key = r.workDate.slice(0, 10) + '_' + r.shiftId; if (!grouped[key]) grouped[key] = []; grouped[key].push(r) })
+        Object.keys(grouped).forEach((key) => {
           const shiftId = parseInt(key.split('_')[1])
-          const shift = branchShifts.find(s => s.id === shiftId)
+          const shift = branchShifts.find((s) => s.id === shiftId)
           const max = shift?.maxStaff || 0
-          const allowedStaff = max > 0 ? max - 1 : 999 
+          const allowedStaff = max > 0 ? max - 1 : 999
           const sorted = grouped[key]
-          for (let i = 0; i < Math.min(allowedStaff, sorted.length); i++) { newDraft.add(sorted[i].id) }
+          for (let i = 0; i < Math.min(allowedStaff, sorted.length); i++) newDraft.add(sorted[i].id)
         })
         setDraftApproved(newDraft)
       } catch (error) { console.error(error) } finally { setLoading(false) }
@@ -1307,22 +943,19 @@ function PeriodReviewScreen({ period, onBack, user }) {
   }
 
   const boardMatrix = {}
-  dates.forEach(dObj => {
+  dates.forEach((dObj) => {
     const dStr = toDateString(dObj)
     boardMatrix[dStr] = {}
-    shifts.forEach(s => {
-      boardMatrix[dStr][s.id] = registrations.filter(r => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id)
-    })
+    shifts.forEach((s) => { boardMatrix[dStr][s.id] = registrations.filter((r) => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id) })
   })
 
   const handlePublish = async () => {
-    if(!window.confirm("Bạn có chắc chắn muốn CHỐT LỊCH?")) return
+    if (!window.confirm('Bạn có chắc chắn muốn CHỐT LỊCH?')) return
     try {
       const payload = { periodId: period.id, approvedRegistrationIds: Array.from(draftApproved) }
       await axios.post('/api/StaffRegistration/publish', payload)
-      alert("✅ Đã chốt lịch làm việc thành công!")
-      onBack() 
-    } catch (error) { alert("Lỗi chốt lịch") }
+      alert('✅ Đã chốt lịch làm việc thành công!'); onBack()
+    } catch (error) { alert('Lỗi chốt lịch') }
   }
 
   return (
@@ -1336,13 +969,13 @@ function PeriodReviewScreen({ period, onBack, user }) {
         <button className="sd-btn-primary" style={{ width: 'auto', marginTop: 0 }} onClick={handlePublish}>🔒 Chốt & Cập nhật Lịch</button>
       </div>
 
-      {loading ? <p>Đang tải ma trận...</p> : (
+      {loading ? <p>Đang tải...</p> : (
         <div className="sd-board-wrap">
           <table className="sd-schedule-board">
             <thead>
               <tr>
                 <th style={{ width: 90 }}>NGÀY</th>
-                {shifts.map(s => <th key={s.id}>{s.shiftName}<br/><span style={{fontWeight: 500, fontSize: 11}}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span></th>)}
+                {shifts.map((s) => <th key={s.id}>{s.shiftName}<br /><span style={{ fontWeight: 500, fontSize: 11 }}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span></th>)}
               </tr>
             </thead>
             <tbody>
@@ -1352,28 +985,42 @@ function PeriodReviewScreen({ period, onBack, user }) {
                 return (
                   <tr key={dStr}>
                     <td className="sd-board-date-col"><strong>{dayOfWeek}</strong><small>{dateObj.getDate()}/{dateObj.getMonth() + 1}</small></td>
-                    {shifts.map(shift => {
+                    {shifts.map((shift) => {
                       const cellRegs = boardMatrix[dStr][shift.id] || []
                       const max = shift.maxStaff || 0
-                      const allowedStaff = max > 0 ? max - 1 : 0 
-                      const assignedRegs = cellRegs.filter(r => draftApproved.has(r.id))
-                      const backupRegs = cellRegs.filter(r => !draftApproved.has(r.id))
-                      const slots = []; for (let i = 0; i < allowedStaff; i++) slots.push(assignedRegs[i] || null)
-
+                      const allowedStaff = max > 0 ? max - 1 : 0
+                      const assignedRegs = cellRegs.filter((r) => draftApproved.has(r.id))
+                      const backupRegs = cellRegs.filter((r) => !draftApproved.has(r.id))
+                      const slots = []
+                      if (max > 0) { for (let i = 0; i < allowedStaff; i++) slots.push(assignedRegs[i] || null) } else { slots.push(...assignedRegs) }
+                      const isWeekend = dayOfWeek === 'Thứ 7' || dayOfWeek === 'Chủ nhật'
+                      const isShiftClosed = isWeekend && cellRegs.length === 0
                       return (
                         <td key={shift.id}>
-                          <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
-                            <span className="sd-reg-name">👑 {user.fullName || user.username}</span>
-                          </div>
+                          {!isShiftClosed && <div style={{ fontSize: 11, marginBottom: 8, color: '#64748b', paddingBottom: 6, borderBottom: '1px dashed #e2e8f0' }}>Số lượng NV cần: <strong>{allowedStaff}</strong></div>}
+                          {!isShiftClosed ? (
+                            <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412', cursor: 'default' }}>
+                              <span className="sd-reg-name">👑 {user.fullName || user.username}</span>
+                              <span style={{ fontSize: 10, fontWeight: 'bold' }}>Quản lý</span>
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '16px 0', color: '#cbd5e1', fontSize: 12, fontWeight: 600 }}>CA NGHỈ</div>
+                          )}
                           {slots.map((r, idx) => {
                             if (!r) {
                               const emptyId = `empty_${dStr}_${shift.id}_${idx}`
                               return (
                                 <div key={emptyId} style={{ position: 'relative' }}>
-                                  <div className="sd-reg-card" style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8', borderStyle: 'dashed', cursor: 'pointer' }} onClick={() => setActiveSwapId(activeSwapId === emptyId ? null : emptyId)}><span>+ Thêm NV</span></div>
+                                  <div className="sd-reg-card" style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8', borderStyle: 'dashed', cursor: 'pointer' }} onClick={() => setActiveSwapId(activeSwapId === emptyId ? null : emptyId)}>
+                                    <span>+ Thêm NV</span>
+                                  </div>
                                   {activeSwapId === emptyId && (
                                     <div className="sd-swap-dropdown">
-                                      {backupRegs.map(backup => <div key={backup.id} className="sd-swap-item" onClick={() => { const next = new Set(draftApproved); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>{backup.user?.fullName}</div>)}
+                                      {backupRegs.map((backup) => (
+                                        <div key={backup.id} className="sd-swap-item" onClick={() => { const next = new Set(draftApproved); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>
+                                          {backup.user?.fullName}
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
@@ -1386,7 +1033,11 @@ function PeriodReviewScreen({ period, onBack, user }) {
                                 </div>
                                 {activeSwapId === r.id && (
                                   <div className="sd-swap-dropdown">
-                                    {backupRegs.map(backup => <div key={backup.id} className="sd-swap-item" onClick={() => { const next = new Set(draftApproved); next.delete(r.id); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>{backup.user?.fullName}</div>)}
+                                    {backupRegs.map((backup) => (
+                                      <div key={backup.id} className="sd-swap-item" onClick={() => { const next = new Set(draftApproved); next.delete(r.id); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>
+                                        {backup.user?.fullName}
+                                      </div>
+                                    ))}
                                   </div>
                                 )}
                               </div>
@@ -1406,70 +1057,44 @@ function PeriodReviewScreen({ period, onBack, user }) {
   )
 }
 
-// ==========================================
-// 👉 👉 5. TAB MỚI: XEM LỊCH CHÍNH THỨC DÀNH CHO ADMIN
-// ==========================================
 function AdminSystemScheduleTab({ branches }) {
   const [periods, setPeriods] = useState([])
   const [shifts, setShifts] = useState([])
   const [dates, setDates] = useState([])
   const [registrations, setRegistrations] = useState([])
-
-  // State lưu cơ sở và tuần đang chọn trên dropdown lọc
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [selectedPeriodId, setSelectedPeriodId] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // 1. Lần đầu vào tab, lấy mặc định chi nhánh đầu tiên
-  useEffect(() => {
-    if (branches.length > 0) {
-      setSelectedBranchId(branches[0].id.toString())
-    }
-  }, [branches])
+  useEffect(() => { if (branches.length > 0) setSelectedBranchId(branches[0].id.toString()) }, [branches])
 
-  // 2. Khi chọn xong Chi nhánh -> Đi tìm các Đợt "ĐÃ CHỐT" (PUBLISHED) của chi nhánh đó
   useEffect(() => {
     if (!selectedBranchId) return
     async function loadBranchPeriods() {
       try {
         const allPeriods = await getAllPeriods()
-        const pPeriods = allPeriods
-          .filter(p => String(p.branchId) === String(selectedBranchId) && p.status === 'PUBLISHED')
-          .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
-        
+        const pPeriods = allPeriods.filter((p) => String(p.branchId) === String(selectedBranchId) && p.status === 'PUBLISHED').sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
         setPeriods(pPeriods)
-        if (pPeriods.length > 0) {
-          setSelectedPeriodId(pPeriods[0].id.toString())
-        } else {
-          setSelectedPeriodId('')
-          setRegistrations([])
-          setDates([])
-        }
+        if (pPeriods.length > 0) setSelectedPeriodId(pPeriods[0].id.toString())
+        else { setSelectedPeriodId(''); setRegistrations([]); setDates([]) }
       } catch (e) { console.error(e) }
     }
     loadBranchPeriods()
   }, [selectedBranchId])
 
-  // 3. Khi đã có cả Chi nhánh + Đợt đã chốt -> Vẽ Ma trận lịch làm chính thức
   useEffect(() => {
     if (!selectedBranchId || !selectedPeriodId) return
     async function loadOfficialSchedule() {
       setLoading(true)
       try {
-        const period = periods.find(p => p.id.toString() === selectedPeriodId)
+        const period = periods.find((p) => p.id.toString() === selectedPeriodId)
         if (!period) return
-
-        const [regRes, shiftRes] = await Promise.all([
-          axios.get(`/api/StaffRegistration/period/${period.id}`),
-          getAllShifts()
-        ])
-
-        // Chỉ lọc lấy những người mang trạng thái "Đã Duyệt" chốt hạ
-        setRegistrations((regRes.data || []).filter(r => r.status === 'Đã Duyệt'))
-        setShifts(shiftRes.filter(s => String(s.branchId) === String(selectedBranchId)))
-
+        const [regRes, shiftRes] = await Promise.all([axios.get(`/api/StaffRegistration/period/${period.id}`), getAllShifts()])
+        setRegistrations((regRes.data || []).filter((r) => r.status === 'Đã Duyệt'))
+        setShifts(shiftRes.filter((s) => String(s.branchId) === String(selectedBranchId)))
         const dArray = []
-        let curr = new Date(period.startDate); const end = new Date(period.endDate)
+        let curr = new Date(period.startDate)
+        const end = new Date(period.endDate)
         while (curr <= end) { dArray.push(new Date(curr)); curr.setDate(curr.getDate() + 1) }
         setDates(dArray)
       } catch (e) { console.error(e) } finally { setLoading(false) }
@@ -1484,43 +1109,28 @@ function AdminSystemScheduleTab({ branches }) {
   }
 
   const boardMatrix = {}
-  dates.forEach(dObj => {
+  dates.forEach((dObj) => {
     const dStr = toDateString(dObj)
     boardMatrix[dStr] = {}
-    shifts.forEach(s => {
-      boardMatrix[dStr][s.id] = registrations.filter(r => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id)
-    })
+    shifts.forEach((s) => { boardMatrix[dStr][s.id] = registrations.filter((r) => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id) })
   })
 
-return (
+  return (
     <div className="sd-card" style={{ padding: '20px 0' }}>
-      
-      {/* KHỐI DROPDOWN KÉP: CHO ADMIN CHỌN CƠ SỞ VÀ TUẦN LÀM VIỆC */}
       <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 12, borderBottom: '1px solid #f1f5f9', marginBottom: 16 }}>
         <div className="sd-field" style={{ marginBottom: 0 }}>
           <label>1. Chọn cơ sở canteen giám sát:</label>
-          
-          {/* 👉 ĐÃ XÓA className="sd-input-search" ĐỂ TRẢ VỀ DÁNG FORM CHUẨN */}
           <select value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)}>
-            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
-
         <div className="sd-field" style={{ marginBottom: 0 }}>
           <label>2. Chọn tuần làm việc đã chốt sổ:</label>
-          
-          {/* 👉 ĐÃ XÓA className="sd-input-search" */}
           <select value={selectedPeriodId} onChange={(e) => setSelectedPeriodId(e.target.value)} disabled={periods.length === 0}>
-            {periods.length === 0 ? (
-              <option value="">-- Canteen này chưa có lịch chốt chính thức --</option>
-            ) : (
-              periods.map(p => <option key={p.id} value={p.id}>Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)}</option>)
-            )}
+            {periods.length === 0 ? <option value="">-- Canteen này chưa có lịch chốt chính thức --</option> : periods.map((p) => <option key={p.id} value={p.id}>Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)}</option>)}
           </select>
         </div>
       </div>
-
-      {/* HIỂN THỊ KẾT QUẢ MA TRẬN CHỈ XEM (READ-ONLY) */}
       <div style={{ padding: '0 20px' }}>
         {loading ? <p>Đang tải dữ liệu lịch làm việc...</p> : periods.length === 0 ? (
           <div className="sd-empty-state" style={{ padding: '30px 0' }}><span className="sd-empty-icon">🗓️</span><p>Cơ sở này hiện chưa được Quản lý xuất bản (Publish) lịch làm việc.</p></div>
@@ -1530,7 +1140,7 @@ return (
               <thead>
                 <tr>
                   <th style={{ width: 90 }}>NGÀY</th>
-                  {shifts.map(s => <th key={s.id}>{s.shiftName}<br/><span style={{fontWeight: 500, fontSize: 11}}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span></th>)}
+                  {shifts.map((s) => <th key={s.id}>{s.shiftName}<br /><span style={{ fontWeight: 500, fontSize: 11 }}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span></th>)}
                 </tr>
               </thead>
               <tbody>
@@ -1540,14 +1150,20 @@ return (
                   return (
                     <tr key={dStr}>
                       <td className="sd-board-date-col"><strong>{dayOfWeek}</strong><small>{dateObj.getDate()}/{dateObj.getMonth() + 1}</small></td>
-                      {shifts.map(shift => {
+                      {shifts.map((shift) => {
                         const cellRegs = boardMatrix[dStr][shift.id] || []
+                        const isWeekend = dayOfWeek === 'Thứ 7' || dayOfWeek === 'Chủ nhật'
+                        const isShiftClosed = isWeekend && cellRegs.length === 0
                         return (
                           <td key={shift.id}>
-                            <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
-                              <span className="sd-reg-name">👑 Quản lý ca</span>
-                            </div>
-                            {cellRegs.map(r => (
+                            {!isShiftClosed ? (
+                              <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
+                                <span className="sd-reg-name">👑 Quản lý ca</span>
+                              </div>
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: '16px 0', color: '#cbd5e1', fontSize: 12, fontWeight: 600 }}>CA NGHỈ</div>
+                            )}
+                            {cellRegs.map((r) => (
                               <div key={r.id} className="sd-reg-cardapproved" style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#475569', padding: '6px 8px', borderRadius: 6, marginBottom: 6, fontSize: 12, fontWeight: 600 }}>
                                 <span>{r.user?.fullName}</span>
                               </div>
@@ -1566,3 +1182,4 @@ return (
     </div>
   )
 }
+

@@ -326,7 +326,7 @@ function PublishedScheduleView({ period, user }) {
     <>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ color: '#1d4ed8', margin: '0 0 4px' }}>Lịch làm việc chính thức</h2>
-        <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Quản lý đã chốt lịch cho tuần này. Tên của bạn được tô màu xanh đậm.</p>
+       
       </div>
 
       <div className="sd-board-wrap" style={{ borderRadius: 12 }}>
@@ -357,11 +357,22 @@ function PublishedScheduleView({ period, user }) {
 
                   {shifts.map(shift => {
                     const cellRegs = boardMatrix[dStr][shift.id] || []
+                    
+                    // 👉 MẸO LOGIC CHO NHÂN VIÊN
+                    const isWeekend = dayOfWeek === 'Thứ 7' || dayOfWeek === 'Chủ nhật'
+                    const isShiftClosed = isWeekend && cellRegs.length === 0
+
                     return (
                       <td key={shift.id}>
-                        <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
-                          <span className="sd-reg-name">👑 Quản lý ca</span>
-                        </div>
+                        {!isShiftClosed ? (
+                          <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
+                            <span className="sd-reg-name"> Quản lý ca</span>
+                          </div>
+                        ) : (
+                          <div style={{ textAlign: 'center', padding: '16px 0', color: '#cbd5e1', fontSize: 12, fontWeight: 600 }}>
+                         KHÔNG CÓ CA LÀM  
+                          </div>
+                        )}
                         
                         {cellRegs.map(r => {
                           const staffName = r.user?.fullName || r.user?.username || 'Nhân viên'
@@ -377,7 +388,7 @@ function PublishedScheduleView({ period, user }) {
                                 fontWeight: isMe ? 700 : 500
                               }}
                             >
-                              <span className="sd-reg-name" title={staffName}>{isMe ? '👉 ' + staffName : staffName}</span>
+                              <span className="sd-reg-name" title={staffName}>{isMe ? ' ' + staffName : staffName}</span>
                             </div>
                           )
                         })}
@@ -614,7 +625,7 @@ function ProfileTab({ branch, user }) {
           <div><h3>{user.fullName || user.username}</h3><span className="sd-role-badge">{user.roleName || 'Nhân viên'}</span></div>
         </div>
         <dl className="sd-dl">
-          <InfoRow label="Tên đăng nhập" value={user.username} />
+      
           <InfoRow label="Họ và tên" value={user.fullName || '—'} />
           <InfoRow label="Chi nhánh" value={branch?.name || user.branchName || 'Chưa có'} />
           <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
