@@ -190,22 +190,72 @@ public class StaffRegistrationService
             await _context.SaveChangesAsync();
         }
 
+        var action = NormalizeText(dto.Action) == "CHECKOUT" ? "CHECKOUT" : "CHECKIN";
         var attendance = await _context.CaAttendances
             .FirstOrDefaultAsync(a => a.ScheduleId == schedule.Id);
+
         if (attendance == null)
         {
-            attendance = new CaAttendance
-            {
-                ScheduleId = schedule.Id,
-                CheckInTime = dto.CheckInTime ?? DateTime.Now,
-                Status = "Da check-in"
-            };
+            attendance = new CaAttendance { ScheduleId = schedule.Id };
             _context.CaAttendances.Add(attendance);
         }
-        else if (attendance.CheckInTime == null)
+
+        decimal workedHours = 0;
+        if (action == "CHECKIN")
         {
-            attendance.CheckInTime = dto.CheckInTime ?? DateTime.Now;
-            attendance.Status = "Da check-in";
+            if (attendance.CheckInTime == null)
+                attendance.CheckInTime = dto.CheckInTime ?? DateTime.Now;
+
+            attendance.Status = "Đang Trong Ca Làm";
+        }
+        else
+        {
+            if (attendance.CheckInTime == null)
+                throw new Exception("Nhan vien chua check-in ca nay.");
+
+            if (attendance.CheckOutTime == null)
+            {
+                attendance.CheckOutTime = dto.CheckOutTime ?? DateTime.Now;
+                workedHours = Math.Round((decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime.Value).TotalHours, 2);
+                if (workedHours < 0)
+                    throw new Exception("Gio check-out khong hop le.");
+
+                var month = attendance.CheckOutTime.Value.Month;
+                var year = attendance.CheckOutTime.Value.Year;
+                var salary = await _context.LuongMonthlySalaries
+                    .FirstOrDefaultAsync(s => s.UserId == employee.Id && s.Month == month && s.Year == year);
+                var hourlyWage = employee.Role?.HourlyWage ?? 0;
+
+                if (salary == null)
+                {
+                    salary = new LuongMonthlySalary
+                    {
+                        UserId = employee.Id,
+                        Month = month,
+                        Year = year,
+                        TotalHours = 0,
+                        HourlyWageAtTime = hourlyWage,
+                        TotalSalary = 0,
+                        TotalBonus = 0,
+                        TotalPenalty = 0,
+                        Status = "PENDING",
+                        CreatedAt = DateTime.Now
+                    };
+                    _context.LuongMonthlySalaries.Add(salary);
+                }
+
+                salary.TotalHours += workedHours;
+                salary.HourlyWageAtTime = hourlyWage;
+                salary.TotalSalary = (salary.TotalHours * salary.HourlyWageAtTime)
+                    + (salary.TotalBonus ?? 0)
+                    - (salary.TotalPenalty ?? 0);
+                attendance.Salary = salary;
+                attendance.Status = "Đã CheckOut";
+            }
+            else
+            {
+                attendance.Status = "Đã CheckOut";
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -231,6 +281,9 @@ public class StaffRegistrationService
             },
             workDate = schedule.WorkDate,
             checkInTime = attendance.CheckInTime,
+            checkOutTime = attendance.CheckOutTime,
+            workedHours,
+            salaryId = attendance.SalaryId,
             attendance.Status
         };
     }

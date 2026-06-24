@@ -17,5 +17,9 @@ public class ScanAttendanceDto
     [Required]
     public DateOnly WorkDate { get; set; }
 
+    public string? Action { get; set; }
+
     public DateTime? CheckInTime { get; set; }
+
+    public DateTime? CheckOutTime { get; set; }
 }
