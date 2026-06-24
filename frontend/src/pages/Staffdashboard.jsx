@@ -76,24 +76,24 @@ export function EmployeeQrCard({ user }) {
       <div className="sd-employee-qr-info">
         <div className="sd-info-avatar">{getInitials(user.fullName || user.username)}</div>
         <div>
-          <p className="sd-eyebrow">Ma QR nhan vien</p>
+          <p className="sd-eyebrow">Mã QR nhân viên</p>
           <h2>{user.fullName || user.username}</h2>
           <dl className="sd-employee-qr-list">
             <InfoRow label="Username" value={user.username || '---'} />
-            <InfoRow label="Chuc vu" value={user.roleName || '---'} />
-            <InfoRow label="Chi nhanh" value={user.branchName || 'Chua gan'} />
+            <InfoRow label="Chức vụ" value={user.roleName || '---'} />
+            <InfoRow label="Chi nhánh" value={user.branchName || 'Chưa gán'} />
           </dl>
         </div>
       </div>
 
       <div className="sd-employee-qr-box">
         {qrUrl ? (
-          <img alt="Ma QR nhan vien" src={qrUrl} />
+          <img alt="Mã QR nhân viên" src={qrUrl} />
         ) : (
-          <div className="sd-employee-qr-placeholder">Dang tao QR...</div>
+          <div className="sd-employee-qr-placeholder">Đang tạo QR...</div>
         )}
         <button className="sd-btn-primary sd-employee-qr-download" disabled={!qrUrl} onClick={downloadQr} type="button">
-          Tai QR
+          Tải QR
         </button>
       </div>
     </div>

@@ -241,13 +241,13 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'account':
         return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
       case 'staffSchedule':
-        return { eyebrow: 'Cong viec', title: 'Lich & Dang ky ca' }
+        return { eyebrow: 'Công việc', title: 'Lịch & Đăng ký ca' }
       case 'branches':
         return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
       case 'periods':
         return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr':
-        return { eyebrow: 'Cham cong', title: 'Quet QR nhan vien' }
+        return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
       case 'systemSchedule':
         return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       default:
@@ -294,12 +294,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     {
       id: 'scanQr',
       icon: 'Q',
-      label: 'Quet QR',
+      label: 'Quét QR',
     },
     {
       id: 'staffSchedule',
       icon: 'S',
-      label: 'Lich & Dang ky',
+      label: 'Lịch & Đăng ký',
     },
     {
       id: 'account',
@@ -786,6 +786,7 @@ function ManagerQrAttendanceTab({ user }) {
   const [shifts, setShifts] = useState([])
   const [shiftId, setShiftId] = useState('')
   const [workDate, setWorkDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [scanAction, setScanAction] = useState('CHECKIN')
   const [manualQr, setManualQr] = useState('')
   const [status, setStatus] = useState(null)
   const [scanResult, setScanResult] = useState(null)
@@ -824,18 +825,18 @@ function ManagerQrAttendanceTab({ user }) {
     return () => {
       scanner.clear().catch(() => {})
     }
-  }, [lastQrText, shiftId, workDate])
+  }, [lastQrText, shiftId, workDate, scanAction])
 
   function parseEmployeeQr(text) {
     const parsed = JSON.parse(text)
     const employeeId = parsed.id || parsed.employeeId || parsed.userId
-    if (!employeeId) throw new Error('QR khong co ma nhan vien')
+    if (!employeeId) throw new Error('QR không có mã nhân viên')
     return { ...parsed, employeeId: Number(employeeId) }
   }
 
   async function handleQrText(text) {
     if (!shiftId || !workDate) {
-      setStatus({ type: 'error', msg: 'Vui long chon ngay va ca truoc khi quet QR.' })
+      setStatus({ type: 'error', msg: 'Vui lòng chọn ngày và ca trước khi quét QR.' })
       return
     }
 
@@ -843,17 +844,25 @@ function ManagerQrAttendanceTab({ user }) {
     setStatus(null)
     try {
       const employeeQr = parseEmployeeQr(text)
+      const now = new Date().toISOString()
       const res = await axios.post('/api/StaffRegistration/scan-attendance', {
         managerId: user.id,
         employeeId: employeeQr.employeeId,
         shiftId: Number(shiftId),
         workDate,
-        checkInTime: new Date().toISOString(),
+        action: scanAction,
+        checkInTime: scanAction === 'CHECKIN' ? now : null,
+        checkOutTime: scanAction === 'CHECKOUT' ? now : null,
       })
       setScanResult(res.data)
-      setStatus({ type: 'success', msg: 'Da luu vao CaFinalSchedule va CaAttendance.' })
+      setStatus({
+        type: 'success',
+        msg: scanAction === 'CHECKIN'
+          ? 'Đã check-in và chuyển trạng thái sang Đang Trong Ca Làm.'
+          : 'Đã check-out, tính giờ làm và cộng vào lương tháng.',
+      })
     } catch (err) {
-      setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Khong doc duoc ma QR.' })
+      setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Không đọc được mã QR.' })
     } finally {
       setIsSubmitting(false)
     }
@@ -870,24 +879,31 @@ function ManagerQrAttendanceTab({ user }) {
     <div className="sd-users-page">
       <div className="sd-card sd-qr-scan-card">
         <div className="sd-card-header">
-          <p className="sd-eyebrow">Cham cong</p>
-          <h2>Quet QR nhan vien</h2>
+          <p className="sd-eyebrow">Chấm công</p>
+          <h2>Quét QR nhân viên</h2>
         </div>
 
         <div className="sd-modal-grid">
           <div className="sd-field">
-            <label>Ngay lam viec</label>
+            <label>Ngày làm việc</label>
             <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
           </div>
           <div className="sd-field">
-            <label>Ca lam</label>
+            <label>Ca làm</label>
             <select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
-              <option value="">-- Chon ca --</option>
+              <option value="">-- Chọn ca --</option>
               {shifts.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.shiftName} ({s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)})
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="sd-field">
+            <label>Hành động</label>
+            <select value={scanAction} onChange={(e) => setScanAction(e.target.value)}>
+              <option value="CHECKIN">Check-in vào ca</option>
+              <option value="CHECKOUT">Check-out kết thúc ca</option>
             </select>
           </div>
         </div>
@@ -896,11 +912,11 @@ function ManagerQrAttendanceTab({ user }) {
 
         <form className="sd-qr-manual" onSubmit={handleManualSubmit}>
           <div className="sd-field">
-            <label>Nhap du lieu QR neu khong mo duoc camera</label>
+            <label>Nhập dữ liệu QR nếu không mở được camera</label>
             <textarea value={manualQr} onChange={(e) => setManualQr(e.target.value)} placeholder='{"type":"EMPLOYEE","id":1,...}' />
           </div>
           <button className="sd-btn-primary" disabled={isSubmitting || !shiftId || !workDate} type="submit">
-            {isSubmitting ? 'Dang luu...' : 'Luu du lieu QR'}
+            {isSubmitting ? 'Đang lưu...' : scanAction === 'CHECKIN' ? 'Lưu check-in' : 'Lưu check-out'}
           </button>
         </form>
 
@@ -910,15 +926,19 @@ function ManagerQrAttendanceTab({ user }) {
       {scanResult && (
         <div className="sd-card">
           <div className="sd-card-header">
-            <p className="sd-eyebrow">Ket qua moi nhat</p>
+            <p className="sd-eyebrow">Kết quả mới nhất</p>
             <h2>{scanResult.employee?.fullName || scanResult.employee?.username}</h2>
           </div>
           <dl className="sd-dl">
-            <InfoRow label="Schedule ID" value={scanResult.scheduleId} />
-            <InfoRow label="Attendance ID" value={scanResult.attendanceId} />
+            <InfoRow label="Mã lịch làm" value={scanResult.scheduleId} />
+            <InfoRow label="Mã chấm công" value={scanResult.attendanceId} />
             <InfoRow label="Ca" value={scanResult.shift?.shiftName || '---'} />
-            <InfoRow label="Ngay" value={formatDate(scanResult.workDate)} />
+            <InfoRow label="Ngày" value={formatDate(scanResult.workDate)} />
             <InfoRow label="Check-in" value={scanResult.checkInTime ? new Date(scanResult.checkInTime).toLocaleString('vi-VN') : '---'} />
+            <InfoRow label="Check-out" value={scanResult.checkOutTime ? new Date(scanResult.checkOutTime).toLocaleString('vi-VN') : '---'} />
+            <InfoRow label="Số giờ làm" value={`${scanResult.workedHours || 0} giờ`} />
+            <InfoRow label="Mã bảng lương" value={scanResult.salaryId || '---'} />
+            <InfoRow label="Trạng thái" value={scanResult.status || '---'} />
           </dl>
         </div>
       )}
