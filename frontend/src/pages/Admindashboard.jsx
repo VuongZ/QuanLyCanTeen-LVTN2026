@@ -460,8 +460,8 @@ function ManagerQrAttendanceTab({ user }) {
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner('manager-qr-reader', { fps: 8, qrbox: { width: 240, height: 240 } }, false)
-    scanner.render((decodedText) => { if (decodedText && decodedText !== lastQrText) { setLastQrText(decodedText); handleQrText(decodedText) } }, () => {})
-    return () => { scanner.clear().catch(() => {}) }
+    scanner.render((decodedText) => { if (decodedText && decodedText !== lastQrText) { setLastQrText(decodedText); handleQrText(decodedText) } }, () => { })
+    return () => { scanner.clear().catch(() => { }) }
   }, [lastQrText, shiftId, workDate, scanAction])
 
   function parseEmployeeQr(text) {
@@ -553,7 +553,7 @@ export function AdminBranchTab({ branches, setBranches }) {
   const [branchForm, setBranchForm] = useState({ name: '', address: '', latitude: '', longitude: '' })
   const [search, setSearch] = useState('')
   const [shifts, setShifts] = useState([])
-  
+
   // 👉 STATE MỚI CHO TÍNH NĂNG CẤU HÌNH NGÀY
   const [shiftConfigs, setShiftConfigs] = useState([])
   const [configModal, setConfigModal] = useState(null)
@@ -566,9 +566,9 @@ export function AdminBranchTab({ branches, setBranches }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getAllShifts().then((data) => setShifts(Array.isArray(data) ? data : [])).catch(() => {})
+    getAllShifts().then((data) => setShifts(Array.isArray(data) ? data : [])).catch(() => { })
     // Load sẵn danh sách cấu hình của tất cả các ca
-    axios.get('/api/BranchShiftConfig').then(res => setShiftConfigs(res.data || [])).catch(() => {})
+    axios.get('/api/BranchShiftConfig').then(res => setShiftConfigs(res.data || [])).catch(() => { })
   }, [])
 
   const displayedBranches = branches.filter((b) =>
@@ -655,11 +655,11 @@ export function AdminBranchTab({ branches, setBranches }) {
       }
       const newData = await getAllShifts()
       setShifts(Array.isArray(newData) ? newData : [])
-      
+
       // Refresh lại config vì C# tự động sinh ra 7 ngày config khi tạo ca mới
       const configData = await axios.get('/api/BranchShiftConfig')
       setShiftConfigs(configData.data || [])
-      
+
       setShiftModal(null)
     } catch (err) { setError('Dữ liệu không hợp lệ!') } finally { setSaving(false) }
   }
@@ -674,15 +674,15 @@ export function AdminBranchTab({ branches, setBranches }) {
   }
 
   // 👉 HÀM MỞ GIAO DIỆN CẤU HÌNH NGÀY
- function openConfigShift(shift) {
+  function openConfigShift(shift) {
     setError('')
     const formState = EN_DAYS_ORDER.map(dayEn => {
       // Ép kiểu về chuỗi chữ thường để so sánh cho an toàn tuyệt đối
-      const existing = shiftConfigs.find(c => 
+      const existing = shiftConfigs.find(c =>
         c.shiftId === shift.id && String(c.dayOfWeek).toLowerCase() === dayEn.toLowerCase()
       )
       return {
-        id: existing?.id, 
+        id: existing?.id,
         dayOfWeek: dayEn,
         maxStaff: existing ? existing.maxStaff : (shift.maxStaff || 0)
       }
@@ -691,7 +691,7 @@ export function AdminBranchTab({ branches, setBranches }) {
     setConfigModal(shift)
   }
 
- // 👉 HÀM LƯU CẤU HÌNH (Nâng cấp chống lỗi bỏ trống ô nhập liệu)
+  // 👉 HÀM LƯU CẤU HÌNH (Nâng cấp chống lỗi bỏ trống ô nhập liệu)
   async function handleSaveConfig() {
     setSaving(true)
     setError('')
@@ -700,12 +700,12 @@ export function AdminBranchTab({ branches, setBranches }) {
         // 🔥 BẢO VỆ DỮ LIỆU: Nếu ô nhập bị xóa trắng (rỗng), tự động chuyển thành số 0
         const safeMaxStaff = (cfg.maxStaff === '' || isNaN(cfg.maxStaff)) ? 0 : parseInt(cfg.maxStaff, 10)
 
-        const payload = { 
-          shiftId: configModal.id, 
-          dayOfWeek: cfg.dayOfWeek, 
-          maxStaff: safeMaxStaff 
+        const payload = {
+          shiftId: configModal.id,
+          dayOfWeek: cfg.dayOfWeek,
+          maxStaff: safeMaxStaff
         }
-        
+
         if (cfg.id) {
           return axios.put(`/api/BranchShiftConfig/${cfg.id}`, payload)
         } else {
@@ -713,7 +713,7 @@ export function AdminBranchTab({ branches, setBranches }) {
         }
       })
       await Promise.all(apiCalls)
-      
+
       const res = await axios.get('/api/BranchShiftConfig')
       setShiftConfigs(res.data || [])
       setConfigModal(null)
@@ -842,17 +842,27 @@ export function AdminBranchTab({ branches, setBranches }) {
                           {s.isOt ? 'Có' : 'Không'}
                         </span>
                       </td>
+                      {/* CỘT CẤU HÌNH: Chỉ hiện trên Desktop, ẩn hoàn toàn trên Mobile */}
                       <td className="sd-td sd-text-center sd-hide-mobile">
-                        {/* 👉 NÚT BẤM MỞ MODAL CẤU HÌNH NGÀY */}
-                        <button 
-                          className="sd-btn-ghost" 
-                          style={{fontSize: 12, padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0'}} 
+                        <button
+                          className="sd-btn-ghost"
+                          style={{ fontSize: 12, padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}
                           onClick={() => openConfigShift(s)}
                         >
                           ⚙️ Cấu hình tuần
                         </button>
                       </td>
+
+                      {/* CỘT THAO TÁC: Chứa các nút hành động */}
                       <td className="sd-td sd-td-actions">
+                        {/* NÚT CẤU HÌNH RIÊNG CHO MOBILE: Sẽ gộp chung với Sửa/Xóa */}
+                        <button
+                          className="sd-action-btn sd-show-mobile-only"
+                          style={{ color: '#475569' }}
+                          onClick={() => openConfigShift(s)}
+                        >
+                          ⚙️
+                        </button>
                         <button className="sd-action-btn sd-action-edit" onClick={() => openEditShift(s)}>✎</button>
                         <button className="sd-action-btn sd-action-delete" onClick={() => openDeleteShift(s)}>✕</button>
                       </td>
@@ -874,34 +884,34 @@ export function AdminBranchTab({ branches, setBranches }) {
               <button onClick={() => setConfigModal(null)}>✕</button>
             </div>
             <div className="sd-modal-body">
-              <p style={{fontSize: 13, color: '#64748b', marginBottom: 16}}>Thiết lập số lượng nhân viên cần thiết cho từng ngày trong tuần. <strong>Nhập 0 nếu ca đó nghỉ.</strong></p>
-              
+              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>Thiết lập số lượng nhân viên cần thiết cho từng ngày trong tuần. <strong>Nhập 0 nếu ca đó nghỉ.</strong></p>
+
               <div className="sd-modal-grid">
-                 {configForm.map((cfg, index) => {
-                    // Nhận diện nếu bằng 0 hoặc rỗng thì coi như là Nghỉ
-                    const isOff = cfg.maxStaff == 0 || cfg.maxStaff === '';
-                    
-                    return (
-                      <div className="sd-field" key={cfg.dayOfWeek}>
-                        <label style={{color: isOff ? '#ef4444' : '#1e293b'}}>
-                          {VN_DAYS[index]} {isOff ? '(Nghỉ)' : ''}
-                        </label>
-                        <input 
-                          type="number" 
-                          min="0" 
-                          value={cfg.maxStaff} 
-                          style={{ 
-                            borderColor: isOff ? '#fecaca' : '', 
-                            background: isOff ? '#fef2f2' : '' 
-                          }}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setConfigForm(prev => prev.map((item, i) => i === index ? {...item, maxStaff: val} : item))
-                          }} 
-                        />
-                      </div>
-                    )
-                 })}
+                {configForm.map((cfg, index) => {
+                  // Nhận diện nếu bằng 0 hoặc rỗng thì coi như là Nghỉ
+                  const isOff = cfg.maxStaff == 0 || cfg.maxStaff === '';
+
+                  return (
+                    <div className="sd-field" key={cfg.dayOfWeek}>
+                      <label style={{ color: isOff ? '#ef4444' : '#1e293b' }}>
+                        {VN_DAYS[index]} {isOff ? '(Nghỉ)' : ''}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cfg.maxStaff}
+                        style={{
+                          borderColor: isOff ? '#fecaca' : '',
+                          background: isOff ? '#fef2f2' : ''
+                        }}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setConfigForm(prev => prev.map((item, i) => i === index ? { ...item, maxStaff: val } : item))
+                        }}
+                      />
+                    </div>
+                  )
+                })}
               </div>
               {error && <p className="sd-status sd-status-error">{error}</p>}
             </div>
@@ -1008,6 +1018,28 @@ export function AdminPeriodTab({ user, isManager, branches }) {
   async function loadPeriods() {
     try { const data = await getAllPeriods(); setPeriods(Array.isArray(data) ? data : []) } catch (err) { console.error(err) }
   }
+  // Thêm hàm này vào trong component AdminPeriodTab
+function handleStartDateChange(e) {
+  const selectedDateStr = e.target.value;
+  
+  if (!selectedDateStr) {
+    setForm({ ...form, startDate: '', endDate: '' });
+    return;
+  }
+
+  // Lấy ngày bắt đầu người dùng vừa chọn
+  const startDateObj = new Date(selectedDateStr);
+  
+  // Tạo ngày kết thúc bằng cách lấy ngày bắt đầu + 6 ngày
+  const endDateObj = new Date(startDateObj);
+  endDateObj.setDate(startDateObj.getDate() + 6);
+
+  // Ép định dạng về YYYY-MM-DD để nhét lại vào thẻ <input type="date">
+  const endDateStr = endDateObj.toISOString().slice(0, 10);
+
+  // Cập nhật state cho cả 2 ngày cùng lúc
+  setForm({ ...form, startDate: selectedDateStr, endDate: endDateStr });
+}
 
   const filteredPeriods = periods
     .filter((p) => { const matchBranch = p.branchId === user.branchId; const dateRangeStr = `${formatDate(p.startDate)} ${formatDate(p.endDate)}`.toLowerCase(); return matchBranch && dateRangeStr.includes(search.toLowerCase()) })
@@ -1084,9 +1116,16 @@ export function AdminPeriodTab({ user, isManager, branches }) {
             <div className="sd-modal-header"><h2>{modal === 'add' ? 'Mở đợt đăng ký mới' : 'Chỉnh sửa'}</h2><button onClick={() => setModal(null)}>✕</button></div>
             <div className="sd-modal-body">
               <div className="sd-modal-grid">
-                <div className="sd-field"><label>Ngày bắt đầu đợt *</label><input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} /></div>
-                <div className="sd-field"><label>Ngày kết thúc đợt *</label><input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} /></div>
-              </div>
+  <div className="sd-field">
+    <label>Ngày bắt đầu đợt (Bắt buộc Thứ 2) *</label>
+    {/* Dùng hàm handleStartDateChange thay vì setForm thông thường */}
+    <input 
+      type="date" 
+      value={form.startDate} 
+      onChange={handleStartDateChange} 
+    />
+  </div>
+</div>
               <div className="sd-field">
                 <label>Trạng thái đợt đăng ký</label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
@@ -1188,7 +1227,7 @@ function PeriodReviewScreen({ period, onBack, user }) {
       <div className="sd-publish-banner">
         <div>
           <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Bảng xếp lịch: Từ {formatDate(period.startDate)} đến {formatDate(period.endDate)}</h2>
-       
+
         </div>
         <button className="sd-btn-primary" style={{ width: 'auto', marginTop: 0 }} onClick={handlePublish}>🔒 Chốt & Cập nhật Lịch</button>
       </div>

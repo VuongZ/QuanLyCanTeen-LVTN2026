@@ -1409,3 +1409,20 @@
   background: #fff7ed;
   color: #ea580c;
 }
+
+/* Fix hiển thị nút cấu hình ca làm trên mobile */
+  .sd-td-config-col {
+    flex: 0 0 auto !important;
+  }
+  
+  .sd-btn-config {
+    padding: 4px 8px !important;
+    font-size: 16px !important; /* Phóng to icon một chút trên điện thoại để dễ bấm */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .sd-text-hide-mobile {
+    display: none !important; /* Ẩn chữ đi để tránh bị tràn màn hình 390px */
+  }
