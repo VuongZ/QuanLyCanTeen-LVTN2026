@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getUserPageData } from './api/UserApi'
 import { AdminDashboard } from './pages/Admindashboard'
+import { StaffDashboard } from './pages/Staffdashboard'
 import './App.css'
+
+function normalizeRole(value = '') {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+}
 
 function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
@@ -75,6 +80,8 @@ function App() {
   }
 
   if (currentUser) {
+    const roleName = normalizeRole(currentUser.roleName || '')
+    const isStaff = roleName.includes('STAFF') || roleName.includes('NHAN VIEN')
     const dashboardProps = {
       branches: pageData.branches,
       onLogout: handleLogout,
@@ -83,6 +90,11 @@ function App() {
       user: currentUser,
       users: pageData.users,
     }
+
+    if (isStaff) {
+      return <StaffDashboard {...dashboardProps} />
+    }
+
     return <AdminDashboard {...dashboardProps} />
   }
 

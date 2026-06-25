@@ -618,6 +618,7 @@ function RegistrationView({ period, user }) {
 function ProfileTab({ branch, user }) {
   return (
     <div className="sd-profile-layout">
+      <EmployeeQrCard user={user} />
       <div className="sd-card">
         <div className="sd-card-header"><p className="sd-eyebrow">Chi tiết</p><h2>Hồ sơ nhân viên</h2></div>
         <div className="sd-info-hero">
