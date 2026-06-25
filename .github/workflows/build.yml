@@ -1,0 +1,52 @@
+name: Build Project
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    # ====================
+    # .NET
+    # ====================
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore Backend
+      run: dotnet restore
+
+    - name: Build Backend
+      run: dotnet build --configuration Release --no-restore
+
+    # ====================
+    # NodeJS
+    # ====================
+
+    - name: Setup NodeJS
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install Frontend Packages
+      working-directory: frontend
+      run: npm install
+
+    - name: Build Frontend
+      working-directory: frontend
+      run: npm run build
