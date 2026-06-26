@@ -1,7 +1,11 @@
 using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.Repositories;
 using LuanVanTotNghiep.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer; // 👉 Thư viện JWT
+using Microsoft.IdentityModel.Tokens;               // 👉 Thư viện Token
 using Microsoft.EntityFrameworkCore;
+using System.Text;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,10 +20,32 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
 });
 
+// 👉 3. KHẮC PHỤC LỖI 500: Đăng ký cơ chế Xác thực (Authentication) JWT
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
+
+builder.Services.AddAuthorization(); // 👉 Kích hoạt phân quyền
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 3. Đăng ký các "Nhân viên" (Services & Repositories)
+// 4. Đăng ký các "Nhân viên" (Services & Repositories)
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<UserRepo>();
 builder.Services.AddScoped<RoleRepo>();
@@ -36,6 +62,8 @@ builder.Services.AddScoped<StaffRegistrationService>();
 builder.Services.AddScoped<KhoImportService>();
 builder.Services.AddScoped<SupplierRepo>();
 builder.Services.AddScoped<SupplierService>();
+builder.Services.AddScoped<InventoryRepo>();
+builder.Services.AddScoped<InventoryService>();
 
 var app = builder.Build();
 
@@ -82,6 +110,10 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+// 👉 5. THỨ TỰ MIDDLEWARE BẮT BUỘC: Authentication phải đứng trước Authorization
+app.UseAuthentication(); 
 app.UseAuthorization();
+
 app.MapControllers();
 app.Run();

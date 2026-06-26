@@ -12,6 +12,7 @@ import { ManagerPeriodTab } from './manager/ManagerPeriodTab'
 import { ManagerQrAttendanceTab } from './manager/ManagerQrAttendanceTab'
 import {ManagerImportTab} from './manager/ManagerImportTab'
 import { AdminSupplierTab } from './admin/AdminSupplierTab';
+import { InventoryTab } from './shared/InventoryTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -42,7 +43,7 @@ const ROLE_COLORS = {
 }
 
 export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: initUsers }) {
-  const rawRoleName = normalizeText(user.roleName || '')
+const rawRoleName = normalizeText(user.roleName || user.role || '')
   const isAdmin = rawRoleName.includes('ADMIN') || rawRoleName.includes('QUAN TRI')
   const isManager = rawRoleName.includes('MANAGER') || rawRoleName.includes('QUAN LY')
 
@@ -155,20 +156,22 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 
   const headerInfo = getHeaderInfo()
 
-  const NAV_ITEMS = []
-  if (isAdmin) {
-    NAV_ITEMS.push({ id: 'overview', icon: '⬡', label: 'Tổng quan' })
-    NAV_ITEMS.push({ id: 'users', icon: '◈', label: 'Nhân viên' })
-    NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
-    NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
-    NAV_ITEMS.push({ id: 'suppliers', icon: '📇', label: 'Nhà cung cấp' })
-  }
-  if (isManager) {
-    NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
-    NAV_ITEMS.push({ id: 'scanQr', icon: 'QR', label: 'Quét QR' })
-  NAV_ITEMS.push({id:'inventory', icon:'[]',label:'Nhập Kho Hàng'})
-  }
-  NAV_ITEMS.push({ id: 'account', icon: '◎', label: 'Tài khoản' })
+ const NAV_ITEMS = []
+if (isAdmin) {
+  NAV_ITEMS.push({ id: 'overview', icon: '⬡', label: 'Tổng quan' })
+  NAV_ITEMS.push({ id: 'users', icon: '◈', label: 'Nhân viên' })
+  NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
+  NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+  NAV_ITEMS.push({ id: 'suppliers', icon: '📇', label: 'Nhà cung cấp' })
+  NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' }) // 👈 Admin xem tồn kho toàn hệ thống
+}
+if (isManager) {
+  NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
+  NAV_ITEMS.push({ id: 'scanQr', icon: 'QR', label: 'Quét QR' })
+  NAV_ITEMS.push({ id: 'inventory', icon: '[]', label: 'Nhập kho hàng' })
+  NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' }) // 👈 Manager xem tồn kho cơ sở của mình
+}
+NAV_ITEMS.push({ id: 'account', icon: '◎', label: 'Tài khoản' })
 
   return (
     <div className="sd-root sd-root--left-nav">
@@ -339,6 +342,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches}/>}
             {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
             {activeTab === 'suppliers' && isAdmin && <AdminSupplierTab />}
+            {activeTab === 'inventoryReport' && <InventoryTab currentUser={user} branches={branches} />}
 
             {/* TÀI KHOẢN VÀ BẢO MẬT */}
             {activeTab === 'account' && (

@@ -13,7 +13,7 @@ export function AdminBranchTab({ branches, setBranches }) {
   const [search, setSearch] = useState('')
   const [shifts, setShifts] = useState([])
 
-  // 👉 STATE MỚI CHO TÍNH NĂNG CẤU HÌNH NGÀY
+  //  STATE MỚI CHO TÍNH NĂNG CẤU HÌNH NGÀY
   const [shiftConfigs, setShiftConfigs] = useState([])
   const [configModal, setConfigModal] = useState(null)
   const [configForm, setConfigForm] = useState([])

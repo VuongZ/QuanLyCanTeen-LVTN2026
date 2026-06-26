@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './css/dashboard.css';
+import { InventoryTab } from './shared/InventoryTab';
 
 // 👉 IMPORT CÁC COMPONENT ĐÃ ĐƯỢC TÁCH RA FILE RIÊNG
 import { UnifiedScheduleTab } from './staff/UnifiedScheduleTab';
@@ -27,11 +28,12 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
   };
   const headerInfo = getHeaderInfo();
 
-  const NAV_ITEMS = [
-    { id: 'schedule', icon: '🗓️', label: 'Lịch & Đăng ký' },
-    { id: 'profile', icon: '◎', label: 'Tài khoản' },
-    { id: 'security', icon: '🔒', label: 'Bảo mật' },
-  ];
+ const NAV_ITEMS = [
+  { id: 'schedule', icon: '🗓️', label: 'Lịch & Đăng ký' },
+  { id: 'inventory', icon: '📦', label: 'Tra cứu tồn kho' }, // 👈 Thêm mục Tồn kho cho Staff
+  { id: 'profile', icon: '◎', label: 'Tài khoản' },
+  { id: 'security', icon: '🔒', label: 'Bảo mật' },
+];
 
   return (
     <div className="sd-root sd-root--left-nav">
@@ -87,6 +89,7 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
             {/* 👉 GỌI CÁC COMPONENT ĐÃ TÁCH Ở ĐÂY TÙY THEO TAB ĐANG CHỌN */}
             {activeTab === 'schedule' && <UnifiedScheduleTab user={user} />}
             {activeTab === 'profile' && <ProfileTab branch={branch} user={user} />}
+            {activeTab === 'inventory' && <InventoryTab currentUser={user} branches={branches} />}
             
             {activeTab === 'security' && (
               <div className="sd-profile-layout">

@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import axios from 'axios' // 👉 Thêm import axios
 import { getUserPageData } from './api/UserApi'
 import { AdminDashboard } from './pages/Admindashboard'
 import { StaffDashboard } from './pages/Staffdashboard'
 import './App.css'
-//hihihihihihi
+
+// =====================================================================
+// 👉 BỘ CHẶN AXIOS: Tự động đính kèm ACCESS_TOKEN vào mọi API gửi đi
+// =====================================================================
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('ACCESS_TOKEN')
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
 function normalizeRole(value = '') {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
 }
@@ -11,18 +26,19 @@ function normalizeRole(value = '') {
 function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
+  
   const [currentUser, setCurrentUser] = useState(() => {
     const savedUser = localStorage.getItem('currentUser')
     return savedUser ? JSON.parse(savedUser) : null
   })
-  const [isLoading, setIsLoading] = useState(true)
+  
+  const [isLoading, setIsLoading] = useState(false) // Đổi mặc định thành false để không bị quay vòng vòng lúc mới mở
   const [error, setError] = useState('')
 
+  // Vẫn giữ nguyên logic tải dữ liệu cho Dashboard
   useEffect(() => {
     async function loadUsers() {
       try {
-        setIsLoading(true)
-        setError('')
         const data = await getUserPageData()
         setPageData({
           users: data.users ?? [],
@@ -30,22 +46,11 @@ function App() {
           branches: data.branches ?? [],
         })
       } catch (err) {
-        setError(err.message || 'Không thể tải dữ liệu')
-      } finally {
-        setIsLoading(false)
+        console.error("Lỗi tải dữ liệu nền:", err)
       }
     }
     loadUsers()
   }, [])
-
-  const selectedUser = useMemo(
-    () =>
-      pageData.users.find(
-        (user) =>
-          user.username?.toLowerCase() === loginForm.username.trim().toLowerCase(),
-      ),
-    [pageData.users, loginForm.username],
-  )
 
   function handleLoginChange(event) {
     const { name, value } = event.target
@@ -53,20 +58,50 @@ function App() {
     setError('')
   }
 
-  function handleSubmit(event) {
+  // =====================================================================
+  // 👉 NÂNG CẤP: GỌI API ĐĂNG NHẬP THẬT XUỐNG BACKEND (JWT)
+  // =====================================================================
+  async function handleSubmit(event) {
     event.preventDefault()
-    if (!selectedUser || selectedUser.password !== loginForm.password) {
-      setError('Username hoặc password không đúng')
+    
+    if (!loginForm.username || !loginForm.password) {
+      setError('Vui lòng nhập đầy đủ tài khoản và mật khẩu')
       return
     }
-    setCurrentUser(selectedUser)
-    localStorage.setItem('currentUser', JSON.stringify(selectedUser))
-    setError('')
+
+    try {
+      setIsLoading(true)
+      
+      // Gọi API Login xuống C#
+      const response = await axios.post('/api/User/login', {
+        username: loginForm.username.trim(),
+        password: loginForm.password
+      })
+
+      const { token, user } = response.data
+
+      // Lưu Token (Chìa khóa mở các API) và Thông tin User vào Local Storage
+      localStorage.setItem('ACCESS_TOKEN', token)
+      localStorage.setItem('currentUser', JSON.stringify(user))
+      
+      setCurrentUser(user)
+      setError('')
+      
+    } catch (err) {
+      // Bắt lỗi 401 từ Backend và hiển thị lên UI
+      setError(err.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
+  // =====================================================================
+  // 👉 NÂNG CẤP: XÓA CẢ TOKEN KHI ĐĂNG XUẤT
+  // =====================================================================
   function handleLogout() {
     setCurrentUser(null)
     localStorage.removeItem('currentUser')
+    localStorage.removeItem('ACCESS_TOKEN') // Xóa sạch Token để khóa cửa lại
     setLoginForm({ username: '', password: '' })
   }
 
@@ -80,7 +115,7 @@ function App() {
   }
 
   if (currentUser) {
-    const roleName = normalizeRole(currentUser.roleName || '')
+    const roleName = normalizeRole(currentUser.roleName || currentUser.role || '')
     const isStaff = roleName.includes('STAFF') || roleName.includes('NHAN VIEN')
     const dashboardProps = {
       branches: pageData.branches,
@@ -137,7 +172,6 @@ function App() {
               className="auth-input"
             />
           </div>
-
 
           {/* Hiển thị lỗi */}
           {error && <div className="auth-error-msg">⚠ {error}</div>}
