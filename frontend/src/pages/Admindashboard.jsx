@@ -10,6 +10,8 @@ import { AdminBranchTab } from './admin/AdminBranchTab'
 import { AdminSystemScheduleTab } from './admin/AdminSystemScheduleTab'
 import { ManagerPeriodTab } from './manager/ManagerPeriodTab'
 import { ManagerQrAttendanceTab } from './manager/ManagerQrAttendanceTab'
+import {ManagerImportTab} from './manager/ManagerImportTab'
+import { AdminSupplierTab } from './admin/AdminSupplierTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -145,6 +147,8 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
+      case 'inventory':return{eyebrow:"Kho hàng", title:'Nhập kho hàng hóa '}
+      case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
       default: return { eyebrow: '', title: '' }
     }
   }
@@ -157,10 +161,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'users', icon: '◈', label: 'Nhân viên' })
     NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
     NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+    NAV_ITEMS.push({ id: 'suppliers', icon: '📇', label: 'Nhà cung cấp' })
   }
   if (isManager) {
     NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
-    NAV_ITEMS.push({ id: 'scanQr', icon: 'Q', label: 'Quét QR' })
+    NAV_ITEMS.push({ id: 'scanQr', icon: 'QR', label: 'Quét QR' })
+  NAV_ITEMS.push({id:'inventory', icon:'[]',label:'Nhập Kho Hàng'})
   }
   NAV_ITEMS.push({ id: 'account', icon: '◎', label: 'Tài khoản' })
 
@@ -330,7 +336,9 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'branches' && isAdmin && <AdminBranchTab branches={branches} setBranches={setBranches} />}
             {activeTab === 'periods' && isManager && <ManagerPeriodTab user={user} isManager={isManager} branches={branches} />}
             {activeTab === 'scanQr' && isManager && <ManagerQrAttendanceTab user={user} />}
+            {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches}/>}
             {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
+            {activeTab === 'suppliers' && isAdmin && <AdminSupplierTab />}
 
             {/* TÀI KHOẢN VÀ BẢO MẬT */}
             {activeTab === 'account' && (

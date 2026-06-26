@@ -33,6 +33,9 @@ builder.Services.AddScoped<SchedulePeriodService>();
 builder.Services.AddScoped<BranchShiftConfigRepo>();
 builder.Services.AddScoped<BranchShiftConfigService>();
 builder.Services.AddScoped<StaffRegistrationService>();
+builder.Services.AddScoped<KhoImportService>();
+builder.Services.AddScoped<SupplierRepo>();
+builder.Services.AddScoped<SupplierService>();
 
 var app = builder.Build();
 
