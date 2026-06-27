@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './css/dashboard.css';
 import { InventoryTab } from './shared/InventoryTab';
+
 
 // 👉 IMPORT CÁC COMPONENT ĐÃ ĐƯỢC TÁCH RA FILE RIÊNG
 import { UnifiedScheduleTab } from './staff/UnifiedScheduleTab';
@@ -11,6 +12,8 @@ import { PasswordForm } from './shared/PasswordForm';
 function getInitials(name = '') {
   return name.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase();
 }
+
+
 
 export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
   const [activeTab, setActiveTab] = useState('schedule');

@@ -4,6 +4,7 @@ import { updateUser } from '../api/UserApi'
 import { getAllBranches } from '../api/BranchApi'
 import './css/admindashboard.css'
 
+
 // 1. IMPORT CÁC COMPONENT ĐÃ ĐƯỢC CHIA TÁCH
 import { PasswordForm } from './shared/PasswordForm'
 import { AdminBranchTab } from './admin/AdminBranchTab'
@@ -65,6 +66,9 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
   useEffect(() => {
     getAllBranches().then((data) => setBranches(Array.isArray(data) ? data : [])).catch(() => setBranches([]))
   }, [])
+  useEffect(() => {
+    setUsers(initUsers);
+  }, [initUsers]);
 
   const branch = branches.find((b) => b.id === user.branchId)
 

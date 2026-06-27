@@ -2,11 +2,13 @@ using LuanVanTotNghiep.Models.Entities;
 using LuanVanTotNghiep.Services;
 using LuanVanTotNghiep.DTOs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization; // 👉 Bổ sung thư viện này
 
 namespace LuanVanTotNghiep.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // 👈 Ổ KHÓA LỚP 1: Chặn tất cả những ai chưa đăng nhập
 public class SchedulePeriodController(SchedulePeriodService service) : ControllerBase
 {
     [HttpGet]
@@ -24,7 +26,8 @@ public class SchedulePeriodController(SchedulePeriodService service) : Controlle
         return Ok(periods);
     }
 
-  [HttpPost]
+    [HttpPost]
+    [Authorize(Roles = "MANAGER")] // 👈 Ổ KHÓA LỚP 2: Tránh Staff tự tạo đợt
     public async Task<IActionResult> Create([FromBody] CreatePeriodDto dto)
     {
         try
@@ -39,6 +42,7 @@ public class SchedulePeriodController(SchedulePeriodService service) : Controlle
     }
 
    [HttpPut("{id}")]
+   [Authorize(Roles = "MANAGER")] // 👈 Ổ KHÓA LỚP 2: Tránh Staff tự sửa đợt
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePeriodDto dto)
     {
         try
@@ -53,9 +57,25 @@ public class SchedulePeriodController(SchedulePeriodService service) : Controlle
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "MANAGER")] // 👈 Ổ KHÓA LỚP 2: Tránh Staff tự xóa đợt
     public async Task<IActionResult> Delete(int id)
     {
         await service.DeleteAsync(id);
         return Ok(new { message = "Xóa đợt đăng ký thành công!" });
     }
+
+    [HttpPatch("{id}/status")]
+[Authorize(Roles = "MANAGER")]
+public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
+{
+    try
+    {
+        await service.UpdateStatusOnlyAsync(id, dto.Status);
+        return Ok(new { message = "Cập nhật trạng thái thành công!" });
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+}
 }

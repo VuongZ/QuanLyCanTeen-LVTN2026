@@ -17,7 +17,8 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [reviewingPeriod, setReviewingPeriod] = useState(null)
+  // ✅ FIX: Chỉ lưu ID, không lưu cả object
+  const [reviewingPeriodId, setReviewingPeriodId] = useState(null)
   const [form, setForm] = useState({ startDate: '', endDate: '', status: 'Mở' })
 
   useEffect(() => { loadPeriods() }, [])
@@ -28,10 +29,7 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
 
   function handleStartDateChange(e) {
     const selectedDateStr = e.target.value;
-    if (!selectedDateStr) {
-      setForm({ ...form, startDate: '', endDate: '' });
-      return;
-    }
+    if (!selectedDateStr) { setForm({ ...form, startDate: '', endDate: '' }); return; }
     const startDateObj = new Date(selectedDateStr);
     const endDateObj = new Date(startDateObj);
     endDateObj.setDate(startDateObj.getDate() + 6);
@@ -40,7 +38,11 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   }
 
   const filteredPeriods = periods
-    .filter((p) => { const matchBranch = p.branchId === user.branchId; const dateRangeStr = `${formatDate(p.startDate)} ${formatDate(p.endDate)}`.toLowerCase(); return matchBranch && dateRangeStr.includes(search.toLowerCase()) })
+    .filter((p) => {
+      const matchBranch = p.branchId === user.branchId
+      const dateRangeStr = `${formatDate(p.startDate)} ${formatDate(p.endDate)}`.toLowerCase()
+      return matchBranch && dateRangeStr.includes(search.toLowerCase())
+    })
     .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
 
   function openAdd() { setForm({ startDate: '', endDate: '', status: 'Mở' }); setError(''); setModal('add') }
@@ -50,8 +52,11 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   async function handleSave() {
     if (!form.startDate || !form.endDate) return setError('Vui lòng điền ngày bắt đầu và kết thúc')
     setSaving(true); setError('')
-    try { const payload = { ...form, branchId: user.branchId }; if (modal === 'add') await createPeriod(payload); else await updatePeriod(form.id, payload); await loadPeriods(); setModal(null) }
-    catch (err) { setError('Lỗi khi lưu đợt.') } finally { setSaving(false) }
+    try {
+      const payload = { ...form, branchId: user.branchId }
+      if (modal === 'add') await createPeriod(payload); else await updatePeriod(form.id, payload)
+      await loadPeriods(); setModal(null)
+    } catch (err) { setError('Lỗi khi lưu đợt.') } finally { setSaving(false) }
   }
 
   async function handleDelete() {
@@ -60,8 +65,20 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
     catch (err) { setError('Không thể xóa đợt đăng ký này!') } finally { setSaving(false) }
   }
 
+  // ✅ FIX: Tìm period object từ periods state (luôn mới nhất sau loadPeriods)
+  const reviewingPeriod = reviewingPeriodId ? periods.find(p => p.id === reviewingPeriodId) : null
+
   if (reviewingPeriod) {
-    return <PeriodReviewScreen period={reviewingPeriod} user={user} onBack={() => { setReviewingPeriod(null); loadPeriods() }} />
+    return (
+      <PeriodReviewScreen
+        period={reviewingPeriod}
+        user={user}
+        onBack={async () => {
+          await loadPeriods()       // fetch DB trước
+          setReviewingPeriodId(null) // rồi mới ra ngoài
+        }}
+      />
+    )
   }
 
   return (
@@ -82,19 +99,38 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
 
       <div className="sd-table-wrap">
         <table className="sd-table">
-          <thead><tr><th className="sd-th sd-td-name-col">Thời gian đợt đăng ký</th><th className="sd-th sd-text-center">Trạng Thái</th><th className="sd-th sd-text-right">Thao tác</th></tr></thead>
+          <thead>
+            <tr>
+              <th className="sd-th sd-td-name-col">Thời gian đợt đăng ký</th>
+              <th className="sd-th sd-text-center">Trạng Thái</th>
+              <th className="sd-th sd-text-right">Thao tác</th>
+            </tr>
+          </thead>
           <tbody>
-            {filteredPeriods.length === 0 && <tr><td colSpan={3} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">📅</span><p>Chưa có đợt đăng ký lịch làm nào</p></div></td></tr>}
+            {filteredPeriods.length === 0 && (
+              <tr><td colSpan={3} className="sd-td-empty">
+                <div className="sd-empty-state"><span className="sd-empty-icon">📅</span><p>Chưa có đợt đăng ký lịch làm nào</p></div>
+              </td></tr>
+            )}
             {filteredPeriods.map((p) => {
-              const isOpen = p.status?.toLowerCase() === 'mở' || p.status === 'Open' || p.status === 'OPEN'
-              const isPublished = p.status === 'PUBLISHED'
+              const st = p.status?.toUpperCase() || ''
+              const isOpen = st === 'MỞ' || st === 'OPEN'
+              const isReviewing = st === 'REVIEWING'
+              const isPublished = st === 'PUBLISHED'
               return (
-                <tr key={p.id} className="sd-tr" style={{ cursor: 'pointer' }} onClick={() => setReviewingPeriod(p)}>
-                  <td className="sd-td sd-td-name-col"><strong style={{ color: '#1e293b' }}>Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)}</strong></td>
+                // ✅ FIX: setReviewingPeriodId(p.id) thay vì setReviewingPeriod(p)
+                <tr key={p.id} className="sd-tr" style={{ cursor: 'pointer' }} onClick={() => setReviewingPeriodId(p.id)}>
+                  <td className="sd-td sd-td-name-col">
+                    <strong style={{ color: '#1e293b' }}>Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)}</strong>
+                  </td>
                   <td className="sd-td sd-text-center sd-td-info-col">
                     {isPublished
-                      ? <span className="sd-status-pill sd-status-pill--closed" style={{ background: '#e0e7ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}>Đã Chốt</span>
-                      : <span className={`sd-status-pill ${isOpen ? 'sd-status-pill--open' : 'sd-status-pill--closed'}`}>{isOpen ? 'Đang Mở' : 'Đã Đóng'}</span>
+                      ? <span className="sd-status-pill" style={{ background: '#e0e7ff', color: '#1d4ed8', borderColor: '#bfdbfe' }}>Đã Chốt</span>
+                      : isReviewing
+                      ? <span className="sd-status-pill" style={{ background: '#fef9c3', color: '#854d0e', borderColor: '#fde047' }}>Đang Xét Duyệt</span>
+                      : <span className={`sd-status-pill ${isOpen ? 'sd-status-pill--open' : 'sd-status-pill--closed'}`}>
+                          {isOpen ? 'Đang Mở' : 'Đã Đóng'}
+                        </span>
                     }
                   </td>
                   <td className="sd-td sd-text-right" style={{ whiteSpace: 'nowrap' }}>
@@ -140,7 +176,10 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
         <div className="sd-overlay" onClick={() => setModal(null)}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
             <div className="sd-modal-header"><h2>Xác nhận xoá đợt</h2><button onClick={() => setModal(null)}>✕</button></div>
-            <div className="sd-modal-body"><p>Bạn có chắc chắn muốn xoá đợt từ <strong>{formatDate(selectedPeriod?.startDate)}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-body">
+              <p>Bạn có chắc chắn muốn xoá đợt từ <strong>{formatDate(selectedPeriod?.startDate)}</strong>?</p>
+              {error && <p className="sd-status sd-status-error">{error}</p>}
+            </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={() => setModal(null)}>Huỷ</button>
               <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>Xoá ngay</button>
@@ -159,31 +198,51 @@ function PeriodReviewScreen({ period, onBack, user }) {
   const [loading, setLoading] = useState(true)
   const [draftApproved, setDraftApproved] = useState(new Set())
   const [activeSwapId, setActiveSwapId] = useState(null)
+  // ✅ FIX CHÍNH: Lưu status vào state riêng, không đọc từ prop
+  const [currentStatus, setCurrentStatus] = useState((period?.status || 'OPEN').toUpperCase())
 
   useEffect(() => {
+    // Khi period prop thay đổi (lần đầu vào), sync lại status
+    setCurrentStatus((period?.status || 'OPEN').toUpperCase())
+
     async function loadBoardData() {
       setLoading(true)
       try {
-        const [regRes, shiftRes] = await Promise.all([axios.get(`/api/StaffRegistration/period/${period.id}`), getAllShifts()])
+        
+        const [regRes, shiftRes] = await Promise.all([
+          axios.get(`/api/StaffRegistration/period/${period.id}`),
+          getAllShifts()
+        ])
         const allRegs = regRes.data || []
         const branchShifts = shiftRes.filter((s) => s.branchId === period.branchId)
-        setRegistrations(allRegs); setShifts(branchShifts)
+        setRegistrations(allRegs)
+        setShifts(branchShifts)
+
         const dArray = []
         let curr = new Date(period.startDate)
         const end = new Date(period.endDate)
         while (curr <= end) { dArray.push(new Date(curr)); curr.setDate(curr.getDate() + 1) }
         setDates(dArray)
+
         const newDraft = new Set()
-        const grouped = {}
-        allRegs.forEach((r) => { const key = r.workDate.slice(0, 10) + '_' + r.shiftId; if (!grouped[key]) grouped[key] = []; grouped[key].push(r) })
-        Object.keys(grouped).forEach((key) => {
-          const shiftId = parseInt(key.split('_')[1])
-          const shift = branchShifts.find((s) => s.id === shiftId)
-          const max = shift?.maxStaff || 0
-          const allowedStaff = max > 0 ? max - 1 : 999
-          const sorted = grouped[key]
-          for (let i = 0; i < Math.min(allowedStaff, sorted.length); i++) newDraft.add(sorted[i].id)
-        })
+        if (period.status === 'PUBLISHED') {
+          allRegs.forEach(r => { if (r.status === 'Đã Duyệt') newDraft.add(r.id) })
+        } else {
+          const grouped = {}
+          allRegs.forEach((r) => {
+            const key = r.workDate.slice(0, 10) + '_' + r.shiftId
+            if (!grouped[key]) grouped[key] = []
+            grouped[key].push(r)
+          })
+          Object.keys(grouped).forEach((key) => {
+            const shiftId = parseInt(key.split('_')[1])
+            const shift = branchShifts.find((s) => s.id === shiftId)
+            const max = shift?.maxStaff || 0
+            const allowedStaff = max > 0 ? max - 1 : 999
+            const sorted = grouped[key]
+            for (let i = 0; i < Math.min(allowedStaff, sorted.length); i++) newDraft.add(sorted[i].id)
+          })
+        }
         setDraftApproved(newDraft)
       } catch (error) { console.error(error) } finally { setLoading(false) }
     }
@@ -200,26 +259,90 @@ function PeriodReviewScreen({ period, onBack, user }) {
   dates.forEach((dObj) => {
     const dStr = toDateString(dObj)
     boardMatrix[dStr] = {}
-    shifts.forEach((s) => { boardMatrix[dStr][s.id] = registrations.filter((r) => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id) })
+    shifts.forEach((s) => {
+      boardMatrix[dStr][s.id] = registrations.filter((r) => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id)
+    })
   })
+
+const handleLockPeriod = async () => {
+  if (!window.confirm('Bạn có chắc muốn KHÓA SỔ đợt này?')) return
+  try {
+    // ✅ Đổi từ updatePeriod(...) sang axios.patch
+    await axios.patch(`/api/SchedulePeriod/${period.id}/status`, { status: 'REVIEWING' })
+    alert('⏸️ Đã khóa sổ đăng ký thành công!')
+    setCurrentStatus('REVIEWING')
+  } catch (error) {
+    alert('Lỗi khi khóa sổ')
+  }
+}
+
+ const handleReopenPeriod = async () => {
+  if (!window.confirm('Bạn muốn MỞ LẠI đợt này?')) return
+  try {
+    // ✅ Đổi từ updatePeriod(...) sang axios.patch
+    await axios.patch(`/api/SchedulePeriod/${period.id}/status`, { status: 'OPEN' })
+    alert('▶️ Đã mở lại đợt đăng ký!')
+    setCurrentStatus('OPEN')
+  } catch (error) {
+    alert('Lỗi khi mở lại đợt')
+  }
+}
 
   const handlePublish = async () => {
     if (!window.confirm('Bạn có chắc chắn muốn CHỐT LỊCH?')) return
     try {
       const payload = { periodId: period.id, approvedRegistrationIds: Array.from(draftApproved) }
       await axios.post('/api/StaffRegistration/publish', payload)
-      alert('✅ Đã chốt lịch làm việc thành công!'); onBack()
+      alert('✅ Đã chốt/cập nhật lịch làm việc thành công!')
+      setCurrentStatus('PUBLISHED')
+      onBack()
     } catch (error) { alert('Lỗi chốt lịch') }
   }
+
+  // ✅ FIX: Đọc từ state local, không phải prop
+  const isOpen = currentStatus === 'MỞ' || currentStatus === 'OPEN'
+  const isReviewing = currentStatus === 'REVIEWING' || currentStatus === 'ĐANG DUYỆT' || currentStatus === 'ĐÓNG' || currentStatus === 'CLOSED'
+  const isPublished = currentStatus === 'PUBLISHED'
 
   return (
     <div className="sd-users-page">
       <button className="sd-btn-back" onClick={onBack}>← Quay lại danh sách đợt</button>
-      <div className="sd-publish-banner">
+
+      <div className="sd-publish-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
         <div>
           <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Bảng xếp lịch: Từ {formatDate(period.startDate)} đến {formatDate(period.endDate)}</h2>
+          <p style={{ margin: 0, fontSize: 14, color: '#64748b' }}>
+            Trạng thái hiện tại: <strong style={{ color: '#ea580c' }}>{currentStatus}</strong>
+          </p>
         </div>
-        <button className="sd-btn-primary" style={{ width: 'auto', marginTop: 0 }} onClick={handlePublish}>🔒 Chốt & Cập nhật Lịch</button>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {isOpen && (
+            <button
+              style={{ padding: '8px 16px', background: '#fef08a', color: '#854d0e', border: '1px solid #fde047', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+              onClick={handleLockPeriod}
+            >
+              ⏸️ Khóa Đăng Ký
+            </button>
+          )}
+
+          {isReviewing && (
+            <button
+              style={{ padding: '8px 16px', background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+              onClick={handleReopenPeriod}
+            >
+              ▶️ Mở Lại Đăng Ký
+            </button>
+          )}
+
+          <button
+            className="sd-btn-primary"
+            style={{ width: 'auto', marginTop: 0, background: isPublished ? '#0284c7' : '#ea580c' }}
+            onClick={handlePublish}
+          >
+            {isPublished ? '🔄 Cập nhật thay đổi' : '🔒 Chốt Lịch chính thức'}
+          </button>
+        </div>
       </div>
 
       {loading ? <p>Đang tải...</p> : (
@@ -228,7 +351,11 @@ function PeriodReviewScreen({ period, onBack, user }) {
             <thead>
               <tr>
                 <th style={{ width: 90 }}>NGÀY</th>
-                {shifts.map((s) => <th key={s.id}>{s.shiftName}<br /><span style={{ fontWeight: 500, fontSize: 11 }}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span></th>)}
+                {shifts.map((s) => (
+                  <th key={s.id}>{s.shiftName}<br />
+                    <span style={{ fontWeight: 500, fontSize: 11 }}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -237,7 +364,10 @@ function PeriodReviewScreen({ period, onBack, user }) {
                 const dayOfWeek = DAY_NAMES[dateObj.getDay()]
                 return (
                   <tr key={dStr}>
-                    <td className="sd-board-date-col"><strong>{dayOfWeek}</strong><small>{dateObj.getDate()}/{dateObj.getMonth() + 1}</small></td>
+                    <td className="sd-board-date-col">
+                      <strong>{dayOfWeek}</strong>
+                      <small>{dateObj.getDate()}/{dateObj.getMonth() + 1}</small>
+                    </td>
                     {shifts.map((shift) => {
                       const cellRegs = boardMatrix[dStr][shift.id] || []
                       const max = shift.maxStaff || 0
@@ -245,31 +375,36 @@ function PeriodReviewScreen({ period, onBack, user }) {
                       const assignedRegs = cellRegs.filter((r) => draftApproved.has(r.id))
                       const backupRegs = cellRegs.filter((r) => !draftApproved.has(r.id))
                       const slots = []
-                      if (max > 0) { for (let i = 0; i < allowedStaff; i++) slots.push(assignedRegs[i] || null) } else { slots.push(...assignedRegs) }
+                      if (max > 0) { for (let i = 0; i < allowedStaff; i++) slots.push(assignedRegs[i] || null) }
+                      else { slots.push(...assignedRegs) }
                       const isWeekend = dayOfWeek === 'Thứ 7' || dayOfWeek === 'Chủ nhật'
                       const isShiftClosed = isWeekend && cellRegs.length === 0
+
                       return (
                         <td key={shift.id}>
                           {!isShiftClosed ? (
                             <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412', cursor: 'default' }}>
-                              <span className="sd-reg-name"> {user.fullName || user.username}</span>
+                              <span className="sd-reg-name">{user.fullName || user.username}</span>
                               <span style={{ fontSize: 10, fontWeight: 'bold' }}>Quản lý</span>
                             </div>
                           ) : (
                             <div style={{ textAlign: 'center', padding: '16px 0', color: '#cbd5e1', fontSize: 12, fontWeight: 600 }}>CA NGHỈ</div>
                           )}
+
                           {slots.map((r, idx) => {
                             if (!r) {
                               const emptyId = `empty_${dStr}_${shift.id}_${idx}`
                               return (
                                 <div key={emptyId} style={{ position: 'relative' }}>
-                                  <div className="sd-reg-card" style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8', borderStyle: 'dashed', cursor: 'pointer' }} onClick={() => setActiveSwapId(activeSwapId === emptyId ? null : emptyId)}>
+                                  <div className="sd-reg-card" style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8', borderStyle: 'dashed', cursor: 'pointer' }}
+                                    onClick={() => setActiveSwapId(activeSwapId === emptyId ? null : emptyId)}>
                                     <span>+ Thêm NV</span>
                                   </div>
                                   {activeSwapId === emptyId && (
                                     <div className="sd-swap-dropdown">
                                       {backupRegs.map((backup) => (
-                                        <div key={backup.id} className="sd-swap-item" onClick={() => { const next = new Set(draftApproved); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>
+                                        <div key={backup.id} className="sd-swap-item"
+                                          onClick={() => { const next = new Set(draftApproved); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>
                                           {backup.user?.fullName}
                                         </div>
                                       ))}
@@ -280,13 +415,15 @@ function PeriodReviewScreen({ period, onBack, user }) {
                             }
                             return (
                               <div key={r.id} style={{ position: 'relative' }}>
-                                <div className="sd-reg-card" style={{ background: '#dcfce7', borderColor: '#bbf7d0', color: '#166534', cursor: 'pointer' }} onClick={() => setActiveSwapId(activeSwapId === r.id ? null : r.id)}>
+                                <div className="sd-reg-card" style={{ background: '#dcfce7', borderColor: '#bbf7d0', color: '#166534', cursor: 'pointer' }}
+                                  onClick={() => setActiveSwapId(activeSwapId === r.id ? null : r.id)}>
                                   <span className="sd-reg-name">{r.user?.fullName}</span>
                                 </div>
                                 {activeSwapId === r.id && (
                                   <div className="sd-swap-dropdown">
                                     {backupRegs.map((backup) => (
-                                      <div key={backup.id} className="sd-swap-item" onClick={() => { const next = new Set(draftApproved); next.delete(r.id); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>
+                                      <div key={backup.id} className="sd-swap-item"
+                                        onClick={() => { const next = new Set(draftApproved); next.delete(r.id); next.add(backup.id); setDraftApproved(next); setActiveSwapId(null) }}>
                                         {backup.user?.fullName}
                                       </div>
                                     ))}

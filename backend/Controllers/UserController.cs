@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;     // 👉 Thư viện Token
 using System.IdentityModel.Tokens.Jwt;    // 👉 Thư viện JWT
 using System.Security.Claims;             // 👉 Thư viện Claim (Quyền)
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 
 namespace LuanVanTotNghiep.Controllers
 {
@@ -19,7 +20,7 @@ namespace LuanVanTotNghiep.Controllers
         BranchService branchService,
         IConfiguration configuration,
         AppDbContext _context) : ControllerBase // 👉 Bổ sung IConfiguration để đọc appsettings.json
-      
+
     {
         [HttpGet]
         public async Task<IActionResult> GetAllUser()
@@ -93,40 +94,45 @@ namespace LuanVanTotNghiep.Controllers
         // =========================================================
 
         [HttpPost("login")]
-[AllowAnonymous]
-public IActionResult Login([FromBody] LoginRequest model)
-{
-    // Truy vấn chính xác thông qua biến _context cục bộ
-    var user = _context.NsUsers.FirstOrDefault(u => u.Username == model.Username && u.Password == model.Password);
+        [AllowAnonymous]
+        public IActionResult Login([FromBody] LoginRequest model)
+        {
+            // Truy vấn chính xác thông qua biến _context cục bộ
+            var user = _context.NsUsers
+        .Include(u => u.Branch)
+        .Include(u => u.Role)
+        .FirstOrDefault(u => u.Username == model.Username && u.Password == model.Password);
 
-    if (user != null)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(configuration["Jwt:Key"] ?? "DayLaChuoiKhoaMacDinhChongLoiNull123456789!");
+            if (user != null)
+            {
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.UTF8.GetBytes(configuration["Jwt:Key"] ?? "DayLaChuoiKhoaMacDinhChongLoiNull123456789!");
 
-        string roleClaim = user.RoleId == 1 ? "ADMIN" : "MANAGER";
+               string roleClaim = "STAFF";
+        if (user.RoleId == 1) roleClaim = "ADMIN";
+        else if (user.RoleId == 2) roleClaim = "MANAGER";
 
-        // Khởi tạo ClaimsIdentity mạch lạc, không bị thừa rác
-        var claims = new ClaimsIdentity(new[]
+                // Khởi tạo ClaimsIdentity mạch lạc, không bị thừa rác
+             var claims = new ClaimsIdentity(new[]
         {
             new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, roleClaim),             
-            new Claim("BranchId", user.BranchId.ToString() ?? "1") 
+            new Claim(ClaimTypes.Role, roleClaim),
+            new Claim("BranchId", user.BranchId.ToString() ?? "1")
         });
 
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = claims,
-            Expires = DateTime.UtcNow.AddDays(7),
-            Issuer = configuration["Jwt:Issuer"],
-            Audience = configuration["Jwt:Audience"],
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
+                var tokenDescriptor = new SecurityTokenDescriptor
+                {
+                    Subject = claims,
+                    Expires = DateTime.UtcNow.AddDays(7),
+                    Issuer = configuration["Jwt:Issuer"],
+                    Audience = configuration["Jwt:Audience"],
+                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                };
 
-        var token = tokenHandler.CreateToken(tokenDescriptor);
+                var token = tokenHandler.CreateToken(tokenDescriptor);
         var tokenString = tokenHandler.WriteToken(token);
 
-        return Ok(new
+               return Ok(new
         {
             token = tokenString,
             user = new
@@ -135,7 +141,10 @@ public IActionResult Login([FromBody] LoginRequest model)
                 username = user.Username,
                 fullName = user.FullName,
                 role = roleClaim,
-                branchId = user.BranchId
+                roleName = user.Role != null ? user.Role.RoleName : roleClaim,
+                branchId = user.BranchId,
+                branchName = user.Branch != null ? user.Branch.Name : "Chưa có",
+                hireDate = user.HireDate 
             }
         });
     }

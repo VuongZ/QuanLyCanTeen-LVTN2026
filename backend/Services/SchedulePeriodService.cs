@@ -84,6 +84,16 @@ public class SchedulePeriodService
     await _repo.Update(existingPeriod);
 }
 
+public async Task UpdateStatusOnlyAsync(int id, string newStatus)
+{
+    var period = await _repo.GetbyId(id);
+    if (period == null)
+        throw new KeyNotFoundException("Không tìm thấy đợt đăng ký.");
+    
+    period.Status = newStatus;
+    await _repo.Update(period);
+}
+
     public async Task DeleteAsync(int id)
     {
         await _repo.Delete(id);

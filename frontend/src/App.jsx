@@ -27,8 +27,9 @@ function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
   
-  const [currentUser, setCurrentUser] = useState(() => {
-    const savedUser = localStorage.getItem('currentUser')
+ const [currentUser, setCurrentUser] = useState(() => {
+    // 👉 Sửa sessionStorage thành localStorage
+    const savedUser = localStorage.getItem('currentUser') 
     return savedUser ? JSON.parse(savedUser) : null
   })
   

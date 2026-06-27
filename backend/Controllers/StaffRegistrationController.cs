@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Services;
-
+using Microsoft.AspNetCore.Authorization; 
 namespace LuanVanTotNghiep.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class StaffRegistrationController : ControllerBase
 {
     private readonly StaffRegistrationService _service;

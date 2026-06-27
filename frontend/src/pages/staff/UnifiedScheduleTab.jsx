@@ -29,7 +29,7 @@ export function UnifiedScheduleTab({ user }) {
             return st === 'mở' || st === 'open' || st === 'published';
           })
           .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
-        
+
         setPeriods(branchPeriods);
         if (branchPeriods.length > 0) {
           setSelectedPeriodId(branchPeriods[0].id.toString());
@@ -64,8 +64,8 @@ export function UnifiedScheduleTab({ user }) {
     <div className="sd-card" style={{ padding: '20px 0' }}>
       <div style={{ padding: '0 20px 16px', display: 'flex', gap: 12, alignItems: 'center', borderBottom: '1px solid #f1f5f9', marginBottom: 16 }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Chọn tuần:</span>
-        <select 
-          className="sd-input-search" 
+        <select
+          className="sd-input-search"
           style={{ width: '100%', maxWidth: 400 }}
           value={selectedPeriodId}
           onChange={(e) => setSelectedPeriodId(e.target.value)}
@@ -82,8 +82,8 @@ export function UnifiedScheduleTab({ user }) {
       </div>
 
       <div style={{ padding: '0 20px' }}>
-        {isPublished 
-          ? <PublishedScheduleView period={selectedPeriod} user={user} /> 
+        {isPublished
+          ? <PublishedScheduleView period={selectedPeriod} user={user} />
           : <RegistrationView period={selectedPeriod} user={user} />
         }
       </div>
@@ -156,8 +156,8 @@ function PublishedScheduleView({ period, user }) {
               <th style={{ width: 90 }}>NGÀY</th>
               {shifts.map(s => (
                 <th key={s.id}>
-                  {s.shiftName}<br/>
-                  <span style={{fontWeight: 500, fontSize: 11}}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span>
+                  {s.shiftName}<br />
+                  <span style={{ fontWeight: 500, fontSize: 11 }}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span>
                 </th>
               ))}
             </tr>
@@ -191,17 +191,17 @@ function PublishedScheduleView({ period, user }) {
                             KHÔNG CÓ CA LÀM
                           </div>
                         )}
-                        
+
                         {cellRegs.map(r => {
                           const staffName = r.user?.fullName || r.user?.username || 'Nhân viên';
                           const isMe = r.userId === user.id;
                           return (
-                            <div 
-                              key={r.id} 
-                              className="sd-reg-card" 
-                              style={{ 
-                                background: isMe ? '#dbeafe' : '#f8fafc', 
-                                borderColor: isMe ? '#93c5fd' : '#e2e8f0', 
+                            <div
+                              key={r.id}
+                              className="sd-reg-card"
+                              style={{
+                                background: isMe ? '#dbeafe' : '#f8fafc',
+                                borderColor: isMe ? '#93c5fd' : '#e2e8f0',
                                 color: isMe ? '#1e3a8a' : '#475569',
                                 fontWeight: isMe ? 700 : 500
                               }}
@@ -234,6 +234,7 @@ function RegistrationView({ period, user }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isReviewing = period.status === 'REVIEWING' || period.status === 'Đang duyệt';
 
   useEffect(() => {
     async function loadData() {
@@ -253,7 +254,7 @@ function RegistrationView({ period, user }) {
 
         const regRes = await axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`);
         const myRegs = regRes.data || [];
-        
+
         const dbMap = {};
         const initRegs = {};
 
@@ -321,7 +322,7 @@ function RegistrationView({ period, user }) {
         ...deletes.map(regId => axios.delete(`/api/StaffRegistration/${regId}/user/${user.id}`))
       ];
       await Promise.all(apiCalls);
-      
+
       const regRes = await axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`);
       const dbMap = {}; const initRegs = {};
       (regRes.data || []).forEach(r => {
@@ -334,7 +335,7 @@ function RegistrationView({ period, user }) {
       setRegistered(initRegs);
       setSaved(true);
 
-    } catch (err) { alert("❌ Lỗi: " + (err.response?.data?.message || 'Có lỗi xảy ra!')); } 
+    } catch (err) { alert("❌ Lỗi: " + (err.response?.data?.message || 'Có lỗi xảy ra!')); }
     finally { setSaving(false); }
   }
 
@@ -357,11 +358,16 @@ function RegistrationView({ period, user }) {
     <>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ color: '#ea580c', margin: '0 0 4px' }}>Đăng ký ca làm việc</h2>
+        {isReviewing && (
+          <div style={{ background: '#fef9c3', color: '#854d0e', padding: '12px 16px', borderRadius: 8, marginBottom: 16, border: '1px solid #fde047' }}>
+            <strong>⏳ Đã khóa sổ đăng ký!</strong> Quản lý đang trong quá trình xét duyệt ca làm việc. Bạn không thể thêm hay hủy ca vào lúc này.
+          </div>
+        )}
         <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Quản lý đang mở đăng ký cho tuần này. Hãy chọn các ca bạn có thể làm.</p>
       </div>
 
       <div className="sd-shift-legend" style={{ marginLeft: -20, marginRight: -20, paddingLeft: 20 }}>
-        {shifts.length === 0 && <p style={{fontSize: 13}}>Chưa cấu hình ca làm việc.</p>}
+        {shifts.length === 0 && <p style={{ fontSize: 13 }}>Chưa cấu hình ca làm việc.</p>}
         {shifts.map((s) => (
           <div key={s.id} className="sd-shift-legend-item">
             <span>⏱️</span>
@@ -387,11 +393,11 @@ function RegistrationView({ period, user }) {
                 <div className="sd-grid-day-row-label">
                   <strong>{dayOfWeek}</strong><small>{shortDate}</small>
                 </div>
-                
+
                 {shifts.map((shift) => {
                   const isOn = registered[dateStr]?.[shift.id] || false;
                   const dbItem = dbRegistrations[dateStr]?.[shift.id];
-                  const isLocked = dbItem && dbItem.status !== "Chờ Duyệt";
+                  const isLocked = dbItem && dbItem.status !== "Chờ Duyệt" || isReviewing;
 
                   return (
                     <button
@@ -399,6 +405,7 @@ function RegistrationView({ period, user }) {
                       className={`sd-shift-cell-v ${isOn ? 'selected' : ''}`}
                       onClick={() => toggle(dateStr, shift.id)}
                       type="button"
+                      disabled={isReviewing}
                       style={isLocked ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#fed7aa', borderColor: '#ea580c' } : {}}
                     >
                       {isOn ? (isLocked ? '🔒' : '✓') : ''}
@@ -413,7 +420,7 @@ function RegistrationView({ period, user }) {
 
       <div className="sd-shift-actions">
         <button className="sd-btn-ghost" onClick={handleReset} type="button" disabled={totalChanges === 0}>Hoàn tác thay đổi</button>
-        <button className="sd-btn-primary" disabled={saving || totalChanges === 0} onClick={handleSave} type="button">
+        <button className="sd-btn-primary" disabled={saving || totalChanges === 0 || isReviewing} onClick={handleSave} type="button">
           {saving ? 'Đang lưu…' : `Xác nhận lưu thay đổi (${totalChanges} ca)`}
         </button>
       </div>
