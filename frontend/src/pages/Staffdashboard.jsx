@@ -6,14 +6,13 @@ import { InventoryTab } from './shared/InventoryTab';
 // 👉 IMPORT CÁC COMPONENT ĐÃ ĐƯỢC TÁCH RA FILE RIÊNG
 import { UnifiedScheduleTab } from './staff/UnifiedScheduleTab';
 import { ProfileTab } from './staff/ProfileTab';
+import { SalaryTab } from './staff/SalaryTab';
 import { PasswordForm } from './shared/PasswordForm';
 
 // Hàm tiện ích tạo Avatar
 function getInitials(name = '') {
   return name.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase();
 }
-
-
 
 export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
   const [activeTab, setActiveTab] = useState('schedule');
@@ -25,6 +24,7 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
     switch (activeTab) {
       case 'profile': return { eyebrow: 'Tài khoản', title: 'Hồ sơ của tôi' };
       case 'schedule': return { eyebrow: 'Công việc', title: 'Lịch & Đăng ký ca' };
+      case 'salary': return { eyebrow: 'Thu nhập', title: 'Giờ làm & lương' };
       case 'security': return { eyebrow: 'Cài đặt', title: 'Bảo mật tài khoản' };
       default: return { eyebrow: '', title: '' };
     }
@@ -34,7 +34,8 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
  const NAV_ITEMS = [
   { id: 'schedule', icon: '🗓️', label: 'Lịch & Đăng ký' },
   { id: 'inventory', icon: '📦', label: 'Tra cứu tồn kho' }, // 👈 Thêm mục Tồn kho cho Staff
-  { id: 'profile', icon: '◎', label: 'Tài khoản' },
+  { id: 'salary', icon: '💰', label: 'Giờ làm & lương' },
+  { id: 'profile', icon: '👤', label: 'Tài khoản' },
   { id: 'security', icon: '🔒', label: 'Bảo mật' },
 ];
 
@@ -93,6 +94,7 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
             {activeTab === 'schedule' && <UnifiedScheduleTab user={user} />}
             {activeTab === 'profile' && <ProfileTab branch={branch} user={user} />}
             {activeTab === 'inventory' && <InventoryTab currentUser={user} branches={branches} />}
+            {activeTab === 'salary' && <SalaryTab user={user} />}
             
             {activeTab === 'security' && (
               <div className="sd-profile-layout">

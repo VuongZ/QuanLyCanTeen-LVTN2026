@@ -25,7 +25,8 @@ public class UserService(UserRepo userRepo)
            if(us1 !=null)
         {
             us1.Username = user.Username;
-            us1.Password = user.Password;
+            if (!string.IsNullOrWhiteSpace(user.Password))
+                us1.Password = user.Password;
             us1.FullName = user.FullName;
             us1.BranchId = user.BranchId;
             us1.RoleId = user.RoleId;

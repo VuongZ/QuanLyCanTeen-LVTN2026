@@ -39,8 +39,7 @@ namespace LuanVanTotNghiep.Controllers
                     BranchName = u.Branch?.Name,
                     RoleId = u.RoleId,
                     RoleName = u.Role?.RoleName,
-                    HireDate = u.HireDate,
-                    Password = u.Password
+                    HireDate = u.HireDate
                 }),
 
                 Roles = roles.Select(r => new RoleDto
@@ -80,6 +79,25 @@ namespace LuanVanTotNghiep.Controllers
             await userService.UpdateUser(user);
 
             return NoContent();
+        }
+
+        [HttpPut("{id}/password")]
+        public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto dto)
+        {
+            var user = await _context.NsUsers.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+                return NotFound(new { message = "Khong tim thay nguoi dung." });
+
+            if (user.Password != dto.CurrentPassword)
+                return BadRequest(new { message = "Mat khau hien tai khong dung." });
+
+            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 4)
+                return BadRequest(new { message = "Mat khau moi can toi thieu 4 ky tu." });
+
+            user.Password = dto.NewPassword;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Da cap nhat mat khau thanh cong." });
         }
 
         [HttpDelete("{id}")]

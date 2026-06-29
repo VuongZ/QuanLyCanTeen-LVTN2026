@@ -15,3 +15,8 @@ export async function getUserById(id) {
 export async function updateUser(id, user) {
   await axios.put(`${BASE_URL}/${id}`, user)
 }
+
+export async function changePassword(id, payload) {
+  const response = await axios.put(`${BASE_URL}/${id}/password`, payload)
+  return response.data
+}

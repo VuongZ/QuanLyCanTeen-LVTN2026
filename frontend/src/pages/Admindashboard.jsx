@@ -96,7 +96,7 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
   }
 
   function openAdd() { setForm(EMPTY_FORM); setFormErr(''); setModal('add') }
-  function openEdit(u) { setForm({ ...u }); setFormErr(''); setModalUser(u); setModal('edit') }
+  function openEdit(u) { setForm({ ...u, password: '' }); setFormErr(''); setModalUser(u); setModal('edit') }
   function openDelete(u) { setModalUser(u); setFormErr(''); setModal('delete') }
   function closeModal() { setModal(null); setModalUser(null) }
 
@@ -124,9 +124,10 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
     setSaving(true); setFormErr('')
     try {
       await updateUser(form.id, form)
-      setUsers((prev) => prev.map((u) => (u.id === form.id ? { ...u, ...form } : u)))
-      if (selectedUser && selectedUser.id === form.id) setSelectedUser({ ...selectedUser, ...form })
-      if (form.id === user.id) onUserUpdated({ ...user, ...form })
+      const { password, ...publicForm } = form
+      setUsers((prev) => prev.map((u) => (u.id === form.id ? { ...u, ...publicForm } : u)))
+      if (selectedUser && selectedUser.id === form.id) setSelectedUser({ ...selectedUser, ...publicForm })
+      if (form.id === user.id) onUserUpdated({ ...user, ...publicForm })
       closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể cập nhật') } finally { setSaving(false) }
   }
@@ -162,20 +163,20 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
 
  const NAV_ITEMS = []
 if (isAdmin) {
-  NAV_ITEMS.push({ id: 'overview', icon: '⬡', label: 'Tổng quan' })
-  NAV_ITEMS.push({ id: 'users', icon: '◈', label: 'Nhân viên' })
-  NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
-  NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
-  NAV_ITEMS.push({ id: 'suppliers', icon: '📇', label: 'Nhà cung cấp' })
-  NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' }) // 👈 Admin xem tồn kho toàn hệ thống
+NAV_ITEMS.push({ id: 'overview', icon: '📊', label: 'Tổng quan' })
+NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
+NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
+NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
+NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// 👈 Admin xem tồn kho toàn hệ thống
 }
 if (isManager) {
   NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
-  NAV_ITEMS.push({ id: 'scanQr', icon: 'QR', label: 'Quét QR' })
-  NAV_ITEMS.push({ id: 'inventory', icon: '[]', label: 'Nhập kho hàng' })
-  NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' }) // 👈 Manager xem tồn kho cơ sở của mình
+NAV_ITEMS.push({ id: 'scanQr', icon: '📷', label: 'Quét QR' })
+NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
+NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// 👈 Manager xem tồn kho cơ sở của mình
 }
-NAV_ITEMS.push({ id: 'account', icon: '◎', label: 'Tài khoản' })
+NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
 
   return (
     <div className="sd-root sd-root--left-nav">
@@ -382,7 +383,7 @@ NAV_ITEMS.push({ id: 'account', icon: '◎', label: 'Tài khoản' })
               <div className="sd-modal-grid">
                 <div className="sd-field"><label>Họ và tên *</label><input name="fullName" value={form.fullName} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>Username *</label><input name="username" value={form.username} onChange={handleFormChange} /></div>
-                <div className="sd-field"><label>Password *</label><input type="password" name="password" value={form.password} onChange={handleFormChange} placeholder="••••••" /></div>
+                <div className="sd-field"><label>{modal === 'add' ? 'Password *' : 'Password mới'}</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder={modal === 'add' ? '••••••' : 'Để trống nếu giữ nguyên'} /></div>
                 <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field">
                   <label>Role</label>

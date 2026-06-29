@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { updateUser } from '../../api/UserApi';
+import { changePassword } from '../../api/UserApi';
 
 export function PasswordForm({ onUserUpdated, user }) {
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -10,17 +10,18 @@ export function PasswordForm({ onUserUpdated, user }) {
 
   async function handleSubmit(e) {
     e.preventDefault(); setStatus(null)
-    if (form.currentPassword !== user.password) return setStatus({ type: 'error', msg: 'Mật khẩu hiện tại không đúng' })
     if (form.newPassword.length < 4) return setStatus({ type: 'error', msg: 'Mật khẩu mới cần tối thiểu 4 ký tự' })
     if (form.newPassword !== form.confirmPassword) return setStatus({ type: 'error', msg: 'Nhập lại mật khẩu chưa khớp' })
     try {
       setIsSaving(true)
-      const updatedUser = { ...user, password: form.newPassword }
-      await updateUser(user.id, updatedUser)
-      onUserUpdated(updatedUser)
+      await changePassword(user.id, {
+        currentPassword: form.currentPassword,
+        newPassword: form.newPassword,
+      })
+      onUserUpdated(user)
       setForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setStatus({ type: 'success', msg: 'Đã cập nhật mật khẩu thành công' })
-    } catch (err) { setStatus({ type: 'error', msg: err.message || 'Lỗi cập nhật' }) } finally { setIsSaving(false) }
+    } catch (err) { setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Lỗi cập nhật' }) } finally { setIsSaving(false) }
   }
 
   return (

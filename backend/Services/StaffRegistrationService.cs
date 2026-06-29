@@ -28,6 +28,40 @@ public class StaffRegistrationService
         return builder.ToString().Normalize(NormalizationForm.FormC).ToUpperInvariant();
     }
 
+    private static TimeZoneInfo GetVietnamTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+        }
+    }
+
+    private static DateTime GetUtcNowForDatabase()
+    {
+        return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+    }
+
+    private static DateTime? ToVietnamTime(DateTime? value)
+    {
+        if (value == null) return null;
+
+        var vietnamTimeZone = GetVietnamTimeZone();
+        var converted = DateTime.SpecifyKind(
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc), vietnamTimeZone),
+            DateTimeKind.Unspecified);
+        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vietnamTimeZone);
+
+        // Some rows may already have been saved as Vietnam local time before this fix.
+        if (converted > vietnamNow.AddMinutes(5))
+            return DateTime.SpecifyKind(value.Value, DateTimeKind.Unspecified);
+
+        return converted;
+    }
+
 public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
 {
     // 1. Kiểm tra Đợt đăng ký
@@ -144,6 +178,58 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
             }
         }
 
+        var approvedRegistrations = allRegistrations
+            .Where(r => dto.ApprovedRegistrationIds.Contains(r.Id))
+            .ToList();
+        var approvedKeys = approvedRegistrations
+            .Select(r => (r.UserId, r.ShiftId, r.WorkDate))
+            .ToHashSet();
+        var branchShiftIds = await _context.CaShifts
+            .Where(s => s.BranchId == period.BranchId)
+            .Select(s => s.Id)
+            .ToListAsync();
+        var existingSchedules = await _context.CaFinalSchedules
+            .Include(s => s.CaAttendances)
+            .Where(s =>
+                s.WorkDate >= period.StartDate &&
+                s.WorkDate <= period.EndDate &&
+                branchShiftIds.Contains(s.ShiftId))
+            .ToListAsync();
+
+        foreach (var schedule in existingSchedules)
+        {
+            var isApproved = approvedKeys.Contains((schedule.UserId, schedule.ShiftId, schedule.WorkDate));
+            if (isApproved)
+            {
+                schedule.Status = "PUBLISHED";
+            }
+            else if (schedule.CaAttendances.Any())
+            {
+                schedule.Status = "DRAFT";
+            }
+            else
+            {
+                _context.CaFinalSchedules.Remove(schedule);
+            }
+        }
+
+        var existingKeys = existingSchedules
+            .Select(s => (s.UserId, s.ShiftId, s.WorkDate))
+            .ToHashSet();
+        foreach (var reg in approvedRegistrations)
+        {
+            if (existingKeys.Contains((reg.UserId, reg.ShiftId, reg.WorkDate)))
+                continue;
+
+            _context.CaFinalSchedules.Add(new CaFinalSchedule
+            {
+                UserId = reg.UserId,
+                ShiftId = reg.ShiftId,
+                WorkDate = reg.WorkDate,
+                Status = "PUBLISHED"
+            });
+        }
+
         // Lưu toàn bộ thay đổi (Cập nhật Status của Period và Registration cùng lúc)
         await _context.SaveChangesAsync();
     }
@@ -181,22 +267,14 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
             .FirstOrDefaultAsync(s =>
                 s.UserId == dto.EmployeeId &&
                 s.ShiftId == dto.ShiftId &&
-                s.WorkDate == dto.WorkDate);
+                s.WorkDate == dto.WorkDate &&
+                s.Status == "PUBLISHED");
 
         if (schedule == null)
-        {
-            schedule = new CaFinalSchedule
-            {
-                UserId = dto.EmployeeId,
-                ShiftId = dto.ShiftId,
-                WorkDate = dto.WorkDate,
-                Status = "PUBLISHED"
-            };
-            _context.CaFinalSchedules.Add(schedule);
-            await _context.SaveChangesAsync();
-        }
+            throw new Exception("Nhan vien chua co lich lam chinh thuc cho ngay va ca nay.");
 
         var action = NormalizeText(dto.Action) == "CHECKOUT" ? "CHECKOUT" : "CHECKIN";
+        var scanTime = GetUtcNowForDatabase();
         var attendance = await _context.CaAttendances
             .FirstOrDefaultAsync(a => a.ScheduleId == schedule.Id);
 
@@ -209,8 +287,11 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
         decimal workedHours = 0;
         if (action == "CHECKIN")
         {
+            if (attendance.CheckOutTime != null)
+                throw new Exception("Ca nay da check-out, khong the check-in lai.");
+
             if (attendance.CheckInTime == null)
-                attendance.CheckInTime = dto.CheckInTime ?? DateTime.Now;
+                attendance.CheckInTime = scanTime;
 
             attendance.Status = "Đang Trong Ca Làm";
         }
@@ -221,13 +302,14 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
 
             if (attendance.CheckOutTime == null)
             {
-                attendance.CheckOutTime = dto.CheckOutTime ?? DateTime.Now;
+                attendance.CheckOutTime = scanTime;
                 workedHours = Math.Round((decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime.Value).TotalHours, 2);
                 if (workedHours < 0)
                     throw new Exception("Gio check-out khong hop le.");
 
-                var month = attendance.CheckOutTime.Value.Month;
-                var year = attendance.CheckOutTime.Value.Year;
+                var checkoutVietnamTime = ToVietnamTime(attendance.CheckOutTime) ?? attendance.CheckOutTime.Value;
+                var month = checkoutVietnamTime.Month;
+                var year = checkoutVietnamTime.Year;
                 var salary = await _context.LuongMonthlySalaries
                     .FirstOrDefaultAsync(s => s.UserId == employee.Id && s.Month == month && s.Year == year);
                 var hourlyWage = employee.Role?.HourlyWage ?? 0;
@@ -245,7 +327,7 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
                         TotalBonus = 0,
                         TotalPenalty = 0,
                         Status = "PENDING",
-                        CreatedAt = DateTime.Now
+                        CreatedAt = scanTime
                     };
                     _context.LuongMonthlySalaries.Add(salary);
                 }
@@ -263,6 +345,9 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
                 attendance.Status = "Đã CheckOut";
             }
         }
+
+        if (attendance.CheckInTime != null && attendance.CheckOutTime != null)
+            workedHours = Math.Round((decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime.Value).TotalHours, 2);
 
         await _context.SaveChangesAsync();
 
@@ -286,8 +371,8 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
                 shift.EndTime
             },
             workDate = schedule.WorkDate,
-            checkInTime = attendance.CheckInTime,
-            checkOutTime = attendance.CheckOutTime,
+            checkInTime = ToVietnamTime(attendance.CheckInTime),
+            checkOutTime = ToVietnamTime(attendance.CheckOutTime),
             workedHours,
             salaryId = attendance.SalaryId,
             attendance.Status
