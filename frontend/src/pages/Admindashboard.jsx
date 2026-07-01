@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { updateUser } from '../api/UserApi'
 import { getAllBranches } from '../api/BranchApi'
@@ -34,7 +34,7 @@ function InfoRow({ label, value }) {
 }
 
 const EMPTY_FORM = {
-  username: '', fullName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '',
+  username: '', fullName: '', phoneNumber: '', bankName: '', bankAccountNumber: '', bankAccountName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '',
 }
 
 const ROLE_COLORS = {
@@ -47,6 +47,8 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 const rawRoleName = normalizeText(user.roleName || user.role || '')
   const isAdmin = rawRoleName.includes('ADMIN') || rawRoleName.includes('QUAN TRI')
   const isManager = rawRoleName.includes('MANAGER') || rawRoleName.includes('QUAN LY')
+  const canViewUsers = isAdmin || isManager
+  const canManageUsers = isAdmin
 
   const [activeTab, setActiveTab] = useState(isAdmin ? 'overview' : 'periods')
   const [users, setUsers] = useState(initUsers)
@@ -71,11 +73,15 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
   }, [initUsers]);
 
   const branch = branches.find((b) => b.id === user.branchId)
+  const visibleUsers = isManager && !isAdmin
+    ? users.filter((u) => String(u.branchId || '') === String(user.branchId || ''))
+    : users
+  const getPhone = (u) => u?.phoneNumber || u?.phone || ''
 
   // LOGIC TÌM KIẾM NHÂN VIÊN
-  const displayed = users
+  const displayed = visibleUsers
     .filter((u) => {
-      const matchSearch = [u.fullName, u.username, u.branchName].some((v) => v?.toLowerCase().includes(search.toLowerCase()))
+      const matchSearch = [u.fullName, u.username, getPhone(u), u.bankName, u.bankAccountNumber, u.bankAccountName, u.branchName].some((v) => v?.toLowerCase().includes(search.toLowerCase()))
       const matchRole = filterRole === 'ALL' || u.roleName?.toUpperCase() === filterRole
       return matchSearch && matchRole
     })
@@ -142,7 +148,7 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
     } catch (err) { setFormErr(err.message || 'Không thể xóa') } finally { setSaving(false) }
   }
 
-  const countByRole = (r) => users.filter((u) => u.roleName?.toUpperCase() === r).length
+  const countByRole = (r) => visibleUsers.filter((u) => u.roleName?.toUpperCase() === r).length
 
   const getHeaderInfo = () => {
     switch (activeTab) {
@@ -153,7 +159,7 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
-      case 'inventory':return{eyebrow:"Kho hàng", title:'Nhập kho hàng hóa '}
+      case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
       case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
       default: return { eyebrow: '', title: '' }
     }
@@ -168,13 +174,14 @@ NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
 NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
 NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
 NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
-NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// 👈 Admin xem tồn kho toàn hệ thống
+NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
 }
 if (isManager) {
   NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
+NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
 NAV_ITEMS.push({ id: 'scanQr', icon: '📷', label: 'Quét QR' })
 NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
-NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// 👈 Manager xem tồn kho cơ sở của mình
+NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// Manager xem tồn kho cơ sở của mình
 }
 NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
 
@@ -232,7 +239,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             {activeTab === 'overview' && isAdmin && (
               <div className="sd-profile-layout">
                 <div className="sd-stat-grid">
-                  <div className="sd-stat-card"><span className="sd-stat-icon">◈</span><h3>{users.length}</h3><p>Tổng nhân viên</p></div>
+                  <div className="sd-stat-card"><span className="sd-stat-icon">●</span><h3>{users.length}</h3><p>Tổng nhân viên</p></div>
                   <div className="sd-stat-card"><span className="sd-stat-icon">⊞</span><h3>{branches.length}</h3><p>Chi nhánh</p></div>
                 </div>
                 <div className="sd-card">
@@ -252,7 +259,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             )}
 
             {/* QUẢN LÝ NHÂN VIÊN */}
-            {activeTab === 'users' && isAdmin && (
+            {activeTab === 'users' && canViewUsers && (
               <>
                 {!selectedUser ? (
                   <div className="sd-users-page">
@@ -260,7 +267,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                       <div className="sd-users-toolbar-left">
                         <div className="sd-search-wrap">
                           <span className="sd-search-icon">⌕</span>
-                          <input className="sd-input-search" placeholder="Tìm tên, username, chi nhánh..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                          <input className="sd-input-search" placeholder="Tìm tên, username, SĐT, chi nhánh..." value={search} onChange={(e) => setSearch(e.target.value)} />
                           {search && <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>}
                         </div>
                         <div className="sd-filter-chips">
@@ -274,7 +281,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                       </div>
                       <div className="sd-users-toolbar-right">
                         <span className="sd-result-count">{displayed.length} nhân viên</span>
-                        <button className="sd-btn-add" onClick={openAdd}><span>＋</span> Thêm nhân viên</button>
+                        {canManageUsers && <button className="sd-btn-add" onClick={openAdd}><span>＋</span> Thêm nhân viên</button>}
                       </div>
                     </div>
                     <div className="sd-table-wrap">
@@ -284,6 +291,8 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                             <th className="sd-th sd-th-avatar" style={{ width: 48 }}></th>
                             <th className="sd-th sd-th-sortable sd-td-name-col" onClick={() => toggleSort('fullName')}>Họ và tên <SortIcon col="fullName" /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('username')}>Username <SortIcon col="username" /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('phoneNumber')}>SĐT <SortIcon col="phoneNumber" /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('bankName')}>Ngân hàng <SortIcon col="bankName" /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon col="roleName" /></th>
                             <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon col="branchName" /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon col="hireDate" /></th>
@@ -291,7 +300,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                         </thead>
                         <tbody>
                           {displayed.length === 0 && (
-                            <tr><td colSpan={6} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">◈</span><p>Không tìm thấy nhân sự</p></div></td></tr>
+                            <tr><td colSpan={8} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">●</span><p>Không tìm thấy nhân sự</p></div></td></tr>
                           )}
                           {displayed.map((u, idx) => {
                             const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
@@ -299,7 +308,9 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                               <tr key={u.id} className="sd-tr" style={{ animationDelay: `${idx * 30}ms`, cursor: 'pointer' }} onClick={() => setSelectedUser(u)}>
                                 <td className="sd-td sd-td-avatar sd-hide-mobile"><div className="sd-info-avatar sd-avatar-sm">{getInitials(u.fullName || u.username)}</div></td>
                                 <td className="sd-td sd-td-name-col"><span className="sd-td-name">{u.fullName || '—'}</span></td>
-                                <td className="sd-td sd-hide-mobile"><span className="sd-td-username">@{u.username}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span className="sd-td-username">{u.username}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span className="sd-td-phone">{getPhone(u) || '—'}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span>{u.bankName || u.bankAccountNumber || '—'}</span></td>
                                 <td className="sd-td sd-hide-mobile"><span className="sd-role-pill" style={{ background: roleColor.bg, color: roleColor.color }}>{u.roleName || '—'}</span></td>
                                 <td className="sd-td sd-td-info-col"><span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span></td>
                                 <td className="sd-td sd-hide-mobile"><span className="sd-td-date">{formatDate(u.hireDate)}</span></td>
@@ -325,13 +336,17 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                           </div>
                         </div>
                         <dl className="sd-dl">
-                          <InfoRow label="Username" value={`@${selectedUser.username}`} />
+                          <InfoRow label="Username" value={selectedUser.username} />
+                          <InfoRow label="SĐT" value={getPhone(selectedUser) || 'Chưa có'} />
+                          <InfoRow label="Ngân hàng" value={selectedUser.bankName || 'Chưa có'} />
+                          <InfoRow label="Số tài khoản" value={selectedUser.bankAccountNumber || 'Chưa có'} />
+                          <InfoRow label="Tên tài khoản" value={selectedUser.bankAccountName || 'Chưa có'} />
                           <InfoRow label="Chi nhánh" value={selectedUser.branchName || 'Chưa gán'} />
                           <InfoRow label="Ngày vào làm" value={formatDate(selectedUser.hireDate)} />
                         </dl>
                         <div className="sd-detail-actions">
-                          <button className="sd-btn-ghost btn-edit" onClick={() => openEdit(selectedUser)}>✎ Chỉnh sửa</button>
-                          {selectedUser.id !== user.id && <button className="sd-btn-ghost btn-delete" onClick={() => openDelete(selectedUser)}>✕ Xóa nhân sự</button>}
+                          {canManageUsers && <button className="sd-btn-ghost btn-edit" onClick={() => openEdit(selectedUser)}>✎ Chỉnh sửa</button>}
+                          {canManageUsers && selectedUser.id !== user.id && <button className="sd-btn-ghost btn-delete" onClick={() => openDelete(selectedUser)}>✕ Xóa nhân sự</button>}
                         </div>
                       </div>
                     </div>
@@ -360,11 +375,13 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                   </div>
                   <dl className="sd-dl">
                     <InfoRow label="Tên đăng nhập" value={user.username} />
+                    <InfoRow label="SĐT" value={getPhone(user) || 'Chưa có'} />
+                    <InfoRow label="Ngân hàng" value={user.bankName || 'Chưa có'} />
+                    <InfoRow label="Số tài khoản" value={user.bankAccountNumber || 'Chưa có'} />
+                    <InfoRow label="Tên tài khoản" value={user.bankAccountName || 'Chưa có'} />
                     <InfoRow label="Chi nhánh" value={branch?.name || user.branchName || 'Chưa có'} />
                     <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
                   </dl>
-                </div>
-                <div className="sd-card">
                   <div className="sd-card-header"><p className="sd-eyebrow">Bảo mật</p><h2>Đổi mật khẩu</h2></div>
                   <PasswordForm onUserUpdated={onUserUpdated} user={user} />
                 </div>
@@ -383,6 +400,10 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
               <div className="sd-modal-grid">
                 <div className="sd-field"><label>Họ và tên *</label><input name="fullName" value={form.fullName} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>Username *</label><input name="username" value={form.username} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>SĐT</label><input name="phoneNumber" value={form.phoneNumber || form.phone || ''} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>Ngân hàng</label><input name="bankName" value={form.bankName || ''} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>Số tài khoản</label><input name="bankAccountNumber" value={form.bankAccountNumber || ''} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>Tên tài khoản</label><input name="bankAccountName" value={form.bankAccountName || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>{modal === 'add' ? 'Password *' : 'Password mới'}</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder={modal === 'add' ? '••••••' : 'Để trống nếu giữ nguyên'} /></div>
                 <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field">
@@ -403,7 +424,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
               {formErr && <p className="sd-status sd-status-error">{formErr}</p>}
             </div>
             <div className="sd-modal-footer">
-              <button className="sd-btn-ghost" onClick={closeModal}>Huỷ</button>
+              <button className="sd-btn-ghost" onClick={closeModal}>Hủy</button>
               <button className="sd-btn-primary" disabled={saving} onClick={modal === 'add' ? handleSaveAdd : handleSaveEdit}>{saving ? 'Đang lưu...' : 'Lưu lại'}</button>
             </div>
           </div>
@@ -419,7 +440,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
               {formErr && <p className="sd-status sd-status-error">{formErr}</p>}
             </div>
             <div className="sd-modal-footer">
-              <button className="sd-btn-ghost" onClick={closeModal}>Huỷ</button>
+              <button className="sd-btn-ghost" onClick={closeModal}>Hủy</button>
               <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>{saving ? 'Đang xoá...' : 'Xoá ngay'}</button>
             </div>
           </div>
@@ -428,3 +449,6 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
     </div>
   )
 }
+
+
+

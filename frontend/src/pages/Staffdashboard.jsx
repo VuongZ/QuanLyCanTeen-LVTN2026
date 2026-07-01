@@ -1,54 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './css/dashboard.css';
 import { InventoryTab } from './shared/InventoryTab';
-
-
-// 👉 IMPORT CÁC COMPONENT ĐÃ ĐƯỢC TÁCH RA FILE RIÊNG
 import { UnifiedScheduleTab } from './staff/UnifiedScheduleTab';
 import { ProfileTab } from './staff/ProfileTab';
 import { SalaryTab } from './staff/SalaryTab';
-import { PasswordForm } from './shared/PasswordForm';
 
-// Hàm tiện ích tạo Avatar
 function getInitials(name = '') {
   return name.split(' ').filter(Boolean).slice(-2).map((p) => p[0]).join('').toUpperCase();
 }
 
 export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
   const [activeTab, setActiveTab] = useState('schedule');
-  const [isMenuOpen, setIsMenuOpen] = useState(false); 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const branch = branches?.find((b) => b.id === user.branchId);
 
   const getHeaderInfo = () => {
     switch (activeTab) {
       case 'profile': return { eyebrow: 'Tài khoản', title: 'Hồ sơ của tôi' };
-      case 'schedule': return { eyebrow: 'Công việc', title: 'Lịch & Đăng ký ca' };
+      case 'schedule': return { eyebrow: 'Công việc', title: 'Lịch & đăng ký ca' };
       case 'salary': return { eyebrow: 'Thu nhập', title: 'Giờ làm & lương' };
-      case 'security': return { eyebrow: 'Cài đặt', title: 'Bảo mật tài khoản' };
+      case 'inventory': return { eyebrow: 'Kho hàng', title: 'Tra cứu tồn kho' };
       default: return { eyebrow: '', title: '' };
     }
   };
-  const headerInfo = getHeaderInfo();
 
- const NAV_ITEMS = [
-  { id: 'schedule', icon: '🗓️', label: 'Lịch & Đăng ký' },
-  { id: 'inventory', icon: '📦', label: 'Tra cứu tồn kho' }, // 👈 Thêm mục Tồn kho cho Staff
-  { id: 'salary', icon: '💰', label: 'Giờ làm & lương' },
-  { id: 'profile', icon: '👤', label: 'Tài khoản' },
-  { id: 'security', icon: '🔒', label: 'Bảo mật' },
-];
+  const headerInfo = getHeaderInfo();
+  const navItems = [
+    { id: 'schedule', icon: '🗓️', label: 'Lịch & đăng ký' },
+    { id: 'inventory', icon: '📦', label: 'Tra cứu tồn kho' },
+    { id: 'salary', icon: '💰', label: 'Giờ làm & lương' },
+    { id: 'profile', icon: '👤', label: 'Tài khoản' },
+  ];
 
   return (
     <div className="sd-root sd-root--left-nav">
-      {/* --- TOPBAR --- */}
       <header className="sd-topbar">
         <div className="sd-brand">
-          <button className="sd-hamburger" onClick={() => setIsMenuOpen(true)}>☰</button>
+          <button className="sd-hamburger" onClick={() => setIsMenuOpen(true)} type="button">☰</button>
           <span className="sd-brand-icon">CT</span>
           <span className="sd-brand-name">Canteen</span>
         </div>
-        <button className="sd-logout-btn" onClick={onLogout}>
+        <button className="sd-logout-btn" onClick={onLogout} type="button">
           <span>Đăng xuất</span> ↩
         </button>
       </header>
@@ -56,7 +49,6 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
       <div className="sd-layout">
         {isMenuOpen && <div className="sd-menu-overlay" onClick={() => setIsMenuOpen(false)}></div>}
 
-        {/* --- MENU TRÁI (SIDEBAR) --- */}
         <nav className={`sd-left-nav ${isMenuOpen ? 'open' : ''}`}>
           <div className="sd-left-nav-user">
             <div className="sd-info-avatar sd-avatar-sm">{getInitials(user.fullName || user.username)}</div>
@@ -64,7 +56,7 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
           </div>
 
           <div className="sd-left-nav-items">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <button
                 key={item.id}
                 className={`sd-left-nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -76,10 +68,9 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
               </button>
             ))}
           </div>
-          <button className="sd-left-nav-logout" onClick={onLogout}>↩ Đăng xuất</button>
+          <button className="sd-left-nav-logout" onClick={onLogout} type="button">↩ Đăng xuất</button>
         </nav>
 
-        {/* --- KHU VỰC NỘI DUNG CHÍNH --- */}
         <main className="sd-main">
           <div className="sd-page-header">
             <div>
@@ -90,24 +81,10 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
           </div>
 
           <div className="sd-content">
-            {/* 👉 GỌI CÁC COMPONENT ĐÃ TÁCH Ở ĐÂY TÙY THEO TAB ĐANG CHỌN */}
             {activeTab === 'schedule' && <UnifiedScheduleTab user={user} />}
-            {activeTab === 'profile' && <ProfileTab branch={branch} user={user} />}
+            {activeTab === 'profile' && <ProfileTab branch={branch} onUserUpdated={onUserUpdated} user={user} />}
             {activeTab === 'inventory' && <InventoryTab currentUser={user} branches={branches} />}
             {activeTab === 'salary' && <SalaryTab user={user} />}
-            
-            {activeTab === 'security' && (
-              <div className="sd-profile-layout">
-                <div className="sd-card">
-                  <div className="sd-card-header">
-                    <p className="sd-eyebrow">Bảo mật</p>
-                    <h2>Đổi mật khẩu</h2>
-                  </div>
-                  {/* Gọi PasswordForm tái sử dụng */}
-                  <PasswordForm onUserUpdated={onUserUpdated} user={user} />
-                </div>
-              </div>
-            )}
           </div>
         </main>
       </div>

@@ -692,6 +692,15 @@ public partial class AppDbContext : DbContext
             entity.HasIndex(e => e.Username, "username").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.BankAccountName)
+                .HasMaxLength(100)
+                .HasColumnName("bank_account_name");
+            entity.Property(e => e.BankAccountNumber)
+                .HasMaxLength(50)
+                .HasColumnName("bank_account_number");
+            entity.Property(e => e.BankName)
+                .HasMaxLength(100)
+                .HasColumnName("bank_name");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
             entity.Property(e => e.FullName)
                 .HasMaxLength(100)
@@ -702,6 +711,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Password)
                 .HasMaxLength(255)
                 .HasColumnName("password");
+            entity.Property(e => e.PhoneNumber)
+                .HasMaxLength(15)
+                .HasColumnName("phone_number");
             entity.Property(e => e.RoleId).HasColumnName("role_id");
             entity.Property(e => e.Username)
                 .HasMaxLength(50)

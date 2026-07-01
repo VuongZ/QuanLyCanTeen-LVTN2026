@@ -341,6 +341,36 @@
   gap: 16px;
 }
 
+.sd-profile-layout--account {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.1fr) minmax(360px, 0.9fr);
+  align-items: start;
+  gap: 26px;
+}
+
+.sd-account-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sd-account-column > .sd-card {
+  margin-bottom: 0;
+}
+
+.sd-account-column .sd-pw-form {
+  gap: 8px;
+}
+
+.sd-account-column .sd-field {
+  margin-bottom: 8px;
+}
+
+.sd-account-column .sd-field:last-of-type {
+  margin-bottom: 0;
+}
+
 .sd-employee-qr-card {
   display: flex;
   align-items: stretch;
@@ -753,6 +783,11 @@
     align-items: start;
   }
 
+  .sd-profile-layout.sd-profile-layout--account {
+    grid-template-columns: minmax(420px, 1.1fr) minmax(360px, 0.9fr);
+    gap: 26px;
+  }
+
   .sd-profile-layout > .sd-card:only-child {
     grid-column: 1 / -1;
   }
@@ -842,6 +877,10 @@
     grid-template-columns: 1fr !important;
     display: flex !important;
     flex-direction: column !important;
+  }
+
+  .sd-profile-layout--account {
+    gap: 14px;
   }
 
   .sd-employee-qr-card {
