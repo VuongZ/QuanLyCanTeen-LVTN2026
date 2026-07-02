@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react'
-import axios from 'axios' // 👉 Thêm import axios
-import { getUserPageData } from './api/UserApi'
+import axios from 'axios'
+import { getUserPageData, requestPasswordReset, resetPassword } from './api/UserApi'
 import { AdminDashboard } from './pages/Admindashboard'
 import { StaffDashboard } from './pages/Staffdashboard'
 import './App.css'
 
-// =====================================================================
-// 👉 BỘ CHẶN AXIOS: Tự động đính kèm ACCESS_TOKEN vào mọi API gửi đi
-// =====================================================================
 axios.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('ACCESS_TOKEN')
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
+      config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
@@ -26,17 +23,16 @@ function normalizeRole(value = '') {
 function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
   const [loginForm, setLoginForm] = useState({ username: '', password: '' })
-  
- const [currentUser, setCurrentUser] = useState(() => {
-    // 👉 Sửa sessionStorage thành localStorage
-    const savedUser = localStorage.getItem('currentUser') 
+  const [authMode, setAuthMode] = useState('login')
+  const [resetForm, setResetForm] = useState({ identifier: '', otp: '', newPassword: '', confirmPassword: '' })
+  const [resetMessage, setResetMessage] = useState(null)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedUser = localStorage.getItem('currentUser')
     return savedUser ? JSON.parse(savedUser) : null
   })
-  
-  const [isLoading, setIsLoading] = useState(false) // Đổi mặc định thành false để không bị quay vòng vòng lúc mới mở
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Vẫn giữ nguyên logic tải dữ liệu cho Dashboard
   useEffect(() => {
     async function loadUsers() {
       try {
@@ -47,7 +43,7 @@ function App() {
           branches: data.branches ?? [],
         })
       } catch (err) {
-        console.error("Lỗi tải dữ liệu nền:", err)
+        console.error('Lỗi Dữ Liệu nền:', err)
       }
     }
     loadUsers()
@@ -59,50 +55,94 @@ function App() {
     setError('')
   }
 
-  // =====================================================================
-  // 👉 NÂNG CẤP: GỌI API ĐĂNG NHẬP THẬT XUỐNG BACKEND (JWT)
-  // =====================================================================
+  function handleResetChange(event) {
+    const { name, value } = event.target
+    setResetForm((form) => ({ ...form, [name]: value }))
+    setResetMessage(null)
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
-    
     if (!loginForm.username || !loginForm.password) {
-      setError('Vui lòng nhập đầy đủ tài khoản và mật khẩu')
+      setError('Vui Lòng Nhập Đầy Đủ Tài Khoản Và Mật Khẩu')
       return
     }
 
     try {
       setIsLoading(true)
-      
-      // Gọi API Login xuống C#
       const response = await axios.post('/api/User/login', {
         username: loginForm.username.trim(),
-        password: loginForm.password
+        password: loginForm.password,
       })
 
       const { token, user } = response.data
-
-      // Lưu Token (Chìa khóa mở các API) và Thông tin User vào Local Storage
       localStorage.setItem('ACCESS_TOKEN', token)
       localStorage.setItem('currentUser', JSON.stringify(user))
-      
       setCurrentUser(user)
       setError('')
-      
     } catch (err) {
-      // Bắt lỗi 401 từ Backend và hiển thị lên UI
-      setError(err.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác')
+      setError(err.response?.data?.message || 'Tài Khoản Hoặc Mật Khẩu Không Chính Xác')
     } finally {
       setIsLoading(false)
     }
   }
 
-  // =====================================================================
-  // 👉 NÂNG CẤP: XÓA CẢ TOKEN KHI ĐĂNG XUẤT
-  // =====================================================================
+  async function handleRequestOtp(event) {
+    event.preventDefault()
+    if (!resetForm.identifier.trim()) {
+      setResetMessage({ type: 'error', text: 'Nhập User Hoặc Email' })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await requestPasswordReset(resetForm.identifier.trim())
+      setResetMessage({ type: 'success', text: response.message || 'Đã Gửi Mã OTP Về Mail.' })
+    } catch (err) {
+      setResetMessage({ type: 'error', text: err.response?.data?.message || 'Không Thể Gửi OTP.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function handleResetPassword(event) {
+    event.preventDefault()
+    if (!resetForm.identifier.trim() || !resetForm.otp.trim() || !resetForm.newPassword) {
+      setResetMessage({ type: 'error', text: 'Nhập Đầy Đủ username/email, OTP Và Mật Khẩu Mới.' })
+      return
+    }
+    if (resetForm.newPassword.length < 4) {
+      setResetMessage({ type: 'error', text: 'Mật Khẩu Mới Tối Thiểu 4 Ký Tự.' })
+      return
+    }
+    if (resetForm.newPassword !== resetForm.confirmPassword) {
+      setResetMessage({ type: 'error', text: 'Mật khẩu nhập lại chưa khớp.' })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await resetPassword({
+        identifier: resetForm.identifier.trim(),
+        otp: resetForm.otp.trim(),
+        newPassword: resetForm.newPassword,
+      })
+      setLoginForm((form) => ({ ...form, username: resetForm.identifier.trim(), password: '' }))
+      setResetForm({ identifier: '', otp: '', newPassword: '', confirmPassword: '' })
+      setAuthMode('login')
+      setError('')
+      setResetMessage({ type: 'success', text: response.message || 'Đã đặt lại mật khẩu thành công.' })
+    } catch (err) {
+      setResetMessage({ type: 'error', text: err.response?.data?.message || 'Không thể đặt lại mật khẩu.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   function handleLogout() {
     setCurrentUser(null)
     localStorage.removeItem('currentUser')
-    localStorage.removeItem('ACCESS_TOKEN') // Xóa sạch Token để khóa cửa lại
+    localStorage.removeItem('ACCESS_TOKEN')
     setLoginForm({ username: '', password: '' })
   }
 
@@ -134,58 +174,133 @@ function App() {
     return <AdminDashboard {...dashboardProps} />
   }
 
- return (
+  return (
     <main className="auth-root-simple">
       <div className="auth-card">
-        {/* Tiêu đề */}
         <div className="auth-header">
           <div className="auth-logo">TriMinh</div>
-          <h2>Quản Lý Nhân Sự Hệ Thống Căn Tin</h2>
-          <p>Đăng nhập để tiếp tục</p>
+          <h2>Quản lý nhân sự hệ thống căn tin</h2>
+          <p>{authMode === 'login' ? 'Đăng Nhập để tiếp tục' : 'Đặt lại mật khẩu bằng OTP email'}</p>
         </div>
 
-        {/* Form đăng nhập */}
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="auth-field">
-            <label htmlFor="username">Tài khoản</label>
-            <input
-              autoComplete="username"
-              id="username"
-              name="username"
-              onChange={handleLoginChange}
-              placeholder="Nhập username"
-              type="text"
-              value={loginForm.username}
-              className="auth-input"
-            />
-          </div>
+        {authMode === 'login' ? (
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-field">
+              <label htmlFor="username">Tài khoản</label>
+              <input
+                autoComplete="username"
+                className="auth-input"
+                id="username"
+                name="username"
+                onChange={handleLoginChange}
+                placeholder="Nhập username"
+                type="text"
+                value={loginForm.username}
+              />
+            </div>
 
-          <div className="auth-field">
-            <label htmlFor="password">Mật khẩu</label>
-            <input
-              autoComplete="current-password"
-              id="password"
-              name="password"
-              onChange={handleLoginChange}
-              placeholder="Nhập password"
-              type="password"
-              value={loginForm.password}
-              className="auth-input"
-            />
-          </div>
+            <div className="auth-field">
+              <label htmlFor="password">Mật khẩu</label>
+              <input
+                autoComplete="current-password"
+                className="auth-input"
+                id="password"
+                name="password"
+                onChange={handleLoginChange}
+                placeholder="Nhập password"
+                type="password"
+                value={loginForm.password}
+              />
+            </div>
 
-          {/* Hiển thị lỗi */}
-          {error && <div className="auth-error-msg">⚠ {error}</div>}
+            {error && <div className="auth-error-msg">{error}</div>}
+            {resetMessage?.type === 'success' && <div className="auth-success-msg">{resetMessage.text}</div>}
 
-          {/* Nút đăng nhập */}
-          <button
-            className="auth-submit-btn"
-            disabled={isLoading}
-            type="submit"
-          >
-            {isLoading ? 'Đang tải...' : 'Đăng nhập'}
-          </button>
-        </form>
+            <button className="auth-submit-btn" disabled={isLoading} type="submit">
+              {isLoading ? 'Đang tải...' : 'Đăng Nhập'}
+            </button>
+            <button className="auth-link-btn" onClick={() => { setAuthMode('reset'); setError(''); setResetMessage(null) }} type="button">
+              Quên mật khẩu?
+            </button>
+          </form>
+        ) : (
+          <form className="auth-form" onSubmit={handleResetPassword}>
+            <div className="auth-field">
+              <label htmlFor="identifier">Username hoặc email</label>
+              <input
+                autoComplete="username"
+                className="auth-input"
+                id="identifier"
+                name="identifier"
+                onChange={handleResetChange}
+                placeholder="Nhập username hoặc email"
+                type="text"
+                value={resetForm.identifier}
+              />
+            </div>
+
+            <button className="auth-secondary-btn" disabled={isLoading} onClick={handleRequestOtp} type="button">
+              {isLoading ? 'Đang gửi...' : 'Gửi mã OTP'}
+            </button>
+
+            <div className="auth-field">
+              <label htmlFor="otp">Mã OTP</label>
+              <input
+                autoComplete="one-time-code"
+                className="auth-input"
+                id="otp"
+                inputMode="numeric"
+                maxLength={6}
+                name="otp"
+                onChange={handleResetChange}
+                placeholder="Nhập mã 6 số"
+                type="text"
+                value={resetForm.otp}
+              />
+            </div>
+
+            <div className="auth-field">
+              <label htmlFor="newPassword">Mật khẩu mới</label>
+              <input
+                autoComplete="new-password"
+                className="auth-input"
+                id="newPassword"
+                name="newPassword"
+                onChange={handleResetChange}
+                placeholder="Nhập mật khẩu mới"
+                type="password"
+                value={resetForm.newPassword}
+              />
+            </div>
+
+            <div className="auth-field">
+              <label htmlFor="confirmPassword">Nhập lại mật khẩu mới</label>
+              <input
+                autoComplete="new-password"
+                className="auth-input"
+                id="confirmPassword"
+                name="confirmPassword"
+                onChange={handleResetChange}
+                placeholder="Nhập lại mật khẩu mới"
+                type="password"
+                value={resetForm.confirmPassword}
+              />
+            </div>
+
+            {resetMessage && (
+              <div className={resetMessage.type === 'success' ? 'auth-success-msg' : 'auth-error-msg'}>
+                {resetMessage.text}
+              </div>
+            )}
+
+            <button className="auth-submit-btn" disabled={isLoading} type="submit">
+              {isLoading ? 'Đang lưu...' : 'Tạo mật khẩu mới'}
+            </button>
+            <button className="auth-link-btn" onClick={() => { setAuthMode('login'); setResetMessage(null) }} type="button">
+              Quay Lại Đăng Nhập
+            </button>
+          </form>
+        )}
       </div>
     </main>
   )

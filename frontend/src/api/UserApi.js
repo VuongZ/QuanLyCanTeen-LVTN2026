@@ -25,3 +25,13 @@ export async function changePassword(id, payload) {
   const response = await axios.put(`${BASE_URL}/${id}/password`, payload)
   return response.data
 }
+
+export async function requestPasswordReset(identifier) {
+  const response = await axios.post(`${BASE_URL}/forgot-password`, { identifier })
+  return response.data
+}
+
+export async function resetPassword(payload) {
+  const response = await axios.post(`${BASE_URL}/reset-password`, payload)
+  return response.data
+}

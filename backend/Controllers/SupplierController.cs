@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.Repositories;
 using Microsoft.AspNetCore.Authorization; // Nhớ import thư viện Authorize
 

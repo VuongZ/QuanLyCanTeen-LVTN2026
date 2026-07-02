@@ -1,5 +1,5 @@
 ﻿using LuanVanTotNghiep.DTOs;
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.Repositories;
 using LuanVanTotNghiep.Services;
 using Microsoft.AspNetCore.Authorization; // 👉 Thư viện JWT
@@ -120,22 +120,45 @@ namespace LuanVanTotNghiep.Controllers
         }
 
         [HttpPut("{id}/password")]
+        [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto dto)
         {
-            var user = await _context.NsUsers.FirstOrDefaultAsync(u => u.Id == id);
-            if (user == null)
-                return NotFound(new { message = "Không tìm thấy người dùng." });
+            var username = User.FindFirstValue(ClaimTypes.Name);
+            var currentUser = await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Username == username);
 
-            if (!VerifyPassword(dto.CurrentPassword, user.Password))
-                return BadRequest(new { message = "Mật khẩu hiện tại không đúng." });
+            if (currentUser == null)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
 
-            if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 4)
-                return BadRequest(new { message = "Mật khẩu mới cần tối thiểu 4 ký tự." });
+            if (currentUser.Id != id)
+                return Forbid();
 
-            user.Password = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-            await _context.SaveChangesAsync();
+            var result = await userService.ChangePasswordAsync(id, dto.CurrentPassword, dto.NewPassword);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
 
-            return Ok(new { message = "Đã cập nhật mật khẩu thành công." });
+            return Ok(new { message = result.Message });
+        }
+
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto dto)
+        {
+            var result = await userService.SendPasswordResetOtpAsync(dto.Identifier);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { message = result.Message });
+        }
+
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var result = await userService.ResetPasswordWithOtpAsync(dto.Identifier, dto.Otp, dto.NewPassword);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { message = result.Message });
         }
 
         [HttpDelete("{id}")]
@@ -159,7 +182,7 @@ namespace LuanVanTotNghiep.Controllers
         .Include(u => u.Role)
         .FirstOrDefault(u => u.Username == model.Username);
 
-            if (user != null && VerifyPassword(model.Password, user.Password))
+            if (user != null && UserService.VerifyPassword(model.Password, user.Password))
             {
                 UpgradePlainTextPasswordIfNeeded(user, model.Password);
                 var tokenHandler = new JwtSecurityTokenHandler();
@@ -220,28 +243,12 @@ namespace LuanVanTotNghiep.Controllers
             public string Password { get; set; } = null!;
         }
 
-        private static bool IsBCryptHash(string password)
-        {
-            return password.StartsWith("$2a$") || password.StartsWith("$2b$") || password.StartsWith("$2y$");
-        }
-
-        private static bool VerifyPassword(string plainPassword, string storedPassword)
-        {
-            if (string.IsNullOrEmpty(storedPassword))
-                return false;
-
-            if (IsBCryptHash(storedPassword))
-                return BCrypt.Net.BCrypt.Verify(plainPassword, storedPassword);
-
-            return storedPassword == plainPassword;
-        }
-
         private void UpgradePlainTextPasswordIfNeeded(NsUser user, string plainPassword)
         {
-            if (IsBCryptHash(user.Password))
+            if (UserService.IsBCryptHash(user.Password))
                 return;
 
-            user.Password = BCrypt.Net.BCrypt.HashPassword(plainPassword);
+            user.Password = UserService.HashPassword(plainPassword);
             _context.SaveChanges();
         }
     }

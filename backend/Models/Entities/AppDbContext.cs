@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
 
-namespace LuanVanTotNghiep.Models.Entities;
+namespace LuanVanTotNghiep.backend.Models.Entities;
 
 public partial class AppDbContext : DbContext
 {
@@ -702,6 +702,9 @@ public partial class AppDbContext : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("bank_name");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
+            entity.Property(e => e.Email)
+                .HasMaxLength(100)
+                .HasColumnName("email");
             entity.Property(e => e.FullName)
                 .HasMaxLength(100)
                 .HasColumnName("full_name");
@@ -714,6 +717,12 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.PhoneNumber)
                 .HasMaxLength(15)
                 .HasColumnName("phone_number");
+            entity.Property(e => e.ResetPasswordCode)
+                .HasMaxLength(10)
+                .HasColumnName("reset_password_code");
+            entity.Property(e => e.ResetPasswordExpiry)
+                .HasColumnType("datetime")
+                .HasColumnName("reset_password_expiry");
             entity.Property(e => e.RoleId).HasColumnName("role_id");
             entity.Property(e => e.Username)
                 .HasMaxLength(50)

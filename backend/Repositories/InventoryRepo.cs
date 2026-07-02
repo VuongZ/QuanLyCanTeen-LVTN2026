@@ -1,5 +1,5 @@
 using LuanVanTotNghiep.DTOs;
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.backend.Models.Entities;
 using Microsoft.EntityFrameworkCore; // 👉 Bắt buộc phải có thư viện này để dùng ToListAsync() và Include()
 
 namespace LuanVanTotNghiep.Repositories

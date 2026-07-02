@@ -150,6 +150,20 @@ body {
   animation: authShake 0.3s ease;
 }
 
+.auth-success-msg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #166534;
+  background: #f0fdf4;
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* ── NÚT SUBMIT ── */
 .auth-submit-btn {
   width: 100%;
@@ -176,6 +190,44 @@ body {
 .auth-submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.auth-secondary-btn {
+  width: 100%;
+  background: #fff7ed;
+  color: var(--orange-dark);
+  padding: 12px;
+  border: 1px solid var(--orange-mid);
+  border-radius: 10px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auth-secondary-btn:hover:not(:disabled) {
+  background: #ffedd5;
+}
+
+.auth-secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-link-btn {
+  color: var(--orange-dark);
+  background: transparent;
+  border: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.auth-link-btn:hover {
+  text-decoration: underline;
 }
 
 /* ── ẢO ẢNH ANIMATION ── */

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace LuanVanTotNghiep.Models.Entities;
+namespace LuanVanTotNghiep.backend.Models.Entities;
 
 public partial class CaAttendance
 {

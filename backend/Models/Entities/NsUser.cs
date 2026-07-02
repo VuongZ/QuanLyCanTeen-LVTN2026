@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace LuanVanTotNghiep.Models.Entities;
+namespace LuanVanTotNghiep.backend.Models.Entities;
 
 public partial class NsUser
 {
@@ -15,6 +15,8 @@ public partial class NsUser
 
     public string? PhoneNumber { get; set; }
 
+    public string? Email { get; set; }
+
     public string? BankName { get; set; }
 
     public string? BankAccountNumber { get; set; }
@@ -26,6 +28,10 @@ public partial class NsUser
     public int? RoleId { get; set; }
 
     public DateOnly? HireDate { get; set; }
+
+    public string? ResetPasswordCode { get; set; }
+
+    public DateTime? ResetPasswordExpiry { get; set; }
 
     public virtual DmBranch? Branch { get; set; }
 

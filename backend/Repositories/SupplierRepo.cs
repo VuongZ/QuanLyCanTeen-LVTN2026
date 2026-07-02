@@ -1,4 +1,4 @@
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.backend.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace LuanVanTotNghiep.Repositories

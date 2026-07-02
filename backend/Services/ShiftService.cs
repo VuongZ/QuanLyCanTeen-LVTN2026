@@ -1,6 +1,6 @@
 using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Repositories;
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.backend.Models.Entities;
 
 namespace LuanVanTotNghiep.Services;
 

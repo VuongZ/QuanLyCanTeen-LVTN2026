@@ -1,4 +1,4 @@
-using LuanVanTotNghiep.Models.Entities;
+using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
