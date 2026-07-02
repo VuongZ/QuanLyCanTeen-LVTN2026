@@ -597,6 +597,8 @@
   color: #64748b;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sd-filter-chip:hover {
@@ -627,6 +629,15 @@
   font-size: 13px;
   color: #94a3b8;
   font-weight: 500;
+}
+
+/* Nút "Làm mới" (hoặc bất kỳ nút sd-btn-ghost nào) khi đặt trực tiếp trong toolbar,
+   không kéo dài full-width như trong modal */
+.sd-users-toolbar > .sd-btn-ghost {
+  width: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 9px 16px;
 }
 
 /* =========================================
@@ -700,6 +711,13 @@
   padding: 13px 16px;
   vertical-align: middle;
   color: #1e293b;
+}
+
+/* Tên/tiêu đề chính trong ô bảng (vd: tên nhân viên, tên ngân hàng)
+   luôn xuống dòng riêng so với dòng phụ (sd-subline) ngay bên dưới,
+   tránh bị dính chữ vào nhau */
+.sd-table td strong {
+  display: block;
 }
 
 .sd-td-avatar {
@@ -1125,6 +1143,11 @@
     justify-content: space-between !important;
   }
 
+  /* Trên mobile, nút "Làm mới" trong toolbar chiếm full-width như các nút khác */
+  .sd-users-toolbar > .sd-btn-ghost {
+    width: 100% !important;
+  }
+
   /* =======================================
      SỬA LỖI MẤT NÚT Ở ĐÂY 
      ======================================= */
@@ -1426,3 +1449,126 @@
   .sd-text-hide-mobile {
     display: none !important; /* Ẩn chữ đi để tránh bị tràn màn hình 390px */
   }
+
+.sd-salary-admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sd-salary-admin-stats {
+  margin-bottom: 4px;
+}
+
+.sd-salary-admin-page .sd-table {
+  min-width: 1120px;
+  table-layout: fixed;
+}
+
+.sd-salary-admin-page .sd-table th,
+.sd-salary-admin-page .sd-table td {
+  padding: 14px 20px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.sd-salary-admin-page .sd-table th:first-child,
+.sd-salary-admin-page .sd-table td:first-child {
+  padding-left: 28px;
+  width: 260px;
+}
+
+.sd-salary-admin-page .sd-table th:nth-child(2),
+.sd-salary-admin-page .sd-table td:nth-child(2) {
+  width: 110px;
+  white-space: nowrap;
+}
+
+.sd-salary-admin-page .sd-table th:nth-child(3),
+.sd-salary-admin-page .sd-table td:nth-child(3) {
+  width: 120px;
+  white-space: nowrap;
+}
+
+.sd-salary-admin-page .sd-table th:nth-child(4),
+.sd-salary-admin-page .sd-table td:nth-child(4) {
+  width: 150px;
+  white-space: nowrap;
+}
+
+.sd-salary-admin-page .sd-table th:nth-child(5),
+.sd-salary-admin-page .sd-table td:nth-child(5) {
+  width: 220px;
+}
+
+.sd-salary-admin-page .sd-table th:nth-child(6),
+.sd-salary-admin-page .sd-table td:nth-child(6) {
+  width: 170px;
+  text-align: center;
+}
+
+.sd-salary-admin-page .sd-table th:nth-child(7),
+.sd-salary-admin-page .sd-table td:nth-child(7) {
+  width: 170px;
+  padding-right: 28px;
+  text-align: center;
+}
+
+.sd-salary-admin-page .sd-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sd-salary-admin-page .sd-table .sd-btn-primary,
+.sd-salary-admin-page .sd-table .sd-btn-ghost {
+  width: 140px;
+  justify-content: center;
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+
+/* Dòng phụ bên dưới tên chính trong ô bảng (vd: tên chi nhánh dưới tên nhân viên,
+   số tài khoản dưới tên ngân hàng) — luôn xuống dòng riêng, cách dòng trên 4px */
+.sd-subline {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sd-salary-admin-total {
+  color: #166534;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sd-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 116px;
+  border-radius: 999px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.sd-status-pill.paid {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.sd-status-pill.pending {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.sd-salary-pay-modal {
+  max-width: 560px;
+}

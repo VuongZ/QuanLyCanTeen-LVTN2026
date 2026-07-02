@@ -12,11 +12,10 @@ public class BranchShiftConfigRepo : Repository<CaBranchShiftConfig>
     public override async Task<CaBranchShiftConfig?> GetbyId(int id)
     {
         return await _dbSet
-            .Include(c => c.Shift) // Chỉ kéo Shift, không kéo Branch nữa
+            .Include(c => c.Shift)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
-    // Hàm này tìm theo Shift thay vì Branch & Shift
     public async Task<CaBranchShiftConfig?> GetConfigByShiftAsync(int shiftId)
     {
         return await _dbSet
@@ -26,7 +25,7 @@ public class BranchShiftConfigRepo : Repository<CaBranchShiftConfig>
     public async Task<IEnumerable<CaBranchShiftConfig>> GetAllConfigsAsync()
     {
         return await _dbSet
-            .Include(c => c.Shift)  // Chỉ kéo Shift
+            .Include(c => c.Shift)
             .ToListAsync();
     }
 }

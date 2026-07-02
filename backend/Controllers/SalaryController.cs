@@ -21,6 +21,16 @@ public class SalaryController : ControllerBase
         _context = context;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        if (!IsAdmin())
+            return Forbid();
+
+        var salaries = await _salaryService.GetAllAsync();
+        return Ok(salaries);
+    }
+
     [HttpGet("user/{userId}")]
     public async Task<IActionResult> GetByUser(int userId)
     {
@@ -36,5 +46,24 @@ public class SalaryController : ControllerBase
 
         var salaries = await _salaryService.GetByUserAsync(userId);
         return Ok(salaries);
+    }
+
+    [HttpPut("{salaryId}/pay")]
+    public async Task<IActionResult> MarkPaid(int salaryId)
+    {
+        if (!IsAdmin())
+            return Forbid();
+
+        var salary = await _salaryService.MarkPaidAsync(salaryId);
+        if (salary == null)
+            return NotFound(new { message = "Khong tim thay bang luong." });
+
+        return Ok(salary);
+    }
+
+    private bool IsAdmin()
+    {
+        var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+        return string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
     }
 }

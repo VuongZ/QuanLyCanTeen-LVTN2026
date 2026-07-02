@@ -4,9 +4,8 @@ using Microsoft.EntityFrameworkCore;
 namespace LuanVanTotNghiep.Repositories;
 public class RoleRepo : Repository<NsRole>
 {
-      public RoleRepo(AppDbContext appContext): base (appContext)
+    public RoleRepo(AppDbContext appContext): base (appContext)
     {
-        
     }
 
 

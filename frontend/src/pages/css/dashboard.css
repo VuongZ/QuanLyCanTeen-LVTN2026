@@ -613,7 +613,18 @@
   width: 100%;
   cursor: pointer;
 }
+.sd-users-toolbar > .sd-btn-ghost {
+  width: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 9px 16px;
+}
 
+/* Chống chip filter bị vỡ chữ xuống dòng */
+.sd-filter-chip {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 /* =========================================
    7. LƯỚI ĐĂNG KÝ CA LÀM (ĐẢO CHIỀU DỌC)
    ========================================= */
@@ -1140,6 +1151,21 @@
   font-size: 11px;
   font-weight: 700;
   padding: 4px 8px;
+}
+
+.sd-salary-status.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sd-salary-status.pending {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.sd-salary-status.cancelled {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .sd-salary-empty {

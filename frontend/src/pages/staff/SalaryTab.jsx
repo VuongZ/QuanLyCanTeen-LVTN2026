@@ -24,6 +24,13 @@ function formatStatus(status) {
   return map[status] || status;
 }
 
+function getStatusClass(status) {
+  const normalized = (status || 'PENDING').toUpperCase();
+  if (normalized === 'PAID') return 'paid';
+  if (normalized === 'CANCELLED') return 'cancelled';
+  return 'pending';
+}
+
 function SalaryMetric({ label, value }) {
   return (
     <div className="sd-salary-metric">
@@ -85,7 +92,7 @@ export function SalaryTab({ user }) {
   }, [filteredSalaries]);
 
   const selectedSalary = filteredSalaries[0] || salaries[0];
-
+  
   return (
     <div className="sd-profile-layout">
       <div className="sd-salary-summary">
@@ -142,7 +149,11 @@ export function SalaryTab({ user }) {
                     <td>{formatMoney(item.totalBonus)}</td>
                     <td>{formatMoney(item.totalPenalty)}</td>
                     <td className="sd-salary-total">{formatMoney(item.totalSalary)}</td>
-                    <td><span className="sd-salary-status">{formatStatus(item.status || 'PENDING')}</span></td>
+                    <td>
+                      <span className={`sd-salary-status ${getStatusClass(item.status)}`}>
+                        {formatStatus(item.status || 'PENDING')}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -152,4 +163,5 @@ export function SalaryTab({ user }) {
       </div>
     </div>
   );
+  
 }
