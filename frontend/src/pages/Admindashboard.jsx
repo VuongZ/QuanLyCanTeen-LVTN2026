@@ -34,6 +34,11 @@ function InfoRow({ label, value }) {
   return <div className="sd-info-row"><dt>{label}</dt><dd>{value}</dd></div>
 }
 
+function SortIcon({ active, direction }) {
+  if (!active) return <span className="sd-sort-icon sd-sort-none">↕</span>
+  return <span className="sd-sort-icon">{direction === 'asc' ? '↑' : '↓'}</span>
+}
+
 const EMPTY_FORM = {
   username: '', fullName: '', phoneNumber: '', bankName: '', bankAccountNumber: '', bankAccountName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '',
 }
@@ -52,7 +57,7 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
   const canManageUsers = isAdmin
 
   const [activeTab, setActiveTab] = useState(isAdmin ? 'overview' : 'periods')
-  const [users, setUsers] = useState(initUsers)
+  const [localUsers, setLocalUsers] = useState([])
   const [branches, setBranches] = useState([])
   const [modal, setModal] = useState(null)
   const [modalUser, setModalUser] = useState(null)
@@ -69,11 +74,8 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
   useEffect(() => {
     getAllBranches().then((data) => setBranches(Array.isArray(data) ? data : [])).catch(() => setBranches([]))
   }, [])
-  useEffect(() => {
-    setUsers(initUsers);
-  }, [initUsers]);
-
   const branch = branches.find((b) => b.id === user.branchId)
+  const users = localUsers.length > 0 ? localUsers : initUsers
   const visibleUsers = isManager && !isAdmin
     ? users.filter((u) => String(u.branchId || '') === String(user.branchId || ''))
     : users
@@ -97,11 +99,6 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
     else { setSortCol(col); setSortDir('asc') }
   }
 
-  function SortIcon({ col }) {
-    if (sortCol !== col) return <span className="sd-sort-icon sd-sort-none">↕</span>
-    return <span className="sd-sort-icon">{sortDir === 'asc' ? '↑' : '↓'}</span>
-  }
-
   function openAdd() { setForm(EMPTY_FORM); setFormErr(''); setModal('add') }
   function openEdit(u) { setForm({ ...u, password: '' }); setFormErr(''); setModalUser(u); setModal('edit') }
   function openDelete(u) { setModalUser(u); setFormErr(''); setModal('delete') }
@@ -122,7 +119,7 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
     setSaving(true); setFormErr('')
     try {
       const res = await axios.post('/api/User', form)
-      setUsers((prev) => [...prev, res.data]); closeModal()
+      setLocalUsers((prev) => [...(prev.length > 0 ? prev : users), res.data]); closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể thêm nhân viên') } finally { setSaving(false) }
   }
 
@@ -131,8 +128,9 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
     setSaving(true); setFormErr('')
     try {
       await updateUser(form.id, form)
-      const { password, ...publicForm } = form
-      setUsers((prev) => prev.map((u) => (u.id === form.id ? { ...u, ...publicForm } : u)))
+      const publicForm = { ...form }
+      delete publicForm.password
+      setLocalUsers((prev) => (prev.length > 0 ? prev : users).map((u) => (u.id === form.id ? { ...u, ...publicForm } : u)))
       if (selectedUser && selectedUser.id === form.id) setSelectedUser({ ...selectedUser, ...publicForm })
       if (form.id === user.id) onUserUpdated({ ...user, ...publicForm })
       closeModal()
@@ -143,7 +141,7 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
     setSaving(true)
     try {
       await axios.delete(`/api/User/${modalUser.id}`)
-      setUsers((prev) => prev.filter((u) => u.id !== modalUser.id))
+      setLocalUsers((prev) => (prev.length > 0 ? prev : users).filter((u) => u.id !== modalUser.id))
       if (selectedUser && selectedUser.id === modalUser.id) setSelectedUser(null)
       closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể xóa') } finally { setSaving(false) }
@@ -292,13 +290,13 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                         <thead>
                           <tr>
                             <th className="sd-th sd-th-avatar" style={{ width: 48 }}></th>
-                            <th className="sd-th sd-th-sortable sd-td-name-col" onClick={() => toggleSort('fullName')}>Họ và tên <SortIcon col="fullName" /></th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('username')}>Username <SortIcon col="username" /></th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('phoneNumber')}>SĐT <SortIcon col="phoneNumber" /></th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('bankName')}>Ngân hàng <SortIcon col="bankName" /></th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon col="roleName" /></th>
-                            <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon col="branchName" /></th>
-                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon col="hireDate" /></th>
+                            <th className="sd-th sd-th-sortable sd-td-name-col" onClick={() => toggleSort('fullName')}>Họ và tên <SortIcon active={sortCol === 'fullName'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('username')}>Username <SortIcon active={sortCol === 'username'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('phoneNumber')}>SĐT <SortIcon active={sortCol === 'phoneNumber'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('bankName')}>Ngân hàng <SortIcon active={sortCol === 'bankName'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon active={sortCol === 'roleName'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon active={sortCol === 'branchName'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon active={sortCol === 'hireDate'} direction={sortDir} /></th>
                           </tr>
                         </thead>
                         <tbody>

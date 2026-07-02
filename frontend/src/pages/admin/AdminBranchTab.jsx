@@ -66,7 +66,7 @@ export function AdminBranchTab({ branches, setBranches }) {
       const newData = await getAllBranches()
       setBranches(Array.isArray(newData) ? newData : [])
       setBranchModal(null)
-    } catch (err) { setError('Lỗi lưu cơ sở!') } finally { setSaving(false) }
+    } catch { setError('Lỗi lưu cơ sở!') } finally { setSaving(false) }
   }
 
   async function handleDeleteBranch() {
@@ -75,7 +75,7 @@ export function AdminBranchTab({ branches, setBranches }) {
       await deleteBranch(selectedBranch.id)
       setBranches((prev) => prev.filter((b) => b.id !== selectedBranch.id))
       setSelectedBranch(null); setBranchModal(null)
-    } catch (err) { setError('Lỗi xóa cơ sở!') } finally { setSaving(false) }
+    } catch { setError('Lỗi xóa cơ sở!') } finally { setSaving(false) }
   }
 
   const displayedShifts = selectedBranch ? shifts.filter((s) => s.branchId === selectedBranch.id) : []
@@ -117,7 +117,7 @@ export function AdminBranchTab({ branches, setBranches }) {
       const configData = await axios.get('/api/BranchShiftConfig')
       setShiftConfigs(configData.data || [])
       setShiftModal(null)
-    } catch (err) { setError('Dữ liệu không hợp lệ!') } finally { setSaving(false) }
+    } catch { setError('Dữ liệu không hợp lệ!') } finally { setSaving(false) }
   }
 
   async function handleDeleteShift() {
@@ -126,7 +126,7 @@ export function AdminBranchTab({ branches, setBranches }) {
       await deleteShift(modalShift.id)
       setShifts((prev) => prev.filter((s) => s.id !== modalShift.id))
       setShiftModal(null)
-    } catch (err) { setError('Lỗi khi xóa ca.') } finally { setSaving(false) }
+    } catch { setError('Lỗi khi xóa ca.') } finally { setSaving(false) }
   }
 
   function openConfigShift(shift) {

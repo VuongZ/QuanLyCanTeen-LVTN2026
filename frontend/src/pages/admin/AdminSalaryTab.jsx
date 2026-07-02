@@ -45,7 +45,7 @@ export function AdminSalaryTab() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedSalary, setSelectedSalary] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -63,7 +63,22 @@ export function AdminSalaryTab() {
   }
 
   useEffect(() => {
-    loadSalaries();
+    let ignore = false;
+
+    getAllSalaries()
+      .then((data) => {
+        if (!ignore) setSalaries(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!ignore) setMessage({ type: 'error', text: err.response?.data?.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch lÆ°Æ¡ng.' });
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const filteredSalaries = useMemo(() => {
