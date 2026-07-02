@@ -75,7 +75,7 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
     {
         var user = await FindByIdentifierAsync(identifier);
         if (user == null || string.IsNullOrWhiteSpace(user.Email))
-            return (false, "Khong tim thay email cua tai khoan.");
+            return (false, "Không tìm thấy email của tài khoản.");
 
         var otp = GenerateOtp();
         user.ResetPasswordCode = otp;
@@ -84,7 +84,7 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         await context.SaveChangesAsync();
         await emailService.SendOtpEmailAsync(user.Email, otp);
 
-        return (true, "Da gui ma OTP ve email.");
+        return (true, "Đã gửi mã OTP về email.");
     }
 
     public async Task<(bool Success, string Message)> ResetPasswordWithOtpAsync(string identifier, string otp, string newPassword)
