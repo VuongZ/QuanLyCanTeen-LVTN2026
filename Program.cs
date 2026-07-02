@@ -1,4 +1,4 @@
-using LuanVanTotNghiep.Models.Entities;
+﻿using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.Repositories;
 using LuanVanTotNghiep.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer; // 👉 Thư viện JWT
@@ -8,6 +8,17 @@ using System.Text;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"];
+var jwtAudience = builder.Configuration["Jwt:Audience"];
+var jwtKey = builder.Configuration["Jwt:Key"];
+
+if (string.IsNullOrWhiteSpace(jwtIssuer) ||
+    string.IsNullOrWhiteSpace(jwtAudience) ||
+    string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException("Missing JWT configuration. Please set Jwt:Issuer, Jwt:Audience, and Jwt:Key in appsettings.json or user secrets.");
+}
 
 // 1. Cấu hình kết nối Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -20,7 +31,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
 });
 
-// 👉 3. KHẮC PHỤC LỖI 500: Đăng ký cơ chế Xác thực (Authentication) JWT
+// 3. KHẮC PHỤC LỖI 500: Đăng ký cơ chế Xác thực (Authentication) JWT
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -34,19 +45,20 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
     };
 });
 
-builder.Services.AddAuthorization(); // 👉 Kích hoạt phân quyền
+builder.Services.AddAuthorization(); // Kích hoạt phân quyền
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // 4. Đăng ký các "Nhân viên" (Services & Repositories)
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<UserRepo>();
 builder.Services.AddScoped<RoleRepo>();
 builder.Services.AddScoped<RoleService>();  
@@ -64,6 +76,7 @@ builder.Services.AddScoped<SupplierRepo>();
 builder.Services.AddScoped<SupplierService>();
 builder.Services.AddScoped<InventoryRepo>();
 builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<SalaryService>();
 
 var app = builder.Build();
 
@@ -111,9 +124,10 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
-// 👉 5. THỨ TỰ MIDDLEWARE BẮT BUỘC: Authentication phải đứng trước Authorization
+// 5. THỨ TỰ MIDDLEWARE BẮT BUỘC: Authentication phải đứng trước Authorization
 app.UseAuthentication(); 
 app.UseAuthorization();
 
 app.MapControllers();
 app.Run();
+
