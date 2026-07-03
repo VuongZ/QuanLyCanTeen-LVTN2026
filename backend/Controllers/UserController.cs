@@ -132,19 +132,32 @@ namespace LuanVanTotNghiep.Controllers
         [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto dto)
         {
-            var username = User.FindFirstValue(ClaimTypes.Name);
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var currentUser = int.TryParse(userIdClaim, out var currentUserId)
-                ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
-                : await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Email == username || u.PhoneNumber == username);
-
+            var currentUser = await GetCurrentUserAsync();
             if (currentUser == null)
                 return Unauthorized(new { message = "Không xác định được người dùng." });
 
             if (currentUser.Id != id)
                 return Forbid();
 
-            var result = await userService.ChangePasswordAsync(id, dto.CurrentPassword, dto.NewPassword);
+            var result = await userService.ChangePasswordAsync(id, dto.CurrentPassword, dto.NewPassword, dto.Otp);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { message = result.Message });
+        }
+
+        [HttpPost("{id}/password/otp")]
+        [Authorize]
+        public async Task<IActionResult> SendChangePasswordOtp(int id)
+        {
+            var currentUser = await GetCurrentUserAsync();
+            if (currentUser == null)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            if (currentUser.Id != id)
+                return Forbid();
+
+            var result = await userService.SendChangePasswordOtpAsync(id);
             if (!result.Success)
                 return BadRequest(new { message = result.Message });
 
@@ -277,6 +290,15 @@ namespace LuanVanTotNghiep.Controllers
         private static string? GetLoginDisplay(NsUser user)
         {
             return user.Email ?? user.PhoneNumber;
+        }
+
+        private async Task<NsUser?> GetCurrentUserAsync()
+        {
+            var username = User.FindFirstValue(ClaimTypes.Name);
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return int.TryParse(userIdClaim, out var currentUserId)
+                ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
+                : await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Email == username || u.PhoneNumber == username);
         }
 
         private static object ToUserResponse(NsUser user)

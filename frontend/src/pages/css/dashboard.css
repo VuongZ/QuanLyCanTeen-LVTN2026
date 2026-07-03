@@ -603,6 +603,25 @@
   transform: scale(0.98);
 }
 
+.sd-btn-secondary {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  width: 100%;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.sd-btn-secondary:disabled,
+.sd-btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .sd-btn-ghost {
   background: transparent;
   border: 1.5px solid #e2e8f0;

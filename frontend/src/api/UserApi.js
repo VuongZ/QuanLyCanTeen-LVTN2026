@@ -26,6 +26,11 @@ export async function changePassword(id, payload) {
   return response.data
 }
 
+export async function requestChangePasswordOtp(id) {
+  const response = await axios.post(`${BASE_URL}/${id}/password/otp`)
+  return response.data
+}
+
 export async function requestPasswordReset(identifier) {
   const response = await axios.post(`${BASE_URL}/forgot-password`, { identifier })
   return response.data

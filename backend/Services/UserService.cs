@@ -65,7 +65,7 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         }
     }
 
-    public async Task<(bool Success, string Message)> ChangePasswordAsync(int id, string currentPassword, string newPassword)
+    public async Task<(bool Success, string Message)> ChangePasswordAsync(int id, string currentPassword, string newPassword, string otp)
     {
         var user = await userRepo.GetbyId(id);
         if (user == null)
@@ -77,9 +77,27 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
             return (false, "Mật khẩu mới cần tối thiểu 4 ký tự.");
 
+        if (!IsValidOtp(user, otp))
+            return (false, "Mã OTP không đúng hoặc đã hết hạn.");
+
         user.Password = HashPassword(newPassword);
+        user.ResetPasswordCode = null;
+        user.ResetPasswordExpiry = null;
         await userRepo.Update(user);
         return (true, "Đã cập nhật mật khẩu thành công.");
+    }
+
+    public async Task<(bool Success, string Message)> SendChangePasswordOtpAsync(int id)
+    {
+        var user = await userRepo.GetbyId(id);
+        if (user == null)
+            return (false, "Không tìm thấy người dùng.");
+
+        if (string.IsNullOrWhiteSpace(user.Email))
+            return (false, "Tài khoản chưa có email để gửi OTP. Vui lòng cập nhật email trước.");
+
+        await SendOtpAsync(user);
+        return (true, "Đã gửi mã OTP về email.");
     }
 
     public async Task<(bool Success, string Message)> SendPasswordResetOtpAsync(string identifier)
@@ -88,12 +106,7 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         if (user == null || string.IsNullOrWhiteSpace(user.Email))
             return (false, "Không tìm thấy tài khoản có email để gửi OTP. Vui lòng kiểm tra email/SĐT hoặc cập nhật email cho nhân viên.");
 
-        var otp = GenerateOtp();
-        user.ResetPasswordCode = otp;
-        user.ResetPasswordExpiry = DateTime.UtcNow.AddMinutes(5);
-
-        await context.SaveChangesAsync();
-        await emailService.SendOtpEmailAsync(user.Email, otp);
+        await SendOtpAsync(user);
 
         return (true, "Đã gửi mã OTP về email.");
     }
@@ -107,13 +120,8 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
             return (false, "Mật khẩu mới cần tối thiểu 4 ký tự.");
 
-        if (string.IsNullOrWhiteSpace(user.ResetPasswordCode) ||
-            user.ResetPasswordExpiry == null ||
-            user.ResetPasswordExpiry < DateTime.UtcNow ||
-            user.ResetPasswordCode != otp)
-        {
+        if (!IsValidOtp(user, otp))
             return (false, "Mã OTP không đúng hoặc đã hết hạn.");
-        }
 
         user.Password = HashPassword(newPassword);
         user.ResetPasswordCode = null;
@@ -191,5 +199,23 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
     private static string GenerateOtp()
     {
         return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+    }
+
+    private async Task SendOtpAsync(NsUser user)
+    {
+        var otp = GenerateOtp();
+        user.ResetPasswordCode = otp;
+        user.ResetPasswordExpiry = DateTime.UtcNow.AddMinutes(5);
+
+        await context.SaveChangesAsync();
+        await emailService.SendOtpEmailAsync(user.Email!, otp);
+    }
+
+    private static bool IsValidOtp(NsUser user, string otp)
+    {
+        return !string.IsNullOrWhiteSpace(user.ResetPasswordCode) &&
+            user.ResetPasswordExpiry != null &&
+            user.ResetPasswordExpiry >= DateTime.UtcNow &&
+            user.ResetPasswordCode == otp?.Trim();
     }
 }
