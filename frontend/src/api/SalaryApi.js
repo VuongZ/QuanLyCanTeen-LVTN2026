@@ -16,3 +16,20 @@ export async function markSalaryPaid(salaryId) {
   const response = await axios.put(`${BASE_URL}/${salaryId}/pay`);
   return response.data;
 }
+
+export async function getSalaryRuleAdjustments(month, year) {
+  const response = await axios.get(`${BASE_URL}/rule-adjustments`, {
+    params: { month, year },
+  });
+  return response.data;
+}
+
+export async function applySalaryRuleAdjustment(payload) {
+  const response = await axios.put(`${BASE_URL}/rule-adjustments/apply`, payload);
+  return response.data;
+}
+
+export async function addManualSalaryAdjustment(payload) {
+  const response = await axios.put(`${BASE_URL}/rule-adjustments/manual`, payload);
+  return response.data;
+}

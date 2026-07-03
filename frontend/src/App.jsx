@@ -22,7 +22,7 @@ function normalizeRole(value = '') {
 
 function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' })
+  const [loginForm, setLoginForm] = useState({ identifier: '', password: '' })
   const [authMode, setAuthMode] = useState('login')
   const [resetForm, setResetForm] = useState({ identifier: '', otp: '', newPassword: '', confirmPassword: '' })
   const [resetMessage, setResetMessage] = useState(null)
@@ -63,15 +63,15 @@ function App() {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (!loginForm.username || !loginForm.password) {
-      setError('Vui Lòng Nhập Đầy Đủ Tài Khoản Và Mật Khẩu')
+    if (!loginForm.identifier || !loginForm.password) {
+      setError('Vui lòng nhập email hoặc số điện thoại và mật khẩu')
       return
     }
 
     try {
       setIsLoading(true)
       const response = await axios.post('/api/User/login', {
-        username: loginForm.username.trim(),
+        identifier: loginForm.identifier.trim(),
         password: loginForm.password,
       })
 
@@ -108,7 +108,7 @@ function App() {
   async function handleResetPassword(event) {
     event.preventDefault()
     if (!resetForm.identifier.trim() || !resetForm.otp.trim() || !resetForm.newPassword) {
-      setResetMessage({ type: 'error', text: 'Nhập Đầy Đủ username/email, OTP Và Mật Khẩu Mới.' })
+      setResetMessage({ type: 'error', text: 'Nhập đầy đủ email/số điện thoại, OTP và mật khẩu mới.' })
       return
     }
     if (resetForm.newPassword.length < 4) {
@@ -127,7 +127,7 @@ function App() {
         otp: resetForm.otp.trim(),
         newPassword: resetForm.newPassword,
       })
-      setLoginForm((form) => ({ ...form, username: resetForm.identifier.trim(), password: '' }))
+      setLoginForm((form) => ({ ...form, identifier: resetForm.identifier.trim(), password: '' }))
       setResetForm({ identifier: '', otp: '', newPassword: '', confirmPassword: '' })
       setAuthMode('login')
       setError('')
@@ -143,7 +143,7 @@ function App() {
     setCurrentUser(null)
     localStorage.removeItem('currentUser')
     localStorage.removeItem('ACCESS_TOKEN')
-    setLoginForm({ username: '', password: '' })
+    setLoginForm({ identifier: '', password: '' })
   }
 
   function handleUserUpdated(updatedUser) {
@@ -186,16 +186,16 @@ function App() {
         {authMode === 'login' ? (
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="auth-field">
-              <label htmlFor="username">Tài khoản</label>
+              <label htmlFor="identifier">Email hoặc số điện thoại</label>
               <input
                 autoComplete="username"
                 className="auth-input"
-                id="username"
-                name="username"
+                id="identifier"
+                name="identifier"
                 onChange={handleLoginChange}
-                placeholder="Nhập username"
+                placeholder="Nhập email hoặc số điện thoại"
                 type="text"
-                value={loginForm.username}
+                value={loginForm.identifier}
               />
             </div>
 
@@ -226,14 +226,14 @@ function App() {
         ) : (
           <form className="auth-form" onSubmit={handleResetPassword}>
             <div className="auth-field">
-              <label htmlFor="identifier">Username hoặc email</label>
+              <label htmlFor="identifier">Email hoặc số điện thoại</label>
               <input
                 autoComplete="username"
                 className="auth-input"
                 id="identifier"
                 name="identifier"
                 onChange={handleResetChange}
-                placeholder="Nhập username hoặc email"
+                placeholder="Nhập email hoặc số điện thoại"
                 type="text"
                 value={resetForm.identifier}
               />

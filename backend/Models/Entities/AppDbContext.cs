@@ -1,16 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
-using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
 
 namespace LuanVanTotNghiep.backend.Models.Entities;
 
 public partial class AppDbContext : DbContext
 {
-    public AppDbContext()
-    {
-    }
-
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {
@@ -58,9 +53,7 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<NsUser> NsUsers { get; set; }
 
-   // protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-//#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-    //  => optionsBuilder.UseMySql("server=localhost;port=3306;database=qlcanteen;user=root", Microsoft.EntityFrameworkCore.ServerVersion.Parse("9.1.0-mysql"));
+    public virtual DbSet<NsUserBankAccount> NsUserBankAccounts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -181,7 +174,7 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.StartDate).HasColumnName("start_date");
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'OPEN'")
-                .HasColumnType("enum('OPEN','DRAFT','PUBLISHED')")
+                .HasColumnType("enum('OPEN','DRAFT','PUBLISHED','REVIEWING','CLOSED')")
                 .HasColumnName("status");
         });
 
@@ -689,18 +682,11 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => e.RoleId, "fk_user_role");
 
-            entity.HasIndex(e => e.Username, "username").IsUnique();
+            entity.HasIndex(e => e.Email, "uq_user_email").IsUnique();
+
+            entity.HasIndex(e => e.PhoneNumber, "uq_user_phone").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.BankAccountName)
-                .HasMaxLength(100)
-                .HasColumnName("bank_account_name");
-            entity.Property(e => e.BankAccountNumber)
-                .HasMaxLength(50)
-                .HasColumnName("bank_account_number");
-            entity.Property(e => e.BankName)
-                .HasMaxLength(100)
-                .HasColumnName("bank_name");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
             entity.Property(e => e.Email)
                 .HasMaxLength(100)
@@ -724,9 +710,6 @@ public partial class AppDbContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("reset_password_expiry");
             entity.Property(e => e.RoleId).HasColumnName("role_id");
-            entity.Property(e => e.Username)
-                .HasMaxLength(50)
-                .HasColumnName("username");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.NsUsers)
                 .HasForeignKey(d => d.BranchId)
@@ -736,6 +719,31 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.Role).WithMany(p => p.NsUsers)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("fk_user_role");
+        });
+
+        modelBuilder.Entity<NsUserBankAccount>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("ns_user_bank_account");
+
+            entity.HasIndex(e => e.UserId, "fk_bank_user");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.BankAccountName)
+                .HasMaxLength(100)
+                .HasColumnName("bank_account_name");
+            entity.Property(e => e.BankAccountNumber)
+                .HasMaxLength(50)
+                .HasColumnName("bank_account_number");
+            entity.Property(e => e.BankName)
+                .HasMaxLength(100)
+                .HasColumnName("bank_name");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.NsUserBankAccounts)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("fk_bank_user");
         });
 
         OnModelCreatingPartial(modelBuilder);

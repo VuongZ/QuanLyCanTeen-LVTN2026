@@ -7,8 +7,6 @@ public partial class NsUser
 {
     public int Id { get; set; }
 
-    public string Username { get; set; } = null!;
-
     public string Password { get; set; } = null!;
 
     public string? FullName { get; set; }
@@ -16,12 +14,6 @@ public partial class NsUser
     public string? PhoneNumber { get; set; }
 
     public string? Email { get; set; }
-
-    public string? BankName { get; set; }
-
-    public string? BankAccountNumber { get; set; }
-
-    public string? BankAccountName { get; set; }
 
     public int? BranchId { get; set; }
 
@@ -46,6 +38,8 @@ public partial class NsUser
     public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReports { get; set; } = new List<KhoShiftClosingReport>();
 
     public virtual ICollection<LuongMonthlySalary> LuongMonthlySalaries { get; set; } = new List<LuongMonthlySalary>();
+
+    public virtual ICollection<NsUserBankAccount> NsUserBankAccounts { get; set; } = new List<NsUserBankAccount>();
 
     public virtual NsRole? Role { get; set; }
 }

@@ -96,6 +96,17 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
         throw new Exception("Bạn đã đăng ký ca này vào ngày này rồi!");
 
     // 5. Lưu nguyện vọng vào Database
+    var registeredCount = await _context.CaStaffRegistrations
+        .CountAsync(r =>
+            r.PeriodId == dto.PeriodId &&
+            r.ShiftId == dto.ShiftId &&
+            r.WorkDate == dto.WorkDate &&
+            r.Status != "Từ Chối" &&
+            r.Status != "Tá»« Chá»‘i");
+
+    if (registeredCount >= config.MaxStaff)
+        throw new Exception("Ca đã đủ người, bạn không thể đăng ký vào ca này.");
+
     var registration = new CaStaffRegistration
     {
         UserId = dto.UserId,
@@ -358,7 +369,7 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
             employee = new
             {
                 employee.Id,
-                employee.Username,
+                Username = employee.Email ?? employee.PhoneNumber,
                 employee.FullName,
                 BranchName = employee.Branch?.Name,
                 RoleName = employee.Role?.RoleName
