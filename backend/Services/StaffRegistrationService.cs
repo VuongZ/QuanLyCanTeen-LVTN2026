@@ -3,6 +3,7 @@ using LuanVanTotNghiep.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 using System.Text;
+using System.Data;
 
 namespace LuanVanTotNghiep.Services;
 
@@ -64,60 +65,124 @@ public class StaffRegistrationService
 
 public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
 {
-    // 1. Kiểm tra Đợt đăng ký
-    var period = await _context.CaSchedulePeriods.FindAsync(dto.PeriodId);
-    if (period == null || period.Status != "OPEN")
-        throw new Exception("Đợt đăng ký không tồn tại hoặc đã khóa.");
+    await using var transaction = await _context.Database
+        .BeginTransactionAsync(IsolationLevel.Serializable);
+
+    // 1. Kiểm tra đợt đăng ký
+    var period = await _context.CaSchedulePeriods
+        .FirstOrDefaultAsync(p => p.Id == dto.PeriodId);
+
+    if (period == null)
+        throw new Exception("Đợt đăng ký không tồn tại.");
+
+    if (!string.Equals(period.Status, "OPEN", StringComparison.OrdinalIgnoreCase))
+        throw new Exception("Đợt đăng ký đã khóa hoặc đã công bố.");
 
     if (dto.WorkDate < period.StartDate || dto.WorkDate > period.EndDate)
         throw new Exception("Ngày đăng ký không nằm trong thời gian của đợt này.");
 
-    // 2. Trích xuất tên ngày bằng tiếng Anh để khớp 100% với Database (VD: "Tuesday")
-    string targetDay = dto.WorkDate.DayOfWeek.ToString(); 
+    // 2. Kiểm tra nhân viên
+    var user = await _context.NsUsers
+        .FirstOrDefaultAsync(u => u.Id == dto.UserId);
 
-    // 3. Dò Database xem ca làm này ngày hôm đó có mở không
+    if (user == null)
+        throw new Exception("Không tìm thấy nhân viên.");
+
+    if (user.BranchId != period.BranchId)
+        throw new Exception("Bạn chỉ được đăng ký ca làm tại chi nhánh của mình.");
+
+    // 3. Kiểm tra ca làm
+    var shift = await _context.CaShifts
+        .FirstOrDefaultAsync(s => s.Id == dto.ShiftId);
+
+    if (shift == null)
+        throw new Exception("Không tìm thấy ca làm.");
+
+    if (shift.BranchId != period.BranchId)
+        throw new Exception("Ca làm không thuộc chi nhánh của đợt đăng ký.");
+
+    // 4. Kiểm tra ca có mở vào ngày đó không
+    string targetDay = dto.WorkDate.DayOfWeek.ToString();
+
     var config = await _context.CaBranchShiftConfigs
-        .FirstOrDefaultAsync(c => c.ShiftId == dto.ShiftId && c.DayOfWeek == targetDay);
+        .FirstOrDefaultAsync(c =>
+            c.ShiftId == dto.ShiftId &&
+            c.DayOfWeek == targetDay);
 
     if (config == null || config.MaxStaff <= 0)
     {
-        // Chỉ dùng mảng tiếng Việt ở đây để xuất câu thông báo lỗi cho đẹp
-        string[] vnDays = { "Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7" };
+        string[] vnDays =
+        {
+            "Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4",
+            "Thứ 5", "Thứ 6", "Thứ 7"
+        };
+
         string vnDayName = vnDays[(int)dto.WorkDate.DayOfWeek];
-        
         throw new Exception($"Ca làm này không mở vào {vnDayName}.");
     }
 
-    // 4. Chống đăng ký trùng
-    var isDuplicate = await _context.CaStaffRegistrations
-        .AnyAsync(r => r.UserId == dto.UserId && r.ShiftId == dto.ShiftId && r.WorkDate == dto.WorkDate);
-    
-    if (isDuplicate)
-        throw new Exception("Bạn đã đăng ký ca này vào ngày này rồi!");
+    // 5. Chống đăng ký trùng
+    var cancelledStatuses = new[]
+    {
+        "CANCELLED",
+        "Từ Chối",
+        "REJECTED",
+        "Tá»« Chá»‘i"
+    };
 
-    // 5. Lưu nguyện vọng vào Database
-    var registeredCount = await _context.CaStaffRegistrations
-        .CountAsync(r =>
-            r.PeriodId == dto.PeriodId &&
+    var isDuplicate = await _context.CaStaffRegistrations
+        .AnyAsync(r =>
+            r.UserId == dto.UserId &&
             r.ShiftId == dto.ShiftId &&
             r.WorkDate == dto.WorkDate &&
-            r.Status != "Từ Chối" &&
-            r.Status != "Tá»« Chá»‘i");
+            !cancelledStatuses.Contains(r.Status));
 
-    if (registeredCount >= config.MaxStaff)
-        throw new Exception("Ca đã đủ người, bạn không thể đăng ký vào ca này.");
+    if (isDuplicate)
+        throw new Exception("Bạn đã đăng ký ca này vào ngày này rồi.");
 
+
+   // 6. Kiểm tra số lượng Staff được đăng ký
+// maxStaff là tổng số người trong ca, trong đó Manager chiếm 1 slot.
+// Ví dụ maxStaff = 2 thì Staff chỉ được đăng ký 1 người.
+int maxStaff = config.MaxStaff.GetValueOrDefault();
+
+int staffSlot = maxStaff - 1;
+
+if (staffSlot < 0)
+{
+    staffSlot = 0;
+}
+
+if (staffSlot <= 0)
+{
+    throw new Exception("Ca làm này chỉ có slot cho Quản lý, nhân viên không thể đăng ký.");
+}
+
+var registeredCount = await _context.CaStaffRegistrations
+    .CountAsync(r =>
+        r.PeriodId == dto.PeriodId &&
+        r.ShiftId == dto.ShiftId &&
+        r.WorkDate == dto.WorkDate &&
+        !cancelledStatuses.Contains(r.Status));
+
+if (registeredCount >= staffSlot)
+{
+    throw new Exception("Ca đã đủ số lượng nhân viên, bạn không thể đăng ký vào ca này.");
+}
+    // 7. Lưu đăng ký theo nguyên tắc first come - first serve
     var registration = new CaStaffRegistration
     {
         UserId = dto.UserId,
         PeriodId = dto.PeriodId,
         ShiftId = dto.ShiftId,
         WorkDate = dto.WorkDate,
-        Status = "Chờ Duyệt" 
+        Status = "REGISTERED"
     };
 
     _context.CaStaffRegistrations.Add(registration);
     await _context.SaveChangesAsync();
+
+    await transaction.CommitAsync();
 
     return registration;
 }
@@ -147,103 +212,161 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
     }
 
     // 2. MANAGER: Duyệt hoặc Từ chối 1 người
-    public async Task UpdateStatusAsync(int registrationId, string newStatus)
+   public async Task UpdateStatusAsync(int registrationId, string newStatus)
+{
+    var registration = await _context.CaStaffRegistrations.FindAsync(registrationId);
+    if (registration == null)
+        throw new Exception("Không tìm thấy phiếu đăng ký này.");
+
+    if (newStatus != "REGISTERED" && newStatus != "CANCELLED")
+        throw new ArgumentException("Trạng thái không hợp lệ.");
+
+    registration.Status = newStatus;
+    await _context.SaveChangesAsync();
+}
+    // 3. MANAGER: Xuất bản lịch làm việc chính thức (Chốt sổ)
+ public async Task PublishScheduleAsync(PublishScheduleDto dto)
+{
+    var period = await _context.CaSchedulePeriods.FindAsync(dto.PeriodId);
+    if (period == null)
+        throw new Exception("Không tìm thấy đợt đăng ký này.");
+
+    if (period.Status == "OPEN")
+        throw new Exception("Vui lòng khóa đăng ký trước khi công bố lịch.");
+        
+        if (period.Status == "PUBLISHED")
+    throw new Exception("Lịch đã được công bố, không thể cập nhật lại.");
+
+    // 1. Lấy Manager của chi nhánh
+    var manager = await _context.NsUsers
+        .Include(u => u.Role)
+        .FirstOrDefaultAsync(u =>
+            u.BranchId == period.BranchId &&
+            u.Role != null &&
+            (
+                u.Role.RoleName.Contains("Manager") ||
+                u.Role.RoleName.Contains("MANAGER") ||
+                u.Role.RoleName.Contains("Quản lý") ||
+                u.Role.RoleName.Contains("Quan ly")
+            )
+        );
+
+    if (manager == null)
+        throw new Exception("Không tìm thấy Quản lý của chi nhánh để thêm vào lịch làm.");
+
+    // 2. Lấy các đăng ký hợp lệ của Staff
+    var registrations = await _context.CaStaffRegistrations
+        .Where(r =>
+            r.PeriodId == dto.PeriodId &&
+            r.Status != "CANCELLED" &&
+            r.Status != "Từ Chối" &&
+            r.Status != "REJECTED" &&
+            r.Status != "Tá»« Chá»‘i")
+        .OrderBy(r => r.WorkDate)
+        .ThenBy(r => r.ShiftId)
+        .ThenBy(r => r.Id)
+        .ToListAsync();
+
+    // 3. Lấy các ca thuộc chi nhánh
+    var branchShifts = await _context.CaShifts
+        .Where(s => s.BranchId == period.BranchId)
+        .ToListAsync();
+
+    var branchShiftIds = branchShifts
+        .Select(s => s.Id)
+        .ToList();
+
+    // 4. Lấy cấu hình ca theo ngày trong tuần
+    var shiftConfigs = await _context.CaBranchShiftConfigs
+        .Where(c => branchShiftIds.Contains(c.ShiftId))
+        .ToListAsync();
+
+    // 5. Tạo danh sách lịch chính thức cần có
+    var finalScheduleKeys = new HashSet<(int UserId, int ShiftId, DateOnly WorkDate)>();
+
+    // 5.1. Thêm Staff đã đăng ký hợp lệ
+    foreach (var reg in registrations)
     {
-        var registration = await _context.CaStaffRegistrations.FindAsync(registrationId);
-        if (registration == null)
-            throw new Exception("Không tìm thấy phiếu đăng ký này.");
-
-        // Chỉ cho phép nhập 2 trạng thái này để tránh rác DB
-        if (newStatus != "Đã Duyệt" && newStatus != "Từ Chối" && newStatus != "Chờ Duyệt")
-            throw new ArgumentException("Trạng thái không hợp lệ.");
-
-        registration.Status = newStatus;
-        await _context.SaveChangesAsync();
+        finalScheduleKeys.Add((reg.UserId, reg.ShiftId, reg.WorkDate));
+        reg.Status = "REGISTERED";
     }
 
-    // 3. MANAGER: Xuất bản lịch làm việc chính thức (Chốt sổ)
-    public async Task PublishScheduleAsync(PublishScheduleDto dto)
+    // 5.2. Tự động thêm Manager vào mỗi ca đang mở
+    var currentDate = period.StartDate;
+
+    while (currentDate <= period.EndDate)
     {
-        // 1. Chuyển trạng thái của Đợt thành PUBLISHED (Đã chốt)
-        var period = await _context.CaSchedulePeriods.FindAsync(dto.PeriodId);
-        if (period == null) 
-            throw new Exception("Không tìm thấy đợt đăng ký này.");
-            
-        period.Status = "PUBLISHED";
+        var dayOfWeek = currentDate.DayOfWeek.ToString();
 
-        // 2. Lấy toàn bộ phiếu đăng ký của đợt này lên
-        var allRegistrations = await _context.CaStaffRegistrations
-            .Where(r => r.PeriodId == dto.PeriodId)
-            .ToListAsync();
-
-        // 3. Quét 1 vòng: Ai có ID nằm trong danh sách gửi lên -> Nhận job. Còn lại -> Rớt.
-        foreach (var reg in allRegistrations)
+        foreach (var shift in branchShifts)
         {
-            if (dto.ApprovedRegistrationIds.Contains(reg.Id))
-            {
-                reg.Status = "Đã Duyệt";
-            }
-            else
-            {
-                reg.Status = "Từ Chối";
-            }
-        }
+            var config = shiftConfigs.FirstOrDefault(c =>
+                c.ShiftId == shift.Id &&
+                c.DayOfWeek == dayOfWeek
+            );
 
-        var approvedRegistrations = allRegistrations
-            .Where(r => dto.ApprovedRegistrationIds.Contains(r.Id))
-            .ToList();
-        var approvedKeys = approvedRegistrations
-            .Select(r => (r.UserId, r.ShiftId, r.WorkDate))
-            .ToHashSet();
-        var branchShiftIds = await _context.CaShifts
-            .Where(s => s.BranchId == period.BranchId)
-            .Select(s => s.Id)
-            .ToListAsync();
-        var existingSchedules = await _context.CaFinalSchedules
-            .Include(s => s.CaAttendances)
-            .Where(s =>
-                s.WorkDate >= period.StartDate &&
-                s.WorkDate <= period.EndDate &&
-                branchShiftIds.Contains(s.ShiftId))
-            .ToListAsync();
-
-        foreach (var schedule in existingSchedules)
-        {
-            var isApproved = approvedKeys.Contains((schedule.UserId, schedule.ShiftId, schedule.WorkDate));
-            if (isApproved)
-            {
-                schedule.Status = "PUBLISHED";
-            }
-            else if (schedule.CaAttendances.Any())
-            {
-                schedule.Status = "DRAFT";
-            }
-            else
-            {
-                _context.CaFinalSchedules.Remove(schedule);
-            }
-        }
-
-        var existingKeys = existingSchedules
-            .Select(s => (s.UserId, s.ShiftId, s.WorkDate))
-            .ToHashSet();
-        foreach (var reg in approvedRegistrations)
-        {
-            if (existingKeys.Contains((reg.UserId, reg.ShiftId, reg.WorkDate)))
+            if (config == null || config.MaxStaff <= 0)
                 continue;
 
-            _context.CaFinalSchedules.Add(new CaFinalSchedule
-            {
-                UserId = reg.UserId,
-                ShiftId = reg.ShiftId,
-                WorkDate = reg.WorkDate,
-                Status = "PUBLISHED"
-            });
+            finalScheduleKeys.Add((manager.Id, shift.Id, currentDate));
         }
 
-        // Lưu toàn bộ thay đổi (Cập nhật Status của Period và Registration cùng lúc)
-        await _context.SaveChangesAsync();
+        currentDate = currentDate.AddDays(1);
     }
+
+    // 6. Lấy lịch chính thức cũ trong khoảng thời gian này
+    var existingSchedules = await _context.CaFinalSchedules
+        .Include(s => s.CaAttendances)
+        .Where(s =>
+            s.WorkDate >= period.StartDate &&
+            s.WorkDate <= period.EndDate &&
+            branchShiftIds.Contains(s.ShiftId))
+        .ToListAsync();
+
+    // 7. Xóa hoặc cập nhật lịch cũ
+    foreach (var schedule in existingSchedules)
+    {
+        var stillExists = finalScheduleKeys.Contains(
+            (schedule.UserId, schedule.ShiftId, schedule.WorkDate)
+        );
+
+        if (stillExists)
+        {
+            schedule.Status = "PUBLISHED";
+        }
+        else if (schedule.CaAttendances.Any())
+        {
+            schedule.Status = "DRAFT";
+        }
+        else
+        {
+            _context.CaFinalSchedules.Remove(schedule);
+        }
+    }
+
+    // 8. Thêm các lịch mới chưa có
+    var existingKeys = existingSchedules
+        .Select(s => (s.UserId, s.ShiftId, s.WorkDate))
+        .ToHashSet();
+
+    foreach (var key in finalScheduleKeys)
+    {
+        if (existingKeys.Contains(key))
+            continue;
+
+        _context.CaFinalSchedules.Add(new CaFinalSchedule
+        {
+            UserId = key.UserId,
+            ShiftId = key.ShiftId,
+            WorkDate = key.WorkDate,
+            Status = "PUBLISHED"
+        });
+    }
+
+    period.Status = "PUBLISHED";
+
+    await _context.SaveChangesAsync();
+}
     // Manager quet QR nhan vien de ghi vao ca_final_schedule va ca_attendance.
     public async Task<object> ScanAttendanceAsync(ScanAttendanceDto dto)
     {
@@ -391,24 +514,23 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
     }
 
     // 5. NHÂN VIÊN: Hủy ca đã đăng ký (Chỉ được hủy khi chưa duyệt)
-   public async Task CancelRegistrationAsync(int id, int userId)
+ public async Task CancelRegistrationAsync(int id, int userId)
 {
     var reg = await _context.CaStaffRegistrations.FindAsync(id);
-    if (reg == null) 
+    if (reg == null)
         throw new Exception("Không tìm thấy phiếu đăng ký này.");
 
-    if (reg.UserId != userId) 
-        throw new Exception("Bạn không có quyền xóa ca của người khác.");
+    if (reg.UserId != userId)
+        throw new Exception("Bạn không có quyền hủy ca của người khác.");
 
-    // 👉 RÀO CẢN BỔ SUNG: Chặn hủy ca nếu hệ thống đã KHÓA SỔ
     var period = await _context.CaSchedulePeriods.FindAsync(reg.PeriodId);
     if (period == null || period.Status != "OPEN")
-        throw new Exception("Hệ thống đang xét duyệt hoặc đã chốt lịch, không thể hủy ca!");
+        throw new Exception("Đợt đăng ký đã đóng hoặc đã công bố, không thể hủy ca.");
 
-    if (reg.Status != "Chờ Duyệt") 
-        throw new Exception("Ca này đã được quản lý xử lý, không thể hủy.");
+    if (reg.Status != "REGISTERED")
+        throw new Exception("Ca này không thể hủy.");
 
-    _context.CaStaffRegistrations.Remove(reg);
+    reg.Status = "CANCELLED";
     await _context.SaveChangesAsync();
 }
 }

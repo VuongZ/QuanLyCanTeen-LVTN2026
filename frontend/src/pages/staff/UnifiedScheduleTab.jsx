@@ -14,81 +14,225 @@ function formatDate(value) {
 // 👉 COMPONENT MỚI: MÀN HÌNH GỘP (LỊCH & ĐĂNG KÝ)
 // ==========================================
 export function UnifiedScheduleTab({ user }) {
-  const [periods, setPeriods] = useState([]);
-  const [selectedPeriodId, setSelectedPeriodId] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [periods, setPeriods] = useState([])
+  const [selectedPeriodId, setSelectedPeriodId] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function init() {
       try {
-        const allPeriods = await getAllPeriods();
-        const branchPeriods = allPeriods
-          .filter(p => String(p.branchId) === String(user.branchId))
-          .filter(p => {
-            const st = p.status?.trim().toLowerCase();
-            return st === 'mở' || st === 'open' || st === 'published';
-          })
-          .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+        const allPeriods = await getAllPeriods()
 
-        setPeriods(branchPeriods);
+        const branchPeriods = allPeriods
+          .filter((p) => String(p.branchId) === String(user.branchId))
+          .filter((p) => {
+            const st = String(p.status || '').toUpperCase()
+
+            return (
+              st === 'OPEN' ||
+              st === 'CLOSED' ||
+              st === 'PUBLISHED' ||
+              st === 'REVIEWING' ||
+              st === 'DRAFT'
+            )
+          })
+          .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
+
+        setPeriods(branchPeriods)
+
         if (branchPeriods.length > 0) {
-          setSelectedPeriodId(branchPeriods[0].id.toString());
+          const firstOpenPeriod = branchPeriods.find((p) => {
+            return String(p.status || '').toUpperCase() === 'OPEN'
+          })
+
+          const firstPeriod = firstOpenPeriod || branchPeriods[0]
+
+          setSelectedPeriodId(firstPeriod.id.toString())
         }
       } catch (e) {
-        console.error("Lỗi lấy danh sách đợt:", e);
+        console.error('Lỗi lấy danh sách đợt:', e)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    init();
-  }, [user.branchId]);
 
-  if (loading) return <div className="sd-card"><p>Đang tải dữ liệu...</p></div>;
+    init()
+  }, [user.branchId])
+
+  const selectedPeriod = periods.find((p) => {
+    return p.id.toString() === selectedPeriodId
+  })
+
+  const selectedStatus = String(selectedPeriod?.status || '').toUpperCase()
+
+  const isPublished = selectedStatus === 'PUBLISHED'
+
+  function handleChangePeriod(e) {
+    setSelectedPeriodId(e.target.value)
+  }
+
+  function getPeriodStatusText(status) {
+    const st = String(status || '').toUpperCase()
+
+    if (st === 'OPEN') return 'Đang mở đăng ký'
+
+    if (
+      st === 'CLOSED' ||
+      st === 'REVIEWING' ||
+      st === 'DRAFT'
+    ) {
+      return 'Đã đóng đăng ký'
+    }
+
+    if (st === 'PUBLISHED') return 'Đã công bố lịch'
+
+    return status || 'Không rõ trạng thái'
+  }
+
+  if (loading) {
+    return (
+      <div className="sd-card">
+        <p>Đang tải dữ liệu...</p>
+      </div>
+    )
+  }
 
   if (periods.length === 0) {
     return (
       <div className="sd-card">
-        <div className="sd-empty-state" style={{ padding: '40px 20px' }}>
+        <div
+          className="sd-empty-state"
+          style={{
+            padding: '40px 20px'
+          }}
+        >
           <span className="sd-empty-icon">🗓️</span>
-          <h3 style={{ color: '#1e293b', marginTop: 10 }}>Chưa có dữ liệu lịch làm</h3>
-          <p>Hiện tại cơ sở của bạn chưa có lịch làm chính thức cũng như đợt đăng ký ca nào được mở.</p>
+
+          <h3
+            style={{
+              color: '#1e293b',
+              marginTop: 10
+            }}
+          >
+            Chưa có dữ liệu lịch làm
+          </h3>
+
+          <p>
+            Hiện tại chi nhánh của bạn chưa có lịch làm chính thức hoặc đợt đăng ký ca nào được mở.
+          </p>
         </div>
       </div>
-    );
+    )
   }
 
-  const selectedPeriod = periods.find(p => p.id.toString() === selectedPeriodId);
-  const isPublished = selectedPeriod?.status === 'PUBLISHED';
-
   return (
-    <div className="sd-card" style={{ padding: '20px 0' }}>
-      <div style={{ padding: '0 20px 16px', display: 'flex', gap: 12, alignItems: 'center', borderBottom: '1px solid #f1f5f9', marginBottom: 16 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Chọn tuần:</span>
-        <select
-          className="sd-input-search"
-          style={{ width: '100%', maxWidth: 400 }}
-          value={selectedPeriodId}
-          onChange={(e) => setSelectedPeriodId(e.target.value)}
+    <div
+      className="sd-card"
+      style={{
+        padding: '20px 0'
+      }}
+    >
+      <div
+        style={{
+          padding: '0 20px 16px',
+          borderBottom: '1px solid #f1f5f9',
+          marginBottom: 16
+        }}
+      >
+        <div
+          style={{
+            display: 'grid',
+            gap: 10
+          }}
         >
-          {periods.map(p => {
-            const st = p.status === 'PUBLISHED' ? '(Đã chốt lịch)' : '(Đang mở đăng ký)';
-            return (
-              <option key={p.id} value={p.id}>
-                Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)} {st}
-              </option>
-            );
-          })}
-        </select>
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}
+          >
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#475569',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Chọn tuần:
+            </span>
+
+            <select
+              className="sd-input-search"
+              style={{
+                width: '100%',
+                maxWidth: 520
+              }}
+              value={selectedPeriodId}
+              onChange={handleChangePeriod}
+            >
+              {periods.map((p) => (
+                <option
+                  key={p.id}
+                  value={p.id}
+                >
+                  Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)} - {getPeriodStatusText(p.status)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div
+            style={{
+              fontSize: 13,
+              color: '#64748b'
+            }}
+          >
+            Trạng thái tuần đang chọn:{' '}
+
+            <strong
+              style={{
+                color: isPublished ? '#1d4ed8' : '#ea580c'
+              }}
+            >
+              {getPeriodStatusText(selectedPeriod?.status)}
+            </strong>
+          </div>
+
+          <div
+            style={{
+              fontSize: 13,
+              color: '#64748b'
+            }}
+          >
+            {isPublished
+              ? 'Tuần này đã công bố lịch. Hệ thống đang hiển thị lịch làm chính thức.'
+              : 'Tuần này chưa công bố lịch. Hệ thống đang hiển thị màn hình đăng ký ca làm.'}
+          </div>
+        </div>
       </div>
 
-      <div style={{ padding: '0 20px' }}>
-        {isPublished
-          ? <PublishedScheduleView period={selectedPeriod} user={user} />
-          : <RegistrationView period={selectedPeriod} user={user} />
-        }
+      <div
+        style={{
+          padding: '0 20px'
+        }}
+      >
+        {isPublished ? (
+          <PublishedScheduleView
+            period={selectedPeriod}
+            user={user}
+          />
+        ) : (
+          <RegistrationView
+            period={selectedPeriod}
+            user={user}
+          />
+        )}
       </div>
     </div>
-  );
+  )
 }
 
 // ==========================================
@@ -109,7 +253,13 @@ function PublishedScheduleView({ period, user }) {
           getAllShifts()
         ]);
 
-        const approvedRegs = (regRes.data || []).filter(r => r.status === 'Đã Duyệt');
+        const approvedRegs = (regRes.data || []).filter((r) => {
+          return (
+            r.status === 'REGISTERED' ||
+            r.status === 'Đã Duyệt' ||
+            r.status === 'APPROVED'
+          )
+        })
         setRegistrations(approvedRegs);
         setShifts(shiftRes.filter(s => String(s.branchId) === String(user.branchId)));
 
@@ -237,7 +387,16 @@ function RegistrationView({ period, user }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const isReviewing = period.status === 'REVIEWING' || period.status === 'Đang duyệt';
+  const periodStatus = String(period.status || '').toUpperCase()
+
+  const isClosed =
+    periodStatus === 'CLOSED' ||
+    periodStatus === 'REVIEWING' ||
+    periodStatus === 'DRAFT'
+
+  const isPublished = periodStatus === 'PUBLISHED'
+
+  const isLocked = isClosed || isPublished
 
   useEffect(() => {
     async function loadData() {
@@ -289,16 +448,36 @@ function RegistrationView({ period, user }) {
     return d.toISOString().split('T')[0];
   }
 
-  function getMaxStaffForShiftDate(shiftId, dateObj) {
-    const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-    const config = shiftConfigs.find((cfg) => cfg.shiftId === shiftId && String(cfg.dayOfWeek).toLowerCase() === dayName.toLowerCase());
-    const shift = shifts.find((item) => item.id === shiftId);
-    return Number(config?.maxStaff ?? shift?.maxStaff ?? 0);
+  function getTotalMaxStaffForShiftDate(shiftId, dateObj) {
+    const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' })
+
+    const config = shiftConfigs.find((cfg) => {
+      return (
+        cfg.shiftId === shiftId &&
+        String(cfg.dayOfWeek).toLowerCase() === dayName.toLowerCase()
+      )
+    })
+
+    const shift = shifts.find((item) => item.id === shiftId)
+
+    return Number(config?.maxStaff ?? shift?.maxStaff ?? 0)
+  }
+
+  function getStaffSlotForShiftDate(shiftId, dateObj) {
+    const totalMaxStaff = getTotalMaxStaffForShiftDate(shiftId, dateObj)
+
+    return Math.max(totalMaxStaff - 1, 0)
   }
 
   function isRejectedStatus(status = '') {
-    const normalized = String(status).toLowerCase();
-    return normalized.includes('từ chối') || normalized.includes('tá»« chá»‘i');
+    const normalized = String(status).toLowerCase()
+
+    return (
+      normalized === 'cancelled' ||
+      normalized === 'rejected' ||
+      normalized.includes('từ chối') ||
+      normalized.includes('tá»« chá»‘i')
+    )
   }
 
   function getRegisteredCount(dateStr, shiftId) {
@@ -310,14 +489,21 @@ function RegistrationView({ period, user }) {
   }
 
   function isShiftFull(dateStr, shiftId, dateObj) {
-    const maxStaff = getMaxStaffForShiftDate(shiftId, dateObj);
-    if (maxStaff <= 0) return true;
-    return getRegisteredCount(dateStr, shiftId) >= maxStaff;
+    const staffSlot = getStaffSlotForShiftDate(shiftId, dateObj)
+
+    if (staffSlot <= 0) return true
+
+    return getRegisteredCount(dateStr, shiftId) >= staffSlot
   }
 
   function toggle(dateStr, shiftId, dateObj) {
-    const dbItem = dbRegistrations[dateStr]?.[shiftId];
-    if (dbItem && dbItem.status !== "Chờ Duyệt") return;
+    const dbItem = dbRegistrations[dateStr]?.[shiftId]
+
+    if (isLocked) return
+
+    if (dbItem && dbItem.status !== 'REGISTERED' && dbItem.status !== 'Chờ Duyệt') {
+      return
+    }
 
     if (!dbItem && isShiftFull(dateStr, shiftId, dateObj)) {
       setCapacityMessage('Ca đã đủ người, bạn không thể đăng ký vào ca này.');
@@ -339,7 +525,13 @@ function RegistrationView({ period, user }) {
     Object.entries(registered).forEach(([dStr, shiftsInfo]) => {
       Object.entries(shiftsInfo).forEach(([sId, isSelected]) => {
         if (isSelected && !dbRegistrations[dStr]?.[sId]) {
-          adds.push({ userId: user.id, periodId: period.id, shiftId: parseInt(sId), workDate: dStr, status: "Chờ Duyệt" });
+          adds.push({
+            userId: user.id,
+            periodId: period.id,
+            shiftId: parseInt(sId),
+            workDate: dStr,
+            status: 'REGISTERED'
+          })
         }
       });
     });
@@ -347,7 +539,12 @@ function RegistrationView({ period, user }) {
     Object.entries(dbRegistrations).forEach(([dStr, shiftsInfo]) => {
       Object.entries(shiftsInfo).forEach(([sId, dbItem]) => {
         const isSelectedNow = registered[dStr]?.[sId];
-        if (!isSelectedNow && dbItem.status === "Chờ Duyệt") deletes.push(dbItem.id);
+        if (
+          !isSelectedNow &&
+          (dbItem.status === 'REGISTERED' || dbItem.status === 'Chờ Duyệt')
+        ) {
+          deletes.push(dbItem.id)
+        }
       });
     });
 
@@ -355,35 +552,71 @@ function RegistrationView({ period, user }) {
   }
 
   async function handleSave() {
-    const { adds, deletes } = getChanges();
-    if (adds.length === 0 && deletes.length === 0) return alert("Không có thay đổi nào để lưu!");
-    setSaving(true);
+    const { adds, deletes } = getChanges()
+
+    if (adds.length === 0 && deletes.length === 0) {
+      return alert('Không có thay đổi nào để lưu!')
+    }
+
+    setSaving(true)
 
     try {
-      const apiCalls = [
-        ...adds.map(payload => axios.post('/api/StaffRegistration', payload)),
-        ...deletes.map(regId => axios.delete(`/api/StaffRegistration/${regId}/user/${user.id}`))
-      ];
-      await Promise.all(apiCalls);
+      // Xóa/hủy ca trước nếu có
+      for (const regId of deletes) {
+        await axios.delete(`/api/StaffRegistration/${regId}/user/${user.id}`)
+      }
 
+      // Đăng ký ca lần lượt, không gửi nhiều request cùng lúc
+      for (const payload of adds) {
+        await axios.post('/api/StaffRegistration', payload)
+      }
+
+      // Load lại dữ liệu sau khi lưu
       const [regRes, periodRegRes] = await Promise.all([
         axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`),
-        axios.get(`/api/StaffRegistration/period/${period.id}`),
-      ]);
-      setAllRegistrations(periodRegRes.data || []);
-      const dbMap = {}; const initRegs = {};
-      (regRes.data || []).forEach(r => {
-        const dStr = r.workDate.slice(0, 10);
-        if (!dbMap[dStr]) { dbMap[dStr] = {}; initRegs[dStr] = {}; }
-        dbMap[dStr][r.shiftId] = { id: r.id, status: r.status };
-        initRegs[dStr][r.shiftId] = true;
-      });
-      setDbRegistrations(dbMap);
-      setRegistered(initRegs);
-      setSaved(true);
+        axios.get(`/api/StaffRegistration/period/${period.id}`)
+      ])
 
-    } catch (err) { alert("❌ Lỗi: " + (err.response?.data?.message || 'Có lỗi xảy ra!')); }
-    finally { setSaving(false); }
+      setAllRegistrations(periodRegRes.data || [])
+
+      const dbMap = {}
+      const initRegs = {}
+
+        ; (regRes.data || []).forEach((r) => {
+          const dStr = r.workDate.slice(0, 10)
+
+          if (!dbMap[dStr]) {
+            dbMap[dStr] = {}
+            initRegs[dStr] = {}
+          }
+
+          dbMap[dStr][r.shiftId] = {
+            id: r.id,
+            status: r.status
+          }
+
+          initRegs[dStr][r.shiftId] = true
+        })
+
+      setDbRegistrations(dbMap)
+      setRegistered(initRegs)
+      setSaved(true)
+
+      alert('✅ Đã lưu đăng ký ca thành công!')
+    } catch (err) {
+      console.error(err)
+
+      alert(
+        '❌ Lỗi: ' +
+        (
+          err.response?.data?.message ||
+          err.response?.data ||
+          'Có lỗi xảy ra khi lưu đăng ký!'
+        )
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleReset() {
@@ -405,12 +638,16 @@ function RegistrationView({ period, user }) {
     <>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ color: '#ea580c', margin: '0 0 4px' }}>Đăng ký ca làm việc</h2>
-        {isReviewing && (
+        {isLocked && (
           <div style={{ background: '#fef9c3', color: '#854d0e', padding: '12px 16px', borderRadius: 8, marginBottom: 16, border: '1px solid #fde047' }}>
-            <strong>⏳ Đã khóa sổ đăng ký!</strong> Quản lý đang trong quá trình xét duyệt ca làm việc. Bạn không thể thêm hay hủy ca vào lúc này.
+            <strong>Đợt đăng ký đã đóng!</strong> Bạn chỉ có thể xem các ca đã đăng ký, không thể thêm hoặc hủy ca trong tuần này.
           </div>
         )}
-        <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Quản lý đang mở đăng ký cho tuần này. Hãy chọn các ca bạn có thể làm.</p>
+        <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+          {isLocked
+            ? 'Đợt đăng ký này đã đóng. Bạn chỉ có thể xem lại các ca đã đăng ký.'
+            : 'Quản lý đang mở đăng ký cho tuần này. Hãy chọn các ca bạn có thể làm.'}
+        </p>
       </div>
 
       {capacityMessage && (
@@ -450,33 +687,104 @@ function RegistrationView({ period, user }) {
                 {shifts.map((shift) => {
                   const isOn = registered[dateStr]?.[shift.id] || false;
                   const dbItem = dbRegistrations[dateStr]?.[shift.id];
-                  const isLocked = dbItem && dbItem.status !== "Chờ Duyệt" || isReviewing;
+                  const isCellLocked =
+                    isLocked ||
+                    (
+                      dbItem &&
+                      dbItem.status !== 'REGISTERED' &&
+                      dbItem.status !== 'Chờ Duyệt'
+                    )
 
-                  const registeredCount = getRegisteredCount(dateStr, shift.id);
-                  const maxStaff = getMaxStaffForShiftDate(shift.id, dateObj);
-                  const isFull = !isOn && isShiftFull(dateStr, shift.id, dateObj);
+                  const totalMaxStaff = getTotalMaxStaffForShiftDate(shift.id, dateObj)
+                  const staffSlot = getStaffSlotForShiftDate(shift.id, dateObj)
+                  const isFull = !isOn && isShiftFull(dateStr, shift.id, dateObj)
+
+                  const savedStaffList = allRegistrations.filter((item) => {
+                    return (
+                      item.workDate?.slice(0, 10) === dateStr &&
+                      item.shiftId === shift.id &&
+                      !isRejectedStatus(item.status)
+                    )
+                  })
+
+                  const hasMeInSavedList = savedStaffList.some((item) => item.userId === user.id)
+
+                  const displayStaffList = savedStaffList.map((item) => ({
+                    id: item.id,
+                    name:
+                      item.userId === user.id
+                        ? user.fullName || 'Bạn'
+                        : item.user?.fullName || item.user?.username || 'Nhân viên',
+                    isMe: item.userId === user.id,
+                    isPending: false
+                  }))
+
+                  if (isOn && !hasMeInSavedList) {
+                    displayStaffList.push({
+                      id: `new-${dateStr}-${shift.id}`,
+                      name: user.fullName || 'Bạn',
+                      isMe: true,
+                      isPending: true
+                    })
+                  }
+
+                  const emptySlotCount = Math.max(staffSlot - displayStaffList.length, 0)
 
                   return (
                     <button
-                      key={shift.id}
-                      className={`sd-shift-cell-v ${isOn ? 'selected' : ''} ${isFull ? 'full' : ''}`}
-                      onClick={() => toggle(dateStr, shift.id, dateObj)}
-                      type="button"
-                      disabled={isReviewing || isFull}
-                      style={isFull
-                        ? { cursor: 'not-allowed', backgroundColor: '#fee2e2', borderColor: '#dc2626', color: '#991b1b', fontWeight: 800 }
-                        : isLocked ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#fed7aa', borderColor: '#ea580c' } : {}}
+                     key={shift.id}
+  className={`sd-shift-cell-v sd-shift-cell-slots ${isOn ? 'selected' : ''} ${(isFull || isCellLocked) ? 'disabled' : ''}`}
+  onClick={() => toggle(dateStr, shift.id, dateObj)}
+  type="button"
+  disabled={isCellLocked || isFull}
                     >
-                      {isFull && (
-                        <span style={{ display: 'grid', gap: 2, lineHeight: 1.1 }}>
-                          <strong>Đã đủ người</strong>
-                          <small>{registeredCount}/{maxStaff}</small>
-                        </span>
-                      )}
-                      {!isFull && !isOn && (
-                        <small style={{ color: '#94a3b8' }}>{registeredCount}/{maxStaff}</small>
-                      )}
-                      {isOn ? (isLocked ? '🔒' : '✓') : ''}
+                      <div className="sd-slot-list">
+  {totalMaxStaff > 0 && (
+    <div className="sd-slot-person sd-slot-manager">
+      <span className="sd-slot-name">
+        Quản lý
+      </span>
+    </div>
+  )}
+
+  {displayStaffList.map((staff) => (
+    <div
+      key={staff.id}
+      className={`sd-slot-person ${staff.isMe ? 'sd-slot-me' : 'sd-slot-staff'}`}
+    >
+      <span className="sd-slot-name">
+        {staff.name}
+      </span>
+
+      {staff.isPending && (
+        <span className="sd-slot-pending">
+          Chưa lưu
+        </span>
+      )}
+    </div>
+  ))}
+
+  {Array.from({ length: emptySlotCount }).map((_, index) => (
+    <div
+      key={`empty-${dateStr}-${shift.id}-${index}`}
+      className="sd-slot-empty"
+    >
+      Còn trống
+    </div>
+  ))}
+
+  {staffSlot <= 0 && (
+    <div className="sd-slot-empty">
+      Không có slot nhân viên
+    </div>
+  )}
+
+  {isFull && (
+    <div className="sd-slot-full-text">
+      Ca đã đủ người
+    </div>
+  )}
+</div>
                     </button>
                   );
                 })}
@@ -488,14 +796,19 @@ function RegistrationView({ period, user }) {
 
       <div className="sd-shift-actions">
         <button className="sd-btn-ghost" onClick={handleReset} type="button" disabled={totalChanges === 0}>Hoàn tác thay đổi</button>
-        <button className="sd-btn-primary" disabled={saving || totalChanges === 0 || isReviewing} onClick={handleSave} type="button">
+        <button
+          className="sd-btn-primary"
+          disabled={saving || totalChanges === 0 || isLocked}
+          onClick={handleSave}
+          type="button"
+        >
           {saving ? 'Đang lưu…' : `Xác nhận lưu thay đổi (${totalChanges} ca)`}
         </button>
       </div>
 
       {saved && totalChanges === 0 && (
         <p className="sd-save-notice" style={{ color: '#15803d', fontSize: 13, marginTop: 12, textAlign: 'center' }}>
-          ✅ Dữ liệu đã được đồng bộ. Các ca đăng ký sẽ có biểu tượng (🔒) nếu quản lý đã bắt đầu duyệt.
+          ✅ Dữ liệu đã được đồng bộ. Các ca đăng ký sẽ có biểu tượng (🔒) nếu đợt đăng ký đã đóng hoặc đã công bố lịch.
         </p>
       )}
     </>

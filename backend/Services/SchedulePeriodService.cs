@@ -13,6 +13,31 @@ public class SchedulePeriodService
         _repo = repo;
     }
 
+private static string NormalizePeriodStatus(string? status)
+{
+    if (string.IsNullOrWhiteSpace(status)) return "OPEN";
+
+    var s = status.Trim().ToUpperInvariant();
+
+    return s switch
+    {
+        "MỞ" => "OPEN",
+        "MO" => "OPEN",
+        "OPEN" => "OPEN",
+
+        "ĐÓNG" => "CLOSED",
+        "DONG" => "CLOSED",
+        "CLOSED" => "CLOSED",
+        "REVIEWING" => "CLOSED",
+        "DRAFT" => "CLOSED",
+
+        "PUBLISHED" => "PUBLISHED",
+        "ĐÃ CHỐT" => "PUBLISHED",
+        "DA CHOT" => "PUBLISHED",
+
+        _ => throw new ArgumentException("Trạng thái đợt đăng ký không hợp lệ.")
+    };
+}
     public async Task<IEnumerable<SchedulePeriodDto>> GetAllAsync()
     {
         var periods = await _repo.GetAll();
@@ -73,13 +98,12 @@ public class SchedulePeriodService
         throw new ArgumentException("Ngày bắt đầu phải là Thứ Hai.");
 
     var existingPeriod = await _repo.GetbyId(id);
-    if (existingPeriod == null) 
+    if (existingPeriod == null)
         throw new KeyNotFoundException("Không tìm thấy đợt đăng ký.");
 
-    // Tự động tính lại ngày kết thúc
     existingPeriod.StartDate = dto.StartDate;
-    existingPeriod.EndDate = dto.StartDate.AddDays(6); 
-    existingPeriod.Status = dto.Status;
+    existingPeriod.EndDate = dto.StartDate.AddDays(6);
+    existingPeriod.Status = NormalizePeriodStatus(dto.Status);
 
     await _repo.Update(existingPeriod);
 }
@@ -89,8 +113,8 @@ public async Task UpdateStatusOnlyAsync(int id, string newStatus)
     var period = await _repo.GetbyId(id);
     if (period == null)
         throw new KeyNotFoundException("Không tìm thấy đợt đăng ký.");
-    
-    period.Status = newStatus;
+
+    period.Status = NormalizePeriodStatus(newStatus);
     await _repo.Update(period);
 }
 
