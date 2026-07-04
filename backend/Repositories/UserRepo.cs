@@ -9,9 +9,22 @@ public class UserRepo : Repository<NsUser>
         
     }
 
+    public new async Task<IEnumerable<NsUser>> GetAll()
+    {
+        return await _dbSet
+            .Include(user => user.Branch)
+            .Include(user => user.Role)
+            .Include(user => user.NsUserBankAccounts)
+            .ToListAsync();
+    }
+
 
     public override async Task<NsUser?> GetbyId(int id)
     {
-        return await  _dbSet.FirstOrDefaultAsync(user=>user.Id==id);
+        return await _dbSet
+            .Include(user => user.Branch)
+            .Include(user => user.Role)
+            .Include(user => user.NsUserBankAccounts)
+            .FirstOrDefaultAsync(user=>user.Id==id);
     }
 }

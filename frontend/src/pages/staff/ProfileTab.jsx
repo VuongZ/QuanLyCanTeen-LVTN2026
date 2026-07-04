@@ -24,7 +24,7 @@ function buildEmployeeQrPayload(user) {
   return JSON.stringify({
     type: 'EMPLOYEE',
     id: user.id,
-    username: user.username,
+    identifier: user.email || user.phoneNumber || user.phone || user.username,
     fullName: user.fullName,
     roleName: user.roleName,
     branchId: user.branchId,
@@ -55,7 +55,7 @@ export function EmployeeQrCard({ user }) {
     if (!qrUrl) return;
     const link = document.createElement('a');
     link.href = qrUrl;
-    link.download = `employee-${user.username || user.id}-qr.png`;
+    link.download = `employee-${user.email || user.phoneNumber || user.id}-qr.png`;
     link.click();
   }
 
@@ -67,7 +67,7 @@ export function EmployeeQrCard({ user }) {
           <p className="sd-eyebrow">Mã QR nhân viên</p>
           <h2>{user.fullName || user.username}</h2>
           <dl className="sd-employee-qr-list">
-            <InfoRow label="Username" value={user.username || '---'} />
+            <InfoRow label="Email/SĐT" value={user.email || user.phoneNumber || user.phone || '---'} />
             <InfoRow label="Chức vụ" value={user.roleName || '---'} />
             <InfoRow label="Chi nhánh" value={user.branchName || 'Chưa gán'} />
           </dl>

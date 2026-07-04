@@ -228,9 +228,12 @@ function PublishedScheduleView({ period, user }) {
 // ==========================================
 function RegistrationView({ period, user }) {
   const [shifts, setShifts] = useState([]);
+  const [shiftConfigs, setShiftConfigs] = useState([]);
+  const [allRegistrations, setAllRegistrations] = useState([]);
   const [dates, setDates] = useState([]);
   const [registered, setRegistered] = useState({});
   const [dbRegistrations, setDbRegistrations] = useState({});
+  const [capacityMessage, setCapacityMessage] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -240,8 +243,16 @@ function RegistrationView({ period, user }) {
     async function loadData() {
       setLoading(true);
       try {
-        const allShifts = await getAllShifts();
-        setShifts(allShifts.filter((s) => String(s.branchId) === String(user.branchId)));
+        const [allShifts, configRes, periodRegRes] = await Promise.all([
+          getAllShifts(),
+          axios.get('/api/BranchShiftConfig'),
+          axios.get(`/api/StaffRegistration/period/${period.id}`),
+        ]);
+        const branchShifts = allShifts.filter((s) => String(s.branchId) === String(user.branchId));
+        const branchShiftIds = new Set(branchShifts.map((s) => s.id));
+        setShifts(branchShifts);
+        setShiftConfigs((configRes.data || []).filter((cfg) => branchShiftIds.has(cfg.shiftId)));
+        setAllRegistrations(periodRegRes.data || []);
 
         const dArray = [];
         let curr = new Date(period.startDate);
@@ -278,10 +289,42 @@ function RegistrationView({ period, user }) {
     return d.toISOString().split('T')[0];
   }
 
-  function toggle(dateStr, shiftId) {
+  function getMaxStaffForShiftDate(shiftId, dateObj) {
+    const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+    const config = shiftConfigs.find((cfg) => cfg.shiftId === shiftId && String(cfg.dayOfWeek).toLowerCase() === dayName.toLowerCase());
+    const shift = shifts.find((item) => item.id === shiftId);
+    return Number(config?.maxStaff ?? shift?.maxStaff ?? 0);
+  }
+
+  function isRejectedStatus(status = '') {
+    const normalized = String(status).toLowerCase();
+    return normalized.includes('từ chối') || normalized.includes('tá»« chá»‘i');
+  }
+
+  function getRegisteredCount(dateStr, shiftId) {
+    return allRegistrations.filter((item) =>
+      item.workDate?.slice(0, 10) === dateStr &&
+      item.shiftId === shiftId &&
+      !isRejectedStatus(item.status)
+    ).length;
+  }
+
+  function isShiftFull(dateStr, shiftId, dateObj) {
+    const maxStaff = getMaxStaffForShiftDate(shiftId, dateObj);
+    if (maxStaff <= 0) return true;
+    return getRegisteredCount(dateStr, shiftId) >= maxStaff;
+  }
+
+  function toggle(dateStr, shiftId, dateObj) {
     const dbItem = dbRegistrations[dateStr]?.[shiftId];
     if (dbItem && dbItem.status !== "Chờ Duyệt") return;
 
+    if (!dbItem && isShiftFull(dateStr, shiftId, dateObj)) {
+      setCapacityMessage('Ca đã đủ người, bạn không thể đăng ký vào ca này.');
+      return;
+    }
+
+    setCapacityMessage('');
     setSaved(false);
     setRegistered((prev) => {
       const dayRegs = prev[dateStr] || {};
@@ -323,7 +366,11 @@ function RegistrationView({ period, user }) {
       ];
       await Promise.all(apiCalls);
 
-      const regRes = await axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`);
+      const [regRes, periodRegRes] = await Promise.all([
+        axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`),
+        axios.get(`/api/StaffRegistration/period/${period.id}`),
+      ]);
+      setAllRegistrations(periodRegRes.data || []);
       const dbMap = {}; const initRegs = {};
       (regRes.data || []).forEach(r => {
         const dStr = r.workDate.slice(0, 10);
@@ -366,6 +413,12 @@ function RegistrationView({ period, user }) {
         <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Quản lý đang mở đăng ký cho tuần này. Hãy chọn các ca bạn có thể làm.</p>
       </div>
 
+      {capacityMessage && (
+        <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, margin: '-4px 0 16px', border: '1px solid #fecaca', fontWeight: 700 }}>
+          {capacityMessage}
+        </div>
+      )}
+
       <div className="sd-shift-legend" style={{ marginLeft: -20, marginRight: -20, paddingLeft: 20 }}>
         {shifts.length === 0 && <p style={{ fontSize: 13 }}>Chưa cấu hình ca làm việc.</p>}
         {shifts.map((s) => (
@@ -399,15 +452,30 @@ function RegistrationView({ period, user }) {
                   const dbItem = dbRegistrations[dateStr]?.[shift.id];
                   const isLocked = dbItem && dbItem.status !== "Chờ Duyệt" || isReviewing;
 
+                  const registeredCount = getRegisteredCount(dateStr, shift.id);
+                  const maxStaff = getMaxStaffForShiftDate(shift.id, dateObj);
+                  const isFull = !isOn && isShiftFull(dateStr, shift.id, dateObj);
+
                   return (
                     <button
                       key={shift.id}
-                      className={`sd-shift-cell-v ${isOn ? 'selected' : ''}`}
-                      onClick={() => toggle(dateStr, shift.id)}
+                      className={`sd-shift-cell-v ${isOn ? 'selected' : ''} ${isFull ? 'full' : ''}`}
+                      onClick={() => toggle(dateStr, shift.id, dateObj)}
                       type="button"
-                      disabled={isReviewing}
-                      style={isLocked ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#fed7aa', borderColor: '#ea580c' } : {}}
+                      disabled={isReviewing || isFull}
+                      style={isFull
+                        ? { cursor: 'not-allowed', backgroundColor: '#fee2e2', borderColor: '#dc2626', color: '#991b1b', fontWeight: 800 }
+                        : isLocked ? { opacity: 0.6, cursor: 'not-allowed', backgroundColor: '#fed7aa', borderColor: '#ea580c' } : {}}
                     >
+                      {isFull && (
+                        <span style={{ display: 'grid', gap: 2, lineHeight: 1.1 }}>
+                          <strong>Đã đủ người</strong>
+                          <small>{registeredCount}/{maxStaff}</small>
+                        </span>
+                      )}
+                      {!isFull && !isOn && (
+                        <small style={{ color: '#94a3b8' }}>{registeredCount}/{maxStaff}</small>
+                      )}
                       {isOn ? (isLocked ? '🔒' : '✓') : ''}
                     </button>
                   );

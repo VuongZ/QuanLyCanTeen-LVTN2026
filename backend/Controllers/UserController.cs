@@ -33,13 +33,14 @@ namespace LuanVanTotNghiep.Controllers
                 Users = users.Select(u => new UserDto
                 {
                     Id = u.Id,
-                    Username = u.Username,
+                    Username = GetLoginDisplay(u),
+                    Email = u.Email,
                     FullName = u.FullName,
                     Phone = u.PhoneNumber,
                     PhoneNumber = u.PhoneNumber,
-                    BankName = u.BankName,
-                    BankAccountNumber = u.BankAccountNumber,
-                    BankAccountName = u.BankAccountName,
+                    BankName = u.NsUserBankAccounts.FirstOrDefault()?.BankName,
+                    BankAccountNumber = u.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
+                    BankAccountName = u.NsUserBankAccounts.FirstOrDefault()?.BankAccountName,
                     BranchId = u.BranchId,
                     BranchName = u.Branch?.Name,
                     RoleId = u.RoleId,
@@ -70,14 +71,14 @@ namespace LuanVanTotNghiep.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddUser(NsUser user)
+        public async Task<IActionResult> AddUser(UserDto user)
         {
-            await userService.AddUser(user);
-            return Ok(user);
+            var created = await userService.AddUser(user);
+            return Ok(ToUserResponse(created));
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(int id, NsUser user)
+        public async Task<IActionResult> UpdateUser(int id, UserDto user)
         {
             if (id != user.Id)
                 return BadRequest("ID không tồn tại");
@@ -92,26 +93,34 @@ namespace LuanVanTotNghiep.Controllers
             var user = await _context.NsUsers
                 .Include(u => u.Branch)
                 .Include(u => u.Role)
+                .Include(u => u.NsUserBankAccounts)
                 .FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
                 return NotFound(new { message = "Không tìm thấy người dùng." });
 
             user.PhoneNumber = dto.PhoneNumber;
-            user.BankName = dto.BankName;
-            user.BankAccountNumber = dto.BankAccountNumber;
-            user.BankAccountName = dto.BankAccountName;
+            var bank = user.NsUserBankAccounts.FirstOrDefault();
+            if (bank == null)
+            {
+                bank = new NsUserBankAccount { UserId = user.Id };
+                _context.NsUserBankAccounts.Add(bank);
+            }
+            bank.BankName = dto.BankName;
+            bank.BankAccountNumber = dto.BankAccountNumber;
+            bank.BankAccountName = dto.BankAccountName;
             await _context.SaveChangesAsync();
 
             return Ok(new
             {
                 id = user.Id,
-                username = user.Username,
+                username = GetLoginDisplay(user),
+                email = user.Email,
                 fullName = user.FullName,
                 phone = user.PhoneNumber,
                 phoneNumber = user.PhoneNumber,
-                bankName = user.BankName,
-                bankAccountNumber = user.BankAccountNumber,
-                bankAccountName = user.BankAccountName,
+                bankName = bank.BankName,
+                bankAccountNumber = bank.BankAccountNumber,
+                bankAccountName = bank.BankAccountName,
                 roleName = user.Role?.RoleName,
                 branchId = user.BranchId,
                 branchName = user.Branch?.Name,
@@ -123,16 +132,32 @@ namespace LuanVanTotNghiep.Controllers
         [Authorize]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto dto)
         {
-            var username = User.FindFirstValue(ClaimTypes.Name);
-            var currentUser = await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Username == username);
-
+            var currentUser = await GetCurrentUserAsync();
             if (currentUser == null)
                 return Unauthorized(new { message = "Không xác định được người dùng." });
 
             if (currentUser.Id != id)
                 return Forbid();
 
-            var result = await userService.ChangePasswordAsync(id, dto.CurrentPassword, dto.NewPassword);
+            var result = await userService.ChangePasswordAsync(id, dto.CurrentPassword, dto.NewPassword, dto.Otp);
+            if (!result.Success)
+                return BadRequest(new { message = result.Message });
+
+            return Ok(new { message = result.Message });
+        }
+
+        [HttpPost("{id}/password/otp")]
+        [Authorize]
+        public async Task<IActionResult> SendChangePasswordOtp(int id)
+        {
+            var currentUser = await GetCurrentUserAsync();
+            if (currentUser == null)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            if (currentUser.Id != id)
+                return Forbid();
+
+            var result = await userService.SendChangePasswordOtpAsync(id);
             if (!result.Success)
                 return BadRequest(new { message = result.Message });
 
@@ -174,13 +199,20 @@ namespace LuanVanTotNghiep.Controllers
 
         [HttpPost("login")]
         [AllowAnonymous]
-        public IActionResult Login([FromBody] LoginRequest model)
+        public async Task<IActionResult> Login([FromBody] LoginRequest model)
         {
-            // Truy vấn chính xác thông qua _context
-            var user = _context.NsUsers
-        .Include(u => u.Branch)
-        .Include(u => u.Role)
-        .FirstOrDefault(u => u.Username == model.Username);
+            var identifier = model.Identifier ?? model.Username;
+            if (string.IsNullOrWhiteSpace(identifier))
+                return Unauthorized(new { message = "Vui lòng nhập email hoặc số điện thoại." });
+
+            var foundUser = await userService.FindByIdentifierAsync(identifier);
+            var user = foundUser == null
+                ? null
+                : await _context.NsUsers
+                    .Include(u => u.Branch)
+                    .Include(u => u.Role)
+                    .Include(u => u.NsUserBankAccounts)
+                    .FirstOrDefaultAsync(u => u.Id == foundUser.Id);
 
             if (user != null && UserService.VerifyPassword(model.Password, user.Password))
             {
@@ -195,9 +227,10 @@ namespace LuanVanTotNghiep.Controllers
                 // Khởi tạo ClaimsIdentity mạch lạc
              var claims = new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, GetLoginDisplay(user) ?? user.Id.ToString()),
             new Claim(ClaimTypes.Role, roleClaim),
-            new Claim("BranchId", user.BranchId.ToString() ?? "1")
+            new Claim("BranchId", (user.BranchId ?? 1).ToString())
         });
 
                 var tokenDescriptor = new SecurityTokenDescriptor
@@ -218,13 +251,14 @@ namespace LuanVanTotNghiep.Controllers
             user = new
             {
                 id = user.Id,
-                username = user.Username,
+                username = GetLoginDisplay(user),
+                email = user.Email,
                 fullName = user.FullName,
                 phone = user.PhoneNumber,
                 phoneNumber = user.PhoneNumber,
-                bankName = user.BankName,
-                bankAccountNumber = user.BankAccountNumber,
-                bankAccountName = user.BankAccountName,
+                bankName = user.NsUserBankAccounts.FirstOrDefault()?.BankName,
+                bankAccountNumber = user.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
+                bankAccountName = user.NsUserBankAccounts.FirstOrDefault()?.BankAccountName,
                 role = roleClaim,
                 roleName = user.Role != null ? user.Role.RoleName : roleClaim,
                 branchId = user.BranchId,
@@ -239,7 +273,8 @@ namespace LuanVanTotNghiep.Controllers
         // Lớp hứng dữ liệu từ file React gửi lên
         public class LoginRequest
         {
-            public string Username { get; set; } = null!;
+            public string? Identifier { get; set; }
+            public string? Username { get; set; }
             public string Password { get; set; } = null!;
         }
 
@@ -250,6 +285,41 @@ namespace LuanVanTotNghiep.Controllers
 
             user.Password = UserService.HashPassword(plainPassword);
             _context.SaveChanges();
+        }
+
+        private static string? GetLoginDisplay(NsUser user)
+        {
+            return user.Email ?? user.PhoneNumber;
+        }
+
+        private async Task<NsUser?> GetCurrentUserAsync()
+        {
+            var username = User.FindFirstValue(ClaimTypes.Name);
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return int.TryParse(userIdClaim, out var currentUserId)
+                ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
+                : await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Email == username || u.PhoneNumber == username);
+        }
+
+        private static object ToUserResponse(NsUser user)
+        {
+            var bank = user.NsUserBankAccounts.FirstOrDefault();
+            return new
+            {
+                id = user.Id,
+                username = GetLoginDisplay(user),
+                email = user.Email,
+                fullName = user.FullName,
+                phone = user.PhoneNumber,
+                phoneNumber = user.PhoneNumber,
+                bankName = bank?.BankName,
+                bankAccountNumber = bank?.BankAccountNumber,
+                bankAccountName = bank?.BankAccountName,
+                roleName = user.Role?.RoleName,
+                branchId = user.BranchId,
+                branchName = user.Branch?.Name,
+                hireDate = user.HireDate
+            };
         }
     }
 }

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -35,8 +36,10 @@ public class SalaryController : ControllerBase
     public async Task<IActionResult> GetByUser(int userId)
     {
         var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value?.ToUpperInvariant();
-        var username = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
-        var currentUser = await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Username == username);
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        var currentUser = int.TryParse(userIdClaim, out var currentUserId)
+            ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
+            : null;
 
         if (currentUser == null)
             return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
@@ -46,6 +49,77 @@ public class SalaryController : ControllerBase
 
         var salaries = await _salaryService.GetByUserAsync(userId);
         return Ok(salaries);
+    }
+
+    [HttpGet("rule-adjustments")]
+    public async Task<IActionResult> GetRuleAdjustments([FromQuery] int month, [FromQuery] int year)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+
+        if (!IsAdmin() && !IsManager())
+            return Forbid();
+
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tai khoan chua duoc gan co so." });
+
+        var result = await _salaryService.GetRuleAdjustmentsAsync(currentUser.BranchId.Value, month, year);
+        return Ok(result);
+    }
+
+    [HttpPut("rule-adjustments/apply")]
+    public async Task<IActionResult> ApplyRuleAdjustment([FromBody] ApplySalaryRuleDto dto)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+
+        if (!IsAdmin() && !IsManager())
+            return Forbid();
+
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tai khoan chua duoc gan co so." });
+
+        try
+        {
+            var result = await _salaryService.ApplyRuleAdjustmentAsync(currentUser.BranchId.Value, dto);
+            if (result == null)
+                return NotFound(new { message = "Khong tim thay nhan vien trong co so cua ban." });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("rule-adjustments/manual")]
+    public async Task<IActionResult> AddManualAdjustment([FromBody] ManualSalaryAdjustmentDto dto)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+
+        if (!IsAdmin() && !IsManager())
+            return Forbid();
+
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tai khoan chua duoc gan co so." });
+
+        try
+        {
+            var result = await _salaryService.AddManualAdjustmentAsync(currentUser.BranchId.Value, dto);
+            if (result == null)
+                return NotFound(new { message = "Khong tim thay nhan vien trong co so cua ban." });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("{salaryId}/pay")]
@@ -65,5 +139,19 @@ public class SalaryController : ControllerBase
     {
         var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
         return string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsManager()
+    {
+        var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+        return string.Equals(role, "MANAGER", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<NsUser?> GetCurrentUserAsync()
+    {
+        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(userIdClaim, out var currentUserId)
+            ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
+            : null;
     }
 }

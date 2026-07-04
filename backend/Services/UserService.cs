@@ -1,4 +1,5 @@
-using LuanVanTotNghiep.backend.Models.Entities;
+﻿using LuanVanTotNghiep.backend.Models.Entities;
+using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -19,29 +20,39 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         return user;
     }
 
-    public async Task AddUser(NsUser user)
+    public async Task<NsUser> AddUser(UserDto dto)
     {
+        var user = new NsUser
+        {
+            Email = Normalize(dto.Email),
+            FullName = dto.FullName,
+            PhoneNumber = Normalize(dto.PhoneNumber ?? dto.Phone),
+            Password = dto.Password ?? string.Empty,
+            BranchId = dto.BranchId,
+            RoleId = dto.RoleId,
+            HireDate = dto.HireDate
+        };
         user.Password = HashPassword(user.Password);
         await userRepo.Add(user);
+        await UpsertBankAccountAsync(user.Id, dto.BankName, dto.BankAccountNumber, dto.BankAccountName);
+        return user;
     }
 
-    public async Task UpdateUser(NsUser user)
+    public async Task UpdateUser(UserDto user)
     {
         var us1 = await userRepo.GetbyId(user.Id);
         if (us1 != null)
         {
-            us1.Username = user.Username;
             if (!string.IsNullOrWhiteSpace(user.Password))
                 us1.Password = HashPassword(user.Password);
+            us1.Email = Normalize(user.Email);
             us1.FullName = user.FullName;
-            us1.PhoneNumber = user.PhoneNumber;
-            us1.BankName = user.BankName;
-            us1.BankAccountNumber = user.BankAccountNumber;
-            us1.BankAccountName = user.BankAccountName;
+            us1.PhoneNumber = Normalize(user.PhoneNumber ?? user.Phone);
             us1.BranchId = user.BranchId;
             us1.RoleId = user.RoleId;
             us1.HireDate = user.HireDate;
             await userRepo.Update(us1);
+            await UpsertBankAccountAsync(us1.Id, user.BankName, user.BankAccountNumber, user.BankAccountName);
         }
     }
 
@@ -54,35 +65,48 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         }
     }
 
-    public async Task<(bool Success, string Message)> ChangePasswordAsync(int id, string currentPassword, string newPassword)
+    public async Task<(bool Success, string Message)> ChangePasswordAsync(int id, string currentPassword, string newPassword, string otp)
     {
         var user = await userRepo.GetbyId(id);
         if (user == null)
-            return (false, "Khong tim thay nguoi dung.");
+            return (false, "Không tìm thấy người dùng.");
 
         if (!VerifyPassword(currentPassword, user.Password))
-            return (false, "Mat khau hien tai khong dung.");
+            return (false, "Mật khẩu hiện tại không đúng.");
 
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
-            return (false, "Mat khau moi can toi thieu 4 ky tu.");
+            return (false, "Mật khẩu mới cần tối thiểu 4 ký tự.");
+
+        if (!IsValidOtp(user, otp))
+            return (false, "Mã OTP không đúng hoặc đã hết hạn.");
 
         user.Password = HashPassword(newPassword);
+        user.ResetPasswordCode = null;
+        user.ResetPasswordExpiry = null;
         await userRepo.Update(user);
-        return (true, "Da cap nhat mat khau thanh cong.");
+        return (true, "Đã cập nhật mật khẩu thành công.");
+    }
+
+    public async Task<(bool Success, string Message)> SendChangePasswordOtpAsync(int id)
+    {
+        var user = await userRepo.GetbyId(id);
+        if (user == null)
+            return (false, "Không tìm thấy người dùng.");
+
+        if (string.IsNullOrWhiteSpace(user.Email))
+            return (false, "Tài khoản chưa có email để gửi OTP. Vui lòng cập nhật email trước.");
+
+        await SendOtpAsync(user);
+        return (true, "Đã gửi mã OTP về email.");
     }
 
     public async Task<(bool Success, string Message)> SendPasswordResetOtpAsync(string identifier)
     {
         var user = await FindByIdentifierAsync(identifier);
         if (user == null || string.IsNullOrWhiteSpace(user.Email))
-            return (false, "Không tìm thấy email của tài khoản.");
+            return (false, "Không tìm thấy tài khoản có email để gửi OTP. Vui lòng kiểm tra email/SĐT hoặc cập nhật email cho nhân viên.");
 
-        var otp = GenerateOtp();
-        user.ResetPasswordCode = otp;
-        user.ResetPasswordExpiry = DateTime.UtcNow.AddMinutes(5);
-
-        await context.SaveChangesAsync();
-        await emailService.SendOtpEmailAsync(user.Email, otp);
+        await SendOtpAsync(user);
 
         return (true, "Đã gửi mã OTP về email.");
     }
@@ -91,25 +115,20 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
     {
         var user = await FindByIdentifierAsync(identifier);
         if (user == null)
-            return (false, "Tai khoan hoac email khong ton tai.");
+            return (false, "Tài khoản hoặc email không tồn tại.");
 
         if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
-            return (false, "Mat khau moi can toi thieu 4 ky tu.");
+            return (false, "Mật khẩu mới cần tối thiểu 4 ký tự.");
 
-        if (string.IsNullOrWhiteSpace(user.ResetPasswordCode) ||
-            user.ResetPasswordExpiry == null ||
-            user.ResetPasswordExpiry < DateTime.UtcNow ||
-            user.ResetPasswordCode != otp)
-        {
-            return (false, "Ma OTP khong dung hoac da het han.");
-        }
+        if (!IsValidOtp(user, otp))
+            return (false, "Mã OTP không đúng hoặc đã hết hạn.");
 
         user.Password = HashPassword(newPassword);
         user.ResetPasswordCode = null;
         user.ResetPasswordExpiry = null;
 
         await context.SaveChangesAsync();
-        return (true, "Da dat lai mat khau thanh cong.");
+        return (true, "Đã đặt lại mật khẩu thành công.");
     }
 
     public static string HashPassword(string plainPassword)
@@ -133,15 +152,70 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         return password.StartsWith("$2a$") || password.StartsWith("$2b$") || password.StartsWith("$2y$");
     }
 
-    private async Task<NsUser?> FindByIdentifierAsync(string identifier)
+    public async Task<NsUser?> FindByIdentifierAsync(string identifier)
     {
-        var normalized = identifier.Trim();
-        return await context.NsUsers.FirstOrDefaultAsync(u =>
-            u.Username == normalized || u.Email == normalized);
+        var normalized = Normalize(identifier) ?? "";
+        var normalizedEmail = normalized.ToLowerInvariant();
+        var normalizedPhone = NormalizePhone(normalized);
+        var users = await context.NsUsers
+            .Where(u => u.Email != null || u.PhoneNumber != null)
+            .ToListAsync();
+
+        return users.FirstOrDefault(u =>
+            string.Equals(Normalize(u.Email)?.ToLowerInvariant(), normalizedEmail, StringComparison.Ordinal) ||
+            NormalizePhone(Normalize(u.PhoneNumber) ?? "") == normalizedPhone);
+    }
+
+    private async Task UpsertBankAccountAsync(int userId, string? bankName, string? bankAccountNumber, string? bankAccountName)
+    {
+        var bank = await context.NsUserBankAccounts.FirstOrDefaultAsync(b => b.UserId == userId);
+        var hasBankInfo = !string.IsNullOrWhiteSpace(bankName)
+            || !string.IsNullOrWhiteSpace(bankAccountNumber)
+            || !string.IsNullOrWhiteSpace(bankAccountName);
+
+        if (bank == null)
+        {
+            if (!hasBankInfo) return;
+            bank = new NsUserBankAccount { UserId = userId };
+            context.NsUserBankAccounts.Add(bank);
+        }
+
+        bank.BankName = Normalize(bankName);
+        bank.BankAccountNumber = Normalize(bankAccountNumber);
+        bank.BankAccountName = Normalize(bankAccountName);
+        await context.SaveChangesAsync();
+    }
+
+    private static string? Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string NormalizePhone(string value)
+    {
+        return value.Replace(" ", "").Replace("-", "").Replace(".", "").Replace("(", "").Replace(")", "");
     }
 
     private static string GenerateOtp()
     {
         return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+    }
+
+    private async Task SendOtpAsync(NsUser user)
+    {
+        var otp = GenerateOtp();
+        user.ResetPasswordCode = otp;
+        user.ResetPasswordExpiry = DateTime.UtcNow.AddMinutes(5);
+
+        await context.SaveChangesAsync();
+        await emailService.SendOtpEmailAsync(user.Email!, otp);
+    }
+
+    private static bool IsValidOtp(NsUser user, string otp)
+    {
+        return !string.IsNullOrWhiteSpace(user.ResetPasswordCode) &&
+            user.ResetPasswordExpiry != null &&
+            user.ResetPasswordExpiry >= DateTime.UtcNow &&
+            user.ResetPasswordCode == otp?.Trim();
     }
 }

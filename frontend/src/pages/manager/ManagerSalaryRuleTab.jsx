@@ -1,0 +1,302 @@
+import { useEffect, useMemo, useState } from 'react';
+import { addManualSalaryAdjustment, getSalaryRuleAdjustments } from '../../api/SalaryApi';
+
+function formatMoney(value) {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0));
+}
+
+function getCurrentPeriod() {
+  const now = new Date();
+  return {
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+  };
+}
+
+function SalaryRuleMetric({ label, value }) {
+  return (
+    <div className="sd-salary-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+export function ManagerSalaryRuleTab() {
+  const currentPeriod = getCurrentPeriod();
+  const [period, setPeriod] = useState(currentPeriod);
+  const [rule, setRule] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [savingUserId, setSavingUserId] = useState(null);
+  const [manualTarget, setManualTarget] = useState(null);
+  const [manualForm, setManualForm] = useState({ bonusAmount: '', penaltyAmount: '' });
+  const [message, setMessage] = useState(null);
+
+  async function loadAdjustments() {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const data = await getSalaryRuleAdjustments(period.month, period.year);
+      setRule(data.rule || null);
+      setEmployees(Array.isArray(data.employees) ? data.employees : []);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được danh sách thưởng phạt.' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAdjustments();
+  }, [period.month, period.year]);
+
+  const filteredEmployees = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return employees;
+
+    return employees.filter((employee) => [
+      employee.fullName,
+      employee.email,
+      employee.phoneNumber,
+      employee.roleName,
+    ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery)));
+  }, [employees, query]);
+
+  const summary = useMemo(() => {
+    return filteredEmployees.reduce(
+      (total, employee) => ({
+        bonus: total.bonus + Number(employee.calculatedBonus || 0),
+        penalty: total.penalty + Number(employee.calculatedPenalty || 0),
+        late: total.late + Number(employee.lateCount || 0),
+        absent: total.absent + Number(employee.absentCount || 0),
+      }),
+      { bonus: 0, penalty: 0, late: 0, absent: 0 }
+    );
+  }, [filteredEmployees]);
+
+  function handlePeriodChange(event) {
+    const [year, month] = event.target.value.split('-').map(Number);
+    setPeriod({ month, year });
+  }
+
+  function openManualAdjustment(employee) {
+    setManualTarget(employee);
+    setManualForm({ bonusAmount: '', penaltyAmount: '' });
+    setMessage(null);
+  }
+
+  async function handleManualSubmit(event) {
+    event.preventDefault();
+    if (!manualTarget) return;
+
+    const bonusAmount = Number(manualForm.bonusAmount || 0);
+    const penaltyAmount = Number(manualForm.penaltyAmount || 0);
+    if (bonusAmount < 0 || penaltyAmount < 0) {
+      setMessage({ type: 'error', text: 'Số tiền thưởng/phạt không được âm.' });
+      return;
+    }
+    if (bonusAmount === 0 && penaltyAmount === 0) {
+      setMessage({ type: 'error', text: 'Vui lòng nhập số tiền thưởng hoặc phạt.' });
+      return;
+    }
+
+    setSavingUserId(manualTarget.userId);
+    setMessage(null);
+    try {
+      const updated = await addManualSalaryAdjustment({
+        userId: manualTarget.userId,
+        month: period.month,
+        year: period.year,
+        bonusAmount,
+        penaltyAmount,
+      });
+      setEmployees((items) => items.map((item) => (item.userId === updated.userId ? updated : item)));
+      setManualTarget(null);
+      setMessage({ type: 'success', text: `Đã cộng thưởng/phạt thủ công cho ${updated.fullName || updated.email || 'nhân viên'}.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể cộng thưởng/phạt thủ công.' });
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  const periodValue = `${period.year}-${String(period.month).padStart(2, '0')}`;
+
+  return (
+    <div className="sd-salary-admin-page">
+      <div className="sd-stat-grid sd-salary-admin-stats">
+        <SalaryRuleMetric label="Tổng thưởng dự kiến" value={formatMoney(summary.bonus)} />
+        <SalaryRuleMetric label="Tổng phạt dự kiến" value={formatMoney(summary.penalty)} />
+        <SalaryRuleMetric label="Số lần đi trễ" value={formatNumber(summary.late)} />
+        <SalaryRuleMetric label="Số ca vắng" value={formatNumber(summary.absent)} />
+      </div>
+
+      <div className="sd-card">
+        <div className="sd-card-header">
+          <p className="sd-eyebrow">Salary rule</p>
+          <h2>Quy định thưởng phạt cơ sở</h2>
+        </div>
+        {rule ? (
+          <div className="sd-salary-summary">
+            <SalaryRuleMetric label="Ngày công đạt thưởng" value={`${rule.bonusThresholdDays} ngày`} />
+            <SalaryRuleMetric label="Mức thưởng" value={formatMoney(rule.bonusAmount)} />
+            <SalaryRuleMetric label="Phạt đi trễ" value={formatMoney(rule.latePenalty)} />
+            <SalaryRuleMetric label="Phạt vắng ca" value={formatMoney(rule.absentPenalty)} />
+          </div>
+        ) : (
+          <p className="sd-status sd-status-error">Cơ sở này chưa có salary rule.</p>
+        )}
+      </div>
+
+      <div className="sd-users-toolbar">
+        <div className="sd-users-toolbar-left">
+          <div className="sd-field sd-salary-filter">
+            <label>Tháng</label>
+            <input type="month" value={periodValue} onChange={handlePeriodChange} />
+          </div>
+          <div className="sd-search-wrap">
+            <span className="sd-search-icon">⌕</span>
+            <input
+              className="sd-input-search"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm nhân viên, email, SĐT..."
+              value={query}
+            />
+            {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
+          </div>
+        </div>
+        <button className="sd-btn-ghost" onClick={loadAdjustments} type="button">Làm mới</button>
+      </div>
+
+      {message && <p className={`sd-status sd-status-${message.type}`}>{message.text}</p>}
+
+      <div className="sd-table-wrap">
+        <table className="sd-table">
+          <thead>
+            <tr>
+              <th>Nhân viên</th>
+              <th>Ngày làm</th>
+              <th>Trễ</th>
+              <th>Vắng</th>
+              <th>Thưởng</th>
+              <th>Phạt</th>
+              <th>Lương hiện tại</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={8} className="sd-td-empty">Đang tải danh sách thưởng phạt...</td></tr>
+            ) : filteredEmployees.length === 0 ? (
+              <tr><td colSpan={8} className="sd-td-empty">Không có nhân viên phù hợp.</td></tr>
+            ) : filteredEmployees.map((employee) => {
+              const isPaid = (employee.status || '').toUpperCase() === 'PAID';
+              const isSaving = savingUserId === employee.userId;
+
+              return (
+                <tr key={employee.userId}>
+                  <td>
+                    <strong>{employee.fullName || employee.email || employee.phoneNumber}</strong>
+                    <span className="sd-subline">{employee.roleName || 'Nhân viên'}</span>
+                  </td>
+                  <td>{employee.workedDays}</td>
+                  <td>{employee.lateCount}</td>
+                  <td>{employee.absentCount}</td>
+                  <td>
+                    <strong>{formatMoney(employee.calculatedBonus)}</strong>
+                    <span className="sd-subline">Đang ghi: {formatMoney(employee.currentBonus)}</span>
+                  </td>
+                  <td>
+                    <strong>{formatMoney(employee.calculatedPenalty)}</strong>
+                    <span className="sd-subline">Đang ghi: {formatMoney(employee.currentPenalty)}</span>
+                  </td>
+                  <td>
+                    <strong>{formatMoney(employee.totalSalary)}</strong>
+                    <span className="sd-subline">{formatNumber(employee.totalHours)} giờ</span>
+                  </td>
+                  <td>
+                    <button
+                      className="sd-btn-primary"
+                      disabled={isPaid || isSaving}
+                      onClick={() => openManualAdjustment(employee)}
+                      type="button"
+                    >
+                      {isPaid ? 'Đã trả' : isSaving ? 'Đang lưu...' : 'Thưởng phạt'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {manualTarget && (
+        <div className="sd-overlay" onClick={() => setManualTarget(null)}>
+          <div className="sd-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="sd-modal-header">
+              <h2>Thêm thưởng/phạt</h2>
+              <button onClick={() => setManualTarget(null)} type="button">✕</button>
+            </div>
+            <form onSubmit={handleManualSubmit}>
+              <div className="sd-modal-body">
+                <div className="sd-info-hero">
+                  <div className="sd-info-avatar">{String(manualTarget.fullName || manualTarget.email || 'NV').slice(0, 2).toUpperCase()}</div>
+                  <div>
+                    <h3>{manualTarget.fullName || manualTarget.email || manualTarget.phoneNumber}</h3>
+                    <span className="sd-role-badge">Tháng {period.month}/{period.year}</span>
+                  </div>
+                </div>
+                <div className="sd-modal-grid">
+                  <div className="sd-field">
+                    <label>Thưởng thêm</label>
+                    <input
+                      min="0"
+                      name="bonusAmount"
+                      onChange={(event) => setManualForm((form) => ({ ...form, bonusAmount: event.target.value }))}
+                      placeholder="VD: 100000"
+                      type="number"
+                      value={manualForm.bonusAmount}
+                    />
+                  </div>
+                  <div className="sd-field">
+                    <label>Phạt thêm</label>
+                    <input
+                      min="0"
+                      name="penaltyAmount"
+                      onChange={(event) => setManualForm((form) => ({ ...form, penaltyAmount: event.target.value }))}
+                      placeholder="VD: 50000"
+                      type="number"
+                      value={manualForm.penaltyAmount}
+                    />
+                  </div>
+                </div>
+                <dl className="sd-dl">
+                  <div className="sd-info-row"><dt>Thưởng hiện tại</dt><dd>{formatMoney(manualTarget.currentBonus)}</dd></div>
+                  <div className="sd-info-row"><dt>Phạt hiện tại</dt><dd>{formatMoney(manualTarget.currentPenalty)}</dd></div>
+                  <div className="sd-info-row"><dt>Lương hiện tại</dt><dd>{formatMoney(manualTarget.totalSalary)}</dd></div>
+                </dl>
+              </div>
+              <div className="sd-modal-footer">
+                <button className="sd-btn-ghost" onClick={() => setManualTarget(null)} type="button">Hủy</button>
+                <button className="sd-btn-primary" disabled={savingUserId === manualTarget.userId} type="submit">
+                  {savingUserId === manualTarget.userId ? 'Đang lưu...' : 'Cộng vào lương'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

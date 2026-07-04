@@ -10,4 +10,7 @@ public class ChangePasswordDto
     [Required]
     [MinLength(4)]
     public string NewPassword { get; set; } = null!;
+
+    [Required]
+    public string Otp { get; set; } = null!;
 }
