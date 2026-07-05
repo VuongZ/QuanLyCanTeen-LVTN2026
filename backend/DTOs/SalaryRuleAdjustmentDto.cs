@@ -34,6 +34,16 @@ public class SalaryRuleDto
     public float WeekendMultiplier { get; set; }
 }
 
+public class UpdateSalaryRuleDto
+{
+    public int BranchId { get; set; }
+    public int BonusThresholdDays { get; set; }
+    public decimal BonusAmount { get; set; }
+    public decimal LatePenalty { get; set; }
+    public decimal AbsentPenalty { get; set; }
+    public float WeekendMultiplier { get; set; } = 1;
+}
+
 public class SalaryRuleAdjustmentPageDto
 {
     public SalaryRuleDto? Rule { get; set; }

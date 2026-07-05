@@ -52,7 +52,7 @@ public class SalaryController : ControllerBase
     }
 
     [HttpGet("rule-adjustments")]
-    public async Task<IActionResult> GetRuleAdjustments([FromQuery] int month, [FromQuery] int year)
+    public async Task<IActionResult> GetRuleAdjustments([FromQuery] int month, [FromQuery] int year, [FromQuery] int? branchId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
@@ -61,15 +61,33 @@ public class SalaryController : ControllerBase
         if (!IsAdmin() && !IsManager())
             return Forbid();
 
-        if (currentUser.BranchId == null)
-            return BadRequest(new { message = "Tai khoan chua duoc gan co so." });
+        var resolvedBranch = ResolveBranchId(currentUser, branchId);
+        if (resolvedBranch == null)
+            return BadRequest(new { message = "Vui long chon co so." });
 
-        var result = await _salaryService.GetRuleAdjustmentsAsync(currentUser.BranchId.Value, month, year);
+        var result = await _salaryService.GetRuleAdjustmentsAsync(resolvedBranch.Value, month, year);
         return Ok(result);
     }
 
+    [HttpPut("rule")]
+    public async Task<IActionResult> UpdateSalaryRule([FromBody] UpdateSalaryRuleDto dto)
+    {
+        if (!IsAdmin())
+            return Forbid();
+
+        try
+        {
+            var result = await _salaryService.UpsertSalaryRuleAsync(dto);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPut("rule-adjustments/apply")]
-    public async Task<IActionResult> ApplyRuleAdjustment([FromBody] ApplySalaryRuleDto dto)
+    public async Task<IActionResult> ApplyRuleAdjustment([FromBody] ApplySalaryRuleDto dto, [FromQuery] int? branchId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
@@ -78,12 +96,13 @@ public class SalaryController : ControllerBase
         if (!IsAdmin() && !IsManager())
             return Forbid();
 
-        if (currentUser.BranchId == null)
-            return BadRequest(new { message = "Tai khoan chua duoc gan co so." });
+        var resolvedBranch = ResolveBranchId(currentUser, branchId);
+        if (resolvedBranch == null)
+            return BadRequest(new { message = "Vui long chon co so." });
 
         try
         {
-            var result = await _salaryService.ApplyRuleAdjustmentAsync(currentUser.BranchId.Value, dto);
+            var result = await _salaryService.ApplyRuleAdjustmentAsync(resolvedBranch.Value, dto);
             if (result == null)
                 return NotFound(new { message = "Khong tim thay nhan vien trong co so cua ban." });
 
@@ -96,7 +115,7 @@ public class SalaryController : ControllerBase
     }
 
     [HttpPut("rule-adjustments/manual")]
-    public async Task<IActionResult> AddManualAdjustment([FromBody] ManualSalaryAdjustmentDto dto)
+    public async Task<IActionResult> AddManualAdjustment([FromBody] ManualSalaryAdjustmentDto dto, [FromQuery] int? branchId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
@@ -105,12 +124,13 @@ public class SalaryController : ControllerBase
         if (!IsAdmin() && !IsManager())
             return Forbid();
 
-        if (currentUser.BranchId == null)
-            return BadRequest(new { message = "Tai khoan chua duoc gan co so." });
+        var resolvedBranch = ResolveBranchId(currentUser, branchId);
+        if (resolvedBranch == null)
+            return BadRequest(new { message = "Vui long chon co so." });
 
         try
         {
-            var result = await _salaryService.AddManualAdjustmentAsync(currentUser.BranchId.Value, dto);
+            var result = await _salaryService.AddManualAdjustmentAsync(resolvedBranch.Value, dto);
             if (result == null)
                 return NotFound(new { message = "Khong tim thay nhan vien trong co so cua ban." });
 
@@ -145,6 +165,20 @@ public class SalaryController : ControllerBase
     {
         var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
         return string.Equals(role, "MANAGER", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private int? ResolveBranchId(NsUser currentUser, int? requestedBranchId)
+    {
+        if (IsAdmin())
+            return requestedBranchId ?? currentUser.BranchId;
+
+        if (currentUser.BranchId == null)
+            return null;
+
+        if (requestedBranchId != null && requestedBranchId.Value != currentUser.BranchId.Value)
+            return null;
+
+        return currentUser.BranchId.Value;
     }
 
     private async Task<NsUser?> GetCurrentUserAsync()

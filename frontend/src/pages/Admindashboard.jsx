@@ -178,6 +178,7 @@ NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
 NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
 NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
 NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
+NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
 NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
 NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
 }
@@ -365,7 +366,9 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             {activeTab === 'branches' && isAdmin && <AdminBranchTab branches={branches} setBranches={setBranches} />}
             {activeTab === 'periods' && isManager && <ManagerPeriodTab user={user} isManager={isManager} branches={branches} />}
             {activeTab === 'scanQr' && isManager && <ManagerQrAttendanceTab user={user} />}
-            {activeTab === 'salaryRules' && isManager && <ManagerSalaryRuleTab />}
+            {activeTab === 'salaryRules' && (isAdmin || isManager) && (
+              <ManagerSalaryRuleTab user={user} isAdmin={isAdmin} branches={branches} />
+            )}
             {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches}/>}
             {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
             {activeTab === 'salaries' && isAdmin && <AdminSalaryTab />}

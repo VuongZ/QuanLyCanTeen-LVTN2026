@@ -17,19 +17,28 @@ export async function markSalaryPaid(salaryId) {
   return response.data;
 }
 
-export async function getSalaryRuleAdjustments(month, year) {
+export async function getSalaryRuleAdjustments(month, year, branchId) {
   const response = await axios.get(`${BASE_URL}/rule-adjustments`, {
-    params: { month, year },
+    params: { month, year, branchId: branchId || undefined },
   });
   return response.data;
 }
 
-export async function applySalaryRuleAdjustment(payload) {
-  const response = await axios.put(`${BASE_URL}/rule-adjustments/apply`, payload);
+export async function updateSalaryRule(payload) {
+  const response = await axios.put(`${BASE_URL}/rule`, payload);
   return response.data;
 }
 
-export async function addManualSalaryAdjustment(payload) {
-  const response = await axios.put(`${BASE_URL}/rule-adjustments/manual`, payload);
+export async function applySalaryRuleAdjustment(payload, branchId) {
+  const response = await axios.put(`${BASE_URL}/rule-adjustments/apply`, payload, {
+    params: { branchId: branchId || undefined },
+  });
+  return response.data;
+}
+
+export async function addManualSalaryAdjustment(payload, branchId) {
+  const response = await axios.put(`${BASE_URL}/rule-adjustments/manual`, payload, {
+    params: { branchId: branchId || undefined },
+  });
   return response.data;
 }

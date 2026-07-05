@@ -108,6 +108,46 @@ public class SalaryService
         };
     }
 
+    public async Task<SalaryRuleDto> UpsertSalaryRuleAsync(UpdateSalaryRuleDto dto)
+    {
+        if (dto.BonusThresholdDays < 0)
+            throw new InvalidOperationException("Số ngày đạt thưởng không được âm.");
+
+        if (dto.BonusAmount < 0 || dto.LatePenalty < 0 || dto.AbsentPenalty < 0)
+            throw new InvalidOperationException("Số tiền thưởng/phạt không được âm.");
+
+        if (dto.WeekendMultiplier <= 0)
+            throw new InvalidOperationException("Hệ số cuối tuần phải lớn hơn 0.");
+
+        var branchExists = await _context.DmBranches.AnyAsync(b => b.Id == dto.BranchId);
+        if (!branchExists)
+            throw new InvalidOperationException("Không tìm thấy cơ sở.");
+
+        var rule = await _context.LuongSalaryRules
+            .Where(r => r.BranchId == dto.BranchId)
+            .OrderByDescending(r => r.Id)
+            .FirstOrDefaultAsync();
+
+        if (rule == null)
+        {
+            rule = new LuongSalaryRule
+            {
+                BranchId = dto.BranchId
+            };
+            _context.LuongSalaryRules.Add(rule);
+        }
+
+        rule.BonusThresholdDays = dto.BonusThresholdDays;
+        rule.BonusAmount = dto.BonusAmount;
+        rule.LatePenalty = dto.LatePenalty;
+        rule.AbsentPenalty = dto.AbsentPenalty;
+        rule.WeekendMultiplier = dto.WeekendMultiplier;
+
+        await _context.SaveChangesAsync();
+
+        return ToRuleDto(rule);
+    }
+
     public async Task<SalaryRuleAdjustmentDto?> ApplyRuleAdjustmentAsync(int branchId, ApplySalaryRuleDto dto)
     {
         var user = await _context.NsUsers

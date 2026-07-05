@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addManualSalaryAdjustment, getSalaryRuleAdjustments } from '../../api/SalaryApi';
+import { addManualSalaryAdjustment, getSalaryRuleAdjustments, updateSalaryRule } from '../../api/SalaryApi';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -30,23 +30,63 @@ function SalaryRuleMetric({ label, value }) {
   );
 }
 
-export function ManagerSalaryRuleTab() {
+const EMPTY_RULE_FORM = {
+  bonusThresholdDays: '',
+  bonusAmount: '',
+  latePenalty: '',
+  absentPenalty: '',
+  weekendMultiplier: '1',
+};
+
+export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
   const currentPeriod = getCurrentPeriod();
   const [period, setPeriod] = useState(currentPeriod);
+  const [selectedBranchId, setSelectedBranchId] = useState(user?.branchId || '');
   const [rule, setRule] = useState(null);
+  const [ruleForm, setRuleForm] = useState(EMPTY_RULE_FORM);
   const [employees, setEmployees] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [savingRule, setSavingRule] = useState(false);
   const [savingUserId, setSavingUserId] = useState(null);
   const [manualTarget, setManualTarget] = useState(null);
   const [manualForm, setManualForm] = useState({ bonusAmount: '', penaltyAmount: '' });
   const [message, setMessage] = useState(null);
 
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedBranchId(user?.branchId || '');
+      return;
+    }
+
+    if (!selectedBranchId && branches.length > 0) {
+      setSelectedBranchId(branches[0].id);
+    }
+  }, [branches, isAdmin, selectedBranchId, user?.branchId]);
+
+  useEffect(() => {
+    setRuleForm(rule ? {
+      bonusThresholdDays: String(rule.bonusThresholdDays ?? ''),
+      bonusAmount: String(rule.bonusAmount ?? ''),
+      latePenalty: String(rule.latePenalty ?? ''),
+      absentPenalty: String(rule.absentPenalty ?? ''),
+      weekendMultiplier: String(rule.weekendMultiplier ?? 1),
+    } : EMPTY_RULE_FORM);
+  }, [rule]);
+
   async function loadAdjustments() {
+    if (!selectedBranchId) {
+      setLoading(false);
+      setRule(null);
+      setEmployees([]);
+      if (isAdmin) setMessage({ type: 'error', text: 'Vui lòng chọn cơ sở.' });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     try {
-      const data = await getSalaryRuleAdjustments(period.month, period.year);
+      const data = await getSalaryRuleAdjustments(period.month, period.year, selectedBranchId);
       setRule(data.rule || null);
       setEmployees(Array.isArray(data.employees) ? data.employees : []);
     } catch (err) {
@@ -58,7 +98,7 @@ export function ManagerSalaryRuleTab() {
 
   useEffect(() => {
     loadAdjustments();
-  }, [period.month, period.year]);
+  }, [period.month, period.year, selectedBranchId]);
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -87,6 +127,51 @@ export function ManagerSalaryRuleTab() {
   function handlePeriodChange(event) {
     const [year, month] = event.target.value.split('-').map(Number);
     setPeriod({ month, year });
+  }
+
+  function handleRuleFormChange(event) {
+    const { name, value } = event.target;
+    setRuleForm((form) => ({ ...form, [name]: value }));
+  }
+
+  async function handleRuleSubmit(event) {
+    event.preventDefault();
+    if (!selectedBranchId) {
+      setMessage({ type: 'error', text: 'Vui lòng chọn cơ sở.' });
+      return;
+    }
+
+    const payload = {
+      branchId: Number(selectedBranchId),
+      bonusThresholdDays: Number(ruleForm.bonusThresholdDays || 0),
+      bonusAmount: Number(ruleForm.bonusAmount || 0),
+      latePenalty: Number(ruleForm.latePenalty || 0),
+      absentPenalty: Number(ruleForm.absentPenalty || 0),
+      weekendMultiplier: Number(ruleForm.weekendMultiplier || 1),
+    };
+
+    if (payload.bonusThresholdDays < 0 || payload.bonusAmount < 0 || payload.latePenalty < 0 || payload.absentPenalty < 0) {
+      setMessage({ type: 'error', text: 'Các giá trị thưởng/phạt không được âm.' });
+      return;
+    }
+
+    if (payload.weekendMultiplier <= 0) {
+      setMessage({ type: 'error', text: 'Hệ số cuối tuần phải lớn hơn 0.' });
+      return;
+    }
+
+    setSavingRule(true);
+    setMessage(null);
+    try {
+      const updatedRule = await updateSalaryRule(payload);
+      setRule(updatedRule);
+      await loadAdjustments();
+      setMessage({ type: 'success', text: 'Đã lưu salary rule cho cơ sở.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể lưu salary rule.' });
+    } finally {
+      setSavingRule(false);
+    }
   }
 
   function openManualAdjustment(employee) {
@@ -119,7 +204,7 @@ export function ManagerSalaryRuleTab() {
         year: period.year,
         bonusAmount,
         penaltyAmount,
-      });
+      }, selectedBranchId);
       setEmployees((items) => items.map((item) => (item.userId === updated.userId ? updated : item)));
       setManualTarget(null);
       setMessage({ type: 'success', text: `Đã cộng thưởng/phạt thủ công cho ${updated.fullName || updated.email || 'nhân viên'}.` });
@@ -146,6 +231,19 @@ export function ManagerSalaryRuleTab() {
           <p className="sd-eyebrow">Salary rule</p>
           <h2>Quy định thưởng phạt cơ sở</h2>
         </div>
+        {isAdmin && (
+          <div className="sd-users-toolbar">
+            <div className="sd-field sd-salary-filter">
+              <label>Cơ sở</label>
+              <select value={selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)}>
+                <option value="">-- Chọn cơ sở --</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name || branch.branchName}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
         {rule ? (
           <div className="sd-salary-summary">
             <SalaryRuleMetric label="Ngày công đạt thưởng" value={`${rule.bonusThresholdDays} ngày`} />
@@ -155,6 +253,36 @@ export function ManagerSalaryRuleTab() {
           </div>
         ) : (
           <p className="sd-status sd-status-error">Cơ sở này chưa có salary rule.</p>
+        )}
+        {isAdmin && selectedBranchId && (
+          <form className="sd-modal-grid" onSubmit={handleRuleSubmit}>
+            <div className="sd-field">
+              <label>Ngày công đạt thưởng</label>
+              <input min="0" name="bonusThresholdDays" onChange={handleRuleFormChange} type="number" value={ruleForm.bonusThresholdDays} />
+            </div>
+            <div className="sd-field">
+              <label>Mức thưởng</label>
+              <input min="0" name="bonusAmount" onChange={handleRuleFormChange} type="number" value={ruleForm.bonusAmount} />
+            </div>
+            <div className="sd-field">
+              <label>Phạt đi trễ</label>
+              <input min="0" name="latePenalty" onChange={handleRuleFormChange} type="number" value={ruleForm.latePenalty} />
+            </div>
+            <div className="sd-field">
+              <label>Phạt vắng ca</label>
+              <input min="0" name="absentPenalty" onChange={handleRuleFormChange} type="number" value={ruleForm.absentPenalty} />
+            </div>
+            <div className="sd-field">
+              <label>Hệ số cuối tuần</label>
+              <input min="0.1" name="weekendMultiplier" onChange={handleRuleFormChange} step="0.1" type="number" value={ruleForm.weekendMultiplier} />
+            </div>
+            <div className="sd-field">
+              <label>&nbsp;</label>
+              <button className="sd-btn-primary" disabled={savingRule} type="submit">
+                {savingRule ? 'Đang lưu...' : 'Lưu salary rule'}
+              </button>
+            </div>
+          </form>
         )}
       </div>
 

@@ -206,7 +206,6 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         var otp = GenerateOtp();
         user.ResetPasswordCode = otp;
         user.ResetPasswordExpiry = DateTime.UtcNow.AddMinutes(5);
-
         await context.SaveChangesAsync();
         await emailService.SendOtpEmailAsync(user.Email!, otp);
     }
