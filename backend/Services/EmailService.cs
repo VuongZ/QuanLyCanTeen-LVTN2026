@@ -11,7 +11,7 @@ public class EmailService(IConfiguration configuration)
         var smtpPort = int.Parse(configuration["Smtp:Port"] ?? "587");
         var smtpUser = configuration["Smtp:User"];
         var smtpPass = configuration["Smtp:Password"];
-        var fromName = configuration["Smtp:FromName"] ?? "He thong quan ly nhan vien";
+        var fromName = configuration["Smtp:FromName"] ?? "Hệ Thống Quản Lý Nhân Viên";
 
         if (string.IsNullOrWhiteSpace(smtpHost) ||
             string.IsNullOrWhiteSpace(smtpUser) ||
@@ -29,8 +29,8 @@ public class EmailService(IConfiguration configuration)
         using var mail = new MailMessage
         {
             From = new MailAddress(smtpUser, fromName),
-            Subject = "Ma xac nhan dat lai mat khau",
-            Body = $"Ma OTP cua ban la: {otp}\nMa co hieu luc trong 5 phut.",
+            Subject = "Mã Xác Nhận Đặt Lại Mật Khẩu",
+            Body = $"Mã OTP Của Bạn Là : {otp}\nMã có hiệu lực trong 5 phút.",
             IsBodyHtml = false
         };
 

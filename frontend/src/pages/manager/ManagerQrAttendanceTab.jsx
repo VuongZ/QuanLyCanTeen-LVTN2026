@@ -47,6 +47,7 @@ export function ManagerQrAttendanceTab({ user }) {
   const [scanAction, setScanAction] = useState('CHECKIN')
   const [manualQr, setManualQr] = useState('')
   const [status, setStatus] = useState(null)
+  const [notification, setNotification] = useState(null)
   const [scanResult, setScanResult] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
@@ -60,6 +61,17 @@ export function ManagerQrAttendanceTab({ user }) {
       setShiftId((current) => current || branchShifts[0]?.id?.toString() || '')
     }).catch(() => setShifts([]))
   }, [user.branchId])
+
+  useEffect(() => {
+    if (!notification) return undefined
+
+    const timeoutId = window.setTimeout(() => setNotification(null), 4500)
+    return () => window.clearTimeout(timeoutId)
+  }, [notification])
+
+  useEffect(() => {
+    if (status) setNotification(status)
+  }, [status])
 
   useEffect(() => {
     if (!isScannerOpen) return
@@ -127,6 +139,14 @@ export function ManagerQrAttendanceTab({ user }) {
 
   return (
     <div className="sd-users-page">
+      {notification && (
+        <div className={`sd-scan-notification sd-scan-notification-${notification.type}`} role="alert">
+          <strong>{notification.type === 'success' ? 'Quét thành công' : 'Quét thất bại'}</strong>
+          <span>{notification.msg}</span>
+          <button aria-label="Đóng thông báo" type="button" onClick={() => setNotification(null)}>x</button>
+        </div>
+      )}
+
       <div className="sd-card sd-qr-scan-card">
         <div className="sd-card-header"><p className="sd-eyebrow">Chấm công</p><h2>Quét QR nhân viên</h2></div>
         <div className="sd-modal-grid">

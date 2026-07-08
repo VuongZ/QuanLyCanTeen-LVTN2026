@@ -127,7 +127,7 @@ public async Task<CaStaffRegistration> RegisterAsync(RegisterShiftDto dto)
         "CANCELLED",
         "Từ Chối",
         "REJECTED",
-        "Tá»« Chá»‘i"
+        "Từ Chối"
     };
 
     var isDuplicate = await _context.CaStaffRegistrations
@@ -261,7 +261,7 @@ if (registeredCount >= staffSlot)
             r.Status != "CANCELLED" &&
             r.Status != "Từ Chối" &&
             r.Status != "REJECTED" &&
-            r.Status != "Tá»« Chá»‘i")
+            r.Status != "Từ Chối")
         .OrderBy(r => r.WorkDate)
         .ThenBy(r => r.ShiftId)
         .ThenBy(r => r.Id)
@@ -367,35 +367,35 @@ if (registeredCount >= staffSlot)
 
     await _context.SaveChangesAsync();
 }
-    // Manager quet QR nhan vien de ghi vao ca_final_schedule va ca_attendance.
+    // Manager quét QR nhân viên để ghi vào ca_final_schedule và ca_attendance.
     public async Task<object> ScanAttendanceAsync(ScanAttendanceDto dto)
     {
         var manager = await _context.NsUsers
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == dto.ManagerId);
         if (manager == null)
-            throw new Exception("Khong tim thay quan ly.");
+            throw new Exception("Không tìm thấy quản lý.");
 
         var managerRole = NormalizeText(manager.Role?.RoleName);
         if (!managerRole.Contains("MANAGER") && !managerRole.Contains("QUAN LY"))
-            throw new Exception("Chi Manager moi duoc quet QR cham cong.");
+            throw new Exception("Chỉ Manager mới được quét QR chấm công.");
 
         var employee = await _context.NsUsers
             .Include(u => u.Role)
             .Include(u => u.Branch)
             .FirstOrDefaultAsync(u => u.Id == dto.EmployeeId);
         if (employee == null)
-            throw new Exception("Khong tim thay nhan vien tu ma QR.");
+            throw new Exception("Không tìm thấy nhân viên từ mã QR.");
 
         if (manager.BranchId == null || employee.BranchId == null || manager.BranchId != employee.BranchId)
-            throw new Exception("Nhan vien khong thuoc co so cua Manager.");
+            throw new Exception("Nhân viên không thuộc cơ sở của Manager.");
 
         var shift = await _context.CaShifts.FirstOrDefaultAsync(s => s.Id == dto.ShiftId);
         if (shift == null)
-            throw new Exception("Khong tim thay ca lam.");
+            throw new Exception("Không tìm thấy ca làm.");
 
         if (shift.BranchId != null && shift.BranchId != manager.BranchId)
-            throw new Exception("Ca lam khong thuoc co so cua Manager.");
+            throw new Exception("Ca làm không thuộc cơ sở của Manager.");
 
         var schedule = await _context.CaFinalSchedules
             .FirstOrDefaultAsync(s =>
@@ -405,7 +405,7 @@ if (registeredCount >= staffSlot)
                 s.Status == "PUBLISHED");
 
         if (schedule == null)
-            throw new Exception("Nhan vien chua co lich lam chinh thuc cho ngay va ca nay.");
+            throw new Exception("Nhân viên chưa có lịch làm chính thức cho ngày và ca này.");
 
         var action = NormalizeText(dto.Action) == "CHECKOUT" ? "CHECKOUT" : "CHECKIN";
         var scanTime = GetUtcNowForDatabase();
@@ -422,7 +422,7 @@ if (registeredCount >= staffSlot)
         if (action == "CHECKIN")
         {
             if (attendance.CheckOutTime != null)
-                throw new Exception("Ca nay da check-out, khong the check-in lai.");
+                throw new Exception("Ca này đã check-out, không thể check-in lại.");
 
             if (attendance.CheckInTime == null)
                 attendance.CheckInTime = scanTime;
@@ -432,14 +432,14 @@ if (registeredCount >= staffSlot)
         else
         {
             if (attendance.CheckInTime == null)
-                throw new Exception("Nhan vien chua check-in ca nay.");
+                throw new Exception("Nhân viên chưa check-in ca này.");
 
             if (attendance.CheckOutTime == null)
             {
                 attendance.CheckOutTime = scanTime;
                 workedHours = Math.Round((decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime.Value).TotalHours, 2);
                 if (workedHours < 0)
-                    throw new Exception("Gio check-out khong hop le.");
+                    throw new Exception("Giờ check-out không hợp lệ.");
 
                 var checkoutVietnamTime = ToVietnamTime(attendance.CheckOutTime) ?? attendance.CheckOutTime.Value;
                 var month = checkoutVietnamTime.Month;
@@ -514,7 +514,7 @@ if (registeredCount >= staffSlot)
     }
 
     // 5. NHÂN VIÊN: Hủy ca đã đăng ký (Chỉ được hủy khi chưa duyệt)
- public async Task CancelRegistrationAsync(int id, int userId)
+public async Task CancelRegistrationAsync(int id, int userId)
 {
     var reg = await _context.CaStaffRegistrations.FindAsync(id);
     if (reg == null)
