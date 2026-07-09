@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getAllSalaries, markSalaryPaid } from '../../api/SalaryApi';
+import { getAllSalaries, getBranchSalaries, markSalaryPaid } from '../../api/SalaryApi';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -40,8 +40,8 @@ function InfoRow({ label, value }) {
   );
 }
 
-export function AdminSalaryTab() {
-  const [salaries, setSalaries] = useState([]);
+export function AdminSalaryTab({ isAdmin = true }) {
+  const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedSalary, setSelectedSalary] = useState(null);
@@ -53,10 +53,10 @@ export function AdminSalaryTab() {
     setLoading(true);
     setMessage(null);
     try {
-      const data = await getAllSalaries();
-      setSalaries(Array.isArray(data) ? data : []);
+      const data = isAdmin ? await getAllSalaries() : await getBranchSalaries();
+      setItems(Array.isArray(data) ? data : []);
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được danh sách lương.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được dữ liệu lương.' });
     } finally {
       setLoading(false);
     }
@@ -65,12 +65,14 @@ export function AdminSalaryTab() {
   useEffect(() => {
     let ignore = false;
 
-    getAllSalaries()
+    setLoading(true);
+    setMessage(null);
+    (isAdmin ? getAllSalaries() : getBranchSalaries())
       .then((data) => {
-        if (!ignore) setSalaries(Array.isArray(data) ? data : []);
+        if (!ignore) setItems(Array.isArray(data) ? data : []);
       })
       .catch((err) => {
-        if (!ignore) setMessage({ type: 'error', text: err.response?.data?.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c danh sÃ¡ch lÆ°Æ¡ng.' });
+        if (!ignore) setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được dữ liệu lương.' });
       })
       .finally(() => {
         if (!ignore) setLoading(false);
@@ -79,11 +81,24 @@ export function AdminSalaryTab() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [isAdmin]);
 
-  const filteredSalaries = useMemo(() => {
+  const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return salaries.filter((item) => {
+    return items.filter((item) => {
+      if (isAdmin) {
+        return !normalizedQuery || [
+          item.branchName,
+          item.managerName,
+          item.managerEmail,
+          item.managerPhoneNumber,
+          item.managerBankName,
+          item.managerBankAccountNumber,
+          item.managerBankAccountName,
+          String(item.branchId || ''),
+        ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
+      }
+
       const status = (item.status || 'PENDING').toUpperCase();
       const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
       const matchesQuery = !normalizedQuery || [
@@ -98,11 +113,19 @@ export function AdminSalaryTab() {
 
       return matchesStatus && matchesQuery;
     });
-  }, [salaries, query, statusFilter]);
+  }, [items, query, statusFilter, isAdmin]);
 
   const summary = useMemo(() => {
-    return filteredSalaries.reduce(
+    return filteredItems.reduce(
       (total, item) => {
+        if (isAdmin) {
+          return {
+            count: total.count + Number(item.salaryCount || 0),
+            pending: total.pending + Number(item.pendingTotal || 0),
+            paid: total.paid + Number(item.paidTotal || 0),
+          };
+        }
+
         const isPaid = (item.status || '').toUpperCase() === 'PAID';
         return {
           count: total.count + 1,
@@ -112,7 +135,7 @@ export function AdminSalaryTab() {
       },
       { count: 0, pending: 0, paid: 0 }
     );
-  }, [filteredSalaries]);
+  }, [filteredItems, isAdmin]);
 
   async function handleConfirmPaid() {
     if (!selectedSalary) return;
@@ -121,7 +144,7 @@ export function AdminSalaryTab() {
     setMessage(null);
     try {
       const updated = await markSalaryPaid(selectedSalary.id);
-      setSalaries((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+      setItems((currentItems) => currentItems.map((item) => (item.id === updated.id ? updated : item)));
       setSelectedSalary(null);
       setMessage({ type: 'success', text: 'Đã cập nhật trạng thái thành đã thanh toán.' });
     } catch (err) {
@@ -134,8 +157,8 @@ export function AdminSalaryTab() {
   return (
     <div className="sd-salary-admin-page">
       <div className="sd-stat-grid sd-salary-admin-stats">
-        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>Bảng lương</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{formatMoney(summary.pending)}</h3><p>Chưa thanh toán</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>{isAdmin ? 'Bảng lương toàn hệ thống' : 'Bảng lương cơ sở'}</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{formatMoney(summary.pending)}</h3><p>{isAdmin ? 'Cần chuyển cho manager' : 'Chưa thanh toán'}</p></div>
         <div className="sd-stat-card"><span className="sd-stat-icon">✓</span><h3>{formatMoney(summary.paid)}</h3><p>Đã thanh toán</p></div>
       </div>
 
@@ -146,83 +169,131 @@ export function AdminSalaryTab() {
             <input
               className="sd-input-search"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tìm nhân viên, ngân hàng, tháng..."
+              placeholder={isAdmin ? 'Tìm cơ sở...' : 'Tìm nhân viên, ngân hàng, tháng...'}
               value={query}
             />
-            {query && <button className="sd-search-clear" onClick={() => setQuery('')}>✕</button>}
+            {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
           </div>
-          <div className="sd-filter-chips">
-            {[
-              ['ALL', 'Tất cả'],
-              ['PENDING', 'Chưa thanh toán'],
-              ['PAID', 'Đã thanh toán'],
-            ].map(([value, label]) => (
-              <button
-                className={`sd-filter-chip ${statusFilter === value ? 'active' : ''}`}
-                key={value}
-                onClick={() => setStatusFilter(value)}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {!isAdmin && (
+            <div className="sd-filter-chips">
+              {[
+                ['ALL', 'Tất cả'],
+                ['PENDING', 'Chưa thanh toán'],
+                ['PAID', 'Đã thanh toán'],
+              ].map(([value, label]) => (
+                <button
+                  className={`sd-filter-chip ${statusFilter === value ? 'active' : ''}`}
+                  key={value}
+                  onClick={() => setStatusFilter(value)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <button className="sd-btn-ghost" onClick={loadSalaries} type="button">Làm mới</button>
       </div>
 
       {message && <p className={`sd-status sd-status-${message.type}`}>{message.text}</p>}
 
-      <div className="sd-table-wrap">
-        <table className="sd-table">
-          <thead>
-            <tr>
-              <th>Nhân viên</th>
-              <th>Tháng</th>
-              <th>Giờ làm</th>
-              <th>Thực nhận</th>
-              <th>Ngân hàng</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr>
-            ) : filteredSalaries.length === 0 ? (
-              <tr><td colSpan={7} className="sd-td-empty">Chưa có bảng lương phù hợp.</td></tr>
-            ) : filteredSalaries.map((item) => {
-              const isPaid = (item.status || '').toUpperCase() === 'PAID';
-              return (
-                <tr key={item.id}>
+      {isAdmin ? (
+        <div className="sd-table-wrap">
+          <table className="sd-table">
+            <thead>
+              <tr>
+                <th>Cơ sở</th>
+                <th>Manager nhận tiền</th>
+                <th>Nhân viên có lương</th>
+                <th>Bảng lương</th>
+                <th>Cần chuyển manager</th>
+                <th>Đã trả</th>
+                <th>Tổng lương</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="sd-td-empty">Đang tải tổng lương theo cơ sở...</td></tr>
+              ) : filteredItems.length === 0 ? (
+                <tr><td colSpan={7} className="sd-td-empty">Chưa có dữ liệu lương theo cơ sở.</td></tr>
+              ) : filteredItems.map((item) => (
+                <tr key={item.branchId || 'unassigned'}>
                   <td>
-                    <strong>{item.fullName || item.username}</strong>
-                    <span className="sd-subline">{item.branchName || 'Chưa gán cơ sở'}</span>
+                    <strong>{item.branchName || 'Chưa gán cơ sở'}</strong>
+                    <span className="sd-subline">Manager cơ sở xác nhận trả lương nhân viên</span>
                   </td>
-                  <td>{item.month}/{item.year}</td>
-                  <td>{formatNumber(item.totalHours)} giờ</td>
-                  <td className="sd-salary-admin-total">{formatMoney(item.totalSalary)}</td>
                   <td>
-                    <strong>{item.bankName || 'Chưa có'}</strong>
-                    <span className="sd-subline">{item.bankAccountNumber || 'Chưa có STK'}</span>
+                    <strong>{item.managerName || item.managerEmail || item.managerPhoneNumber || 'Chưa có manager'}</strong>
+                    <span className="sd-subline">{item.managerBankName || 'Chưa có ngân hàng'}</span>
+                    <span className="sd-subline">{item.managerBankAccountNumber || 'Chưa có STK'}</span>
+                    <span className="sd-subline">{item.managerBankAccountName || 'Chưa có tên tài khoản'}</span>
                   </td>
-                  <td><span className={`sd-status-pill ${isPaid ? 'paid' : 'pending'}`}>{formatStatus(item.status)}</span></td>
+                  <td>{formatNumber(item.employeeCount)}</td>
                   <td>
-                    <button
-                      className={isPaid ? 'sd-btn-ghost' : 'sd-btn-primary'}
-                      disabled={isPaid}
-                      onClick={() => setSelectedSalary(item)}
-                      type="button"
-                    >
-                      {isPaid ? 'Đã trả' : 'Trả lương'}
-                    </button>
+                    <strong>{formatNumber(item.salaryCount)}</strong>
+                    <span className="sd-subline">{formatNumber(item.pendingCount)} chưa trả / {formatNumber(item.paidCount)} đã trả</span>
                   </td>
+                  <td className="sd-salary-admin-total">{formatMoney(item.pendingTotal)}</td>
+                  <td>{formatMoney(item.paidTotal)}</td>
+                  <td>{formatMoney(item.totalSalary)}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="sd-table-wrap">
+          <table className="sd-table">
+            <thead>
+              <tr>
+                <th>Nhân viên</th>
+                <th>Tháng</th>
+                <th>Giờ làm</th>
+                <th>Thực nhận</th>
+                <th>Ngân hàng</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr>
+              ) : filteredItems.length === 0 ? (
+                <tr><td colSpan={7} className="sd-td-empty">Chưa có bảng lương phù hợp.</td></tr>
+              ) : filteredItems.map((item) => {
+                const isPaid = (item.status || '').toUpperCase() === 'PAID';
+                return (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>{item.fullName || item.username}</strong>
+                      <span className="sd-subline">{item.branchName || 'Chưa gán cơ sở'}</span>
+                    </td>
+                    <td>{item.month}/{item.year}</td>
+                    <td>{formatNumber(item.totalHours)} giờ</td>
+                    <td className="sd-salary-admin-total">{formatMoney(item.totalSalary)}</td>
+                    <td>
+                      <strong>{item.bankName || 'Chưa có'}</strong>
+                      <span className="sd-subline">{item.bankAccountNumber || 'Chưa có STK'}</span>
+                    </td>
+                    <td><span className={`sd-status-pill ${isPaid ? 'paid' : 'pending'}`}>{formatStatus(item.status)}</span></td>
+                    <td>
+                      <button
+                        className={isPaid ? 'sd-btn-ghost' : 'sd-btn-primary'}
+                        disabled={isPaid}
+                        onClick={() => setSelectedSalary(item)}
+                        type="button"
+                      >
+                        {isPaid ? 'Đã trả' : 'Trả lương'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {selectedSalary && (
         <div className="sd-overlay" onClick={() => setSelectedSalary(null)}>

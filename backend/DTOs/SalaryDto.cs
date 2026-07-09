@@ -21,3 +21,23 @@ public class SalaryDto
     public DateTime? PaidAt { get; set; }
     public DateTime? CreatedAt { get; set; }
 }
+
+public class BranchSalarySummaryDto
+{
+    public int? BranchId { get; set; }
+    public string? BranchName { get; set; }
+    public int? ManagerId { get; set; }
+    public string? ManagerName { get; set; }
+    public string? ManagerEmail { get; set; }
+    public string? ManagerPhoneNumber { get; set; }
+    public string? ManagerBankName { get; set; }
+    public string? ManagerBankAccountNumber { get; set; }
+    public string? ManagerBankAccountName { get; set; }
+    public int SalaryCount { get; set; }
+    public decimal PendingTotal { get; set; }
+    public decimal PaidTotal { get; set; }
+    public decimal TotalSalary { get; set; }
+    public int PendingCount { get; set; }
+    public int PaidCount { get; set; }
+    public int EmployeeCount { get; set; }
+}

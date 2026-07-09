@@ -164,7 +164,9 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
       case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
-      case 'salaries': return { eyebrow: 'Tài chính', title: 'Quản lý lương' }
+      case 'salaries': return isAdmin
+        ? { eyebrow: 'Tài chính', title: 'Tổng lương theo cơ sở' }
+        : { eyebrow: 'Tài chính', title: 'Trả lương nhân viên' }
       default: return { eyebrow: '', title: '' }
     }
   }
@@ -178,7 +180,6 @@ NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
 NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
 NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
 NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
-NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
 NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
 NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
 }
@@ -187,6 +188,7 @@ if (isManager) {
 NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
 NAV_ITEMS.push({ id: 'scanQr', icon: '📷', label: 'Quét QR' })
 NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
+NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Trả lương' })
 NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
 NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// Manager xem tồn kho cơ sở của mình
 }
@@ -366,12 +368,12 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             {activeTab === 'branches' && isAdmin && <AdminBranchTab branches={branches} setBranches={setBranches} />}
             {activeTab === 'periods' && isManager && <ManagerPeriodTab user={user} isManager={isManager} branches={branches} />}
             {activeTab === 'scanQr' && isManager && <ManagerQrAttendanceTab user={user} />}
-            {activeTab === 'salaryRules' && (isAdmin || isManager) && (
+            {activeTab === 'salaryRules' && isManager && (
               <ManagerSalaryRuleTab user={user} isAdmin={isAdmin} branches={branches} />
             )}
             {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches}/>}
             {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
-            {activeTab === 'salaries' && isAdmin && <AdminSalaryTab />}
+            {activeTab === 'salaries' && (isAdmin || isManager) && <AdminSalaryTab isAdmin={isAdmin} />}
             {activeTab === 'suppliers' && isAdmin && <AdminSupplierTab />}
             {activeTab === 'inventoryReport' && <InventoryTab currentUser={user} branches={branches} />}
 

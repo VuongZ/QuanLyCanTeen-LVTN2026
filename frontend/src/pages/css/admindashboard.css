@@ -1531,7 +1531,7 @@
 }
 
 .sd-salary-admin-page .sd-table {
-  min-width: 1120px;
+  min-width: 1360px;
   table-layout: fixed;
 }
 
@@ -1545,18 +1545,18 @@
 .sd-salary-admin-page .sd-table th:first-child,
 .sd-salary-admin-page .sd-table td:first-child {
   padding-left: 28px;
-  width: 260px;
+  width: 270px;
 }
 
 .sd-salary-admin-page .sd-table th:nth-child(2),
 .sd-salary-admin-page .sd-table td:nth-child(2) {
-  width: 110px;
+  width: 230px;
   white-space: nowrap;
 }
 
 .sd-salary-admin-page .sd-table th:nth-child(3),
 .sd-salary-admin-page .sd-table td:nth-child(3) {
-  width: 120px;
+  width: 150px;
   white-space: nowrap;
 }
 
@@ -1568,7 +1568,7 @@
 
 .sd-salary-admin-page .sd-table th:nth-child(5),
 .sd-salary-admin-page .sd-table td:nth-child(5) {
-  width: 220px;
+  width: 230px;
 }
 
 .sd-salary-admin-page .sd-table th:nth-child(6),

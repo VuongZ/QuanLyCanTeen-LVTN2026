@@ -441,12 +441,14 @@ if (registeredCount >= staffSlot)
                 if (workedHours < 0)
                     throw new Exception("Giờ check-out không hợp lệ.");
 
-                var checkoutVietnamTime = ToVietnamTime(attendance.CheckOutTime) ?? attendance.CheckOutTime.Value;
-                var month = checkoutVietnamTime.Month;
-                var year = checkoutVietnamTime.Year;
+                var month = schedule.WorkDate.Month;
+                var year = schedule.WorkDate.Year;
                 var salary = await _context.LuongMonthlySalaries
                     .FirstOrDefaultAsync(s => s.UserId == employee.Id && s.Month == month && s.Year == year);
                 var hourlyWage = employee.Role?.HourlyWage ?? 0;
+
+                if (salary != null && string.Equals(salary.Status, "PAID", StringComparison.OrdinalIgnoreCase))
+                    throw new Exception("Bảng lương của tháng này đã thanh toán, không thể cộng thêm giờ làm.");
 
                 if (salary == null)
                 {

@@ -24,18 +24,15 @@ private static string NormalizePeriodStatus(string? status)
         "MỞ" => "OPEN",
         "MO" => "OPEN",
         "OPEN" => "OPEN",
-
         "ĐÓNG" => "CLOSED",
         "DONG" => "CLOSED",
         "CLOSED" => "CLOSED",
         "REVIEWING" => "CLOSED",
         "DRAFT" => "CLOSED",
-
         "PUBLISHED" => "PUBLISHED",
         "ĐÃ CHỐT" => "PUBLISHED",
         "DA CHOT" => "PUBLISHED",
-
-        _ => throw new ArgumentException("Trạng thái đợt đăng ký không hợp lệ.")
+        _=> throw new ArgumentException("Trạng thái đợt đăng ký không hợp lệ.")
     };
 }
     public async Task<IEnumerable<SchedulePeriodDto>> GetAllAsync()

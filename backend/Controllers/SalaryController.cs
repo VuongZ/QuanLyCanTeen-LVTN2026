@@ -28,7 +28,24 @@ public class SalaryController : ControllerBase
         if (!IsAdmin())
             return Forbid();
 
-        var salaries = await _salaryService.GetAllAsync();
+        var summaries = await _salaryService.GetBranchSummariesAsync();
+        return Ok(summaries);
+    }
+
+    [HttpGet("branch")]
+    public async Task<IActionResult> GetBranchSalaries()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không Xác Định Được Người Dùng" });
+
+        if (!IsManager())
+            return Forbid();
+
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tài Khoản Quản Lý Chưa Được Gắn Cơ Sở" });
+
+        var salaries = await _salaryService.GetByBranchAsync(currentUser.BranchId.Value);
         return Ok(salaries);
     }
 
@@ -42,10 +59,25 @@ public class SalaryController : ControllerBase
             : null;
 
         if (currentUser == null)
-            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+            return Unauthorized(new { message = "Không Xác Định Được Người Dùng." });
 
-        if (role != "ADMIN" && role != "MANAGER" && currentUser.Id != userId)
+        if (currentUser.Id != userId && role != "MANAGER")
             return Forbid();
+
+        if (role == "MANAGER")
+        {
+            if (currentUser.BranchId == null)
+                return BadRequest(new { message = "Tài Khoản Quản Lý Chưa Được Gắn Cơ Sở." });
+
+            var targetBranchId = await _context.NsUsers
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.BranchId)
+                .FirstOrDefaultAsync();
+
+            if (targetBranchId != currentUser.BranchId)
+                return Forbid();
+        }
 
         var salaries = await _salaryService.GetByUserAsync(userId);
         return Ok(salaries);
@@ -56,14 +88,14 @@ public class SalaryController : ControllerBase
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
-            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+            return Unauthorized(new { message = "Không Xác Địng Được Người Dùng." });
 
-        if (!IsAdmin() && !IsManager())
+        if (!IsManager())
             return Forbid();
 
         var resolvedBranch = ResolveBranchId(currentUser, branchId);
         if (resolvedBranch == null)
-            return BadRequest(new { message = "Vui long chon co so." });
+            return BadRequest(new { message = "Vui lòng chọn cơ sở." });
 
         var result = await _salaryService.GetRuleAdjustmentsAsync(resolvedBranch.Value, month, year);
         return Ok(result);
@@ -72,7 +104,17 @@ public class SalaryController : ControllerBase
     [HttpPut("rule")]
     public async Task<IActionResult> UpdateSalaryRule([FromBody] UpdateSalaryRuleDto dto)
     {
-        if (!IsAdmin())
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không Xác Định Được Người Dùng." });
+
+        if (!IsManager())
+            return Forbid();
+
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tài Khoản Quản Lý Chưa Được Gắn cơ sở." });
+
+        if (dto.BranchId != currentUser.BranchId.Value)
             return Forbid();
 
         try
@@ -91,20 +133,20 @@ public class SalaryController : ControllerBase
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
-            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+            return Unauthorized(new { message = "Không Xác Định Được Người Dùng." });
 
-        if (!IsAdmin() && !IsManager())
+        if (!IsManager())
             return Forbid();
 
         var resolvedBranch = ResolveBranchId(currentUser, branchId);
         if (resolvedBranch == null)
-            return BadRequest(new { message = "Vui long chon co so." });
+            return BadRequest(new { message = "Vui lòng chọn cơ sở." });
 
         try
         {
             var result = await _salaryService.ApplyRuleAdjustmentAsync(resolvedBranch.Value, dto);
             if (result == null)
-                return NotFound(new { message = "Khong tim thay nhan vien trong co so cua ban." });
+                return NotFound(new { message = "Không Tìm Thấy Nhân Viên Trong Cơ Sở Của Bạn." });
 
             return Ok(result);
         }
@@ -119,20 +161,20 @@ public class SalaryController : ControllerBase
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
-            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+            return Unauthorized(new { message = "Không Xác Định Được Người Dùng." });
 
-        if (!IsAdmin() && !IsManager())
+        if (!IsManager())
             return Forbid();
 
         var resolvedBranch = ResolveBranchId(currentUser, branchId);
         if (resolvedBranch == null)
-            return BadRequest(new { message = "Vui long chon co so." });
+            return BadRequest(new { message = "Vui lòng chọn cơ sở." });
 
         try
         {
             var result = await _salaryService.AddManualAdjustmentAsync(resolvedBranch.Value, dto);
             if (result == null)
-                return NotFound(new { message = "Khong tim thay nhan vien trong co so cua ban." });
+                return NotFound(new { message = "Không Tìm Thấy Nhân Viên Trong Cơ Sở Của Bạn." });
 
             return Ok(result);
         }
@@ -145,12 +187,19 @@ public class SalaryController : ControllerBase
     [HttpPut("{salaryId}/pay")]
     public async Task<IActionResult> MarkPaid(int salaryId)
     {
-        if (!IsAdmin())
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không Xác Định Được Người Dùng." });
+
+        if (!IsManager())
             return Forbid();
 
-        var salary = await _salaryService.MarkPaidAsync(salaryId);
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tài Khoản Quản Lý Chưa Được Gắn cơ sở." });
+
+        var salary = await _salaryService.MarkPaidAsync(salaryId, currentUser.BranchId.Value);
         if (salary == null)
-            return NotFound(new { message = "Khong tim thay bang luong." });
+            return NotFound(new { message = "Không Tìm Thấy Bảng Lương Trong Cơ Sở Của Bạn." });
 
         return Ok(salary);
     }

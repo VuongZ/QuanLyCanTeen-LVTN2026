@@ -79,6 +79,114 @@ public class SalaryService
             .ToListAsync();
     }
 
+    public async Task<List<SalaryDto>> GetByBranchAsync(int branchId)
+    {
+        return await _context.LuongMonthlySalaries
+            .AsNoTracking()
+            .Where(s => s.User.BranchId == branchId)
+            .Include(s => s.User)
+            .ThenInclude(u => u.Branch)
+            .Include(s => s.User)
+            .ThenInclude(u => u.NsUserBankAccounts)
+            .OrderByDescending(s => s.Year)
+            .ThenByDescending(s => s.Month)
+            .ThenBy(s => s.User.FullName ?? s.User.Email ?? s.User.PhoneNumber)
+            .Select(s => new SalaryDto
+            {
+                Id = s.Id,
+                UserId = s.UserId,
+                Username = s.User.Email ?? s.User.PhoneNumber,
+                FullName = s.User.FullName,
+                BranchName = s.User.Branch != null ? s.User.Branch.Name : null,
+                BankName = s.User.NsUserBankAccounts.Select(b => b.BankName).FirstOrDefault(),
+                BankAccountNumber = s.User.NsUserBankAccounts.Select(b => b.BankAccountNumber).FirstOrDefault(),
+                BankAccountName = s.User.NsUserBankAccounts.Select(b => b.BankAccountName).FirstOrDefault(),
+                Month = s.Month,
+                Year = s.Year,
+                TotalHours = s.TotalHours,
+                HourlyWageAtTime = s.HourlyWageAtTime,
+                TotalSalary = s.TotalSalary,
+                TotalBonus = s.TotalBonus ?? 0,
+                TotalPenalty = s.TotalPenalty ?? 0,
+                Status = s.Status,
+                PaidAt = s.PaidAt,
+                CreatedAt = s.CreatedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<List<BranchSalarySummaryDto>> GetBranchSummariesAsync()
+    {
+        var summaries = await _context.LuongMonthlySalaries
+            .AsNoTracking()
+            .GroupBy(s => new
+            {
+                s.User.BranchId,
+                BranchName = s.User.Branch != null ? s.User.Branch.Name : null
+            })
+            .Select(g => new BranchSalarySummaryDto
+            {
+                BranchId = g.Key.BranchId,
+                BranchName = g.Key.BranchName,
+                SalaryCount = g.Count(),
+                PendingTotal = g.Sum(s => (s.Status ?? "").ToUpper() == "PAID" ? 0 : s.TotalSalary),
+                PaidTotal = g.Sum(s => (s.Status ?? "").ToUpper() == "PAID" ? s.TotalSalary : 0),
+                TotalSalary = g.Sum(s => s.TotalSalary),
+                PendingCount = g.Count(s => (s.Status ?? "").ToUpper() != "PAID"),
+                PaidCount = g.Count(s => (s.Status ?? "").ToUpper() == "PAID"),
+                EmployeeCount = g.Select(s => s.UserId).Distinct().Count()
+            })
+            .OrderBy(s => s.BranchName ?? "Chua gan co so")
+            .ToListAsync();
+
+        var branchIds = summaries
+            .Where(s => s.BranchId != null)
+            .Select(s => s.BranchId!.Value)
+            .Distinct()
+            .ToList();
+
+        var managers = await _context.NsUsers
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .Include(u => u.NsUserBankAccounts)
+            .Where(u => u.BranchId != null && branchIds.Contains(u.BranchId.Value))
+            .Where(u => u.Role != null && u.Role.RoleName.ToUpper().Contains("MANAGER"))
+            .OrderBy(u => u.FullName ?? u.Email ?? u.PhoneNumber)
+            .Select(u => new
+            {
+                u.Id,
+                u.BranchId,
+                u.FullName,
+                u.Email,
+                u.PhoneNumber,
+                BankName = u.NsUserBankAccounts.Select(b => b.BankName).FirstOrDefault(),
+                BankAccountNumber = u.NsUserBankAccounts.Select(b => b.BankAccountNumber).FirstOrDefault(),
+                BankAccountName = u.NsUserBankAccounts.Select(b => b.BankAccountName).FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var managerByBranch = managers
+            .Where(m => m.BranchId != null)
+            .GroupBy(m => m.BranchId!.Value)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var summary in summaries)
+        {
+            if (summary.BranchId == null || !managerByBranch.TryGetValue(summary.BranchId.Value, out var manager))
+                continue;
+
+            summary.ManagerId = manager.Id;
+            summary.ManagerName = manager.FullName;
+            summary.ManagerEmail = manager.Email;
+            summary.ManagerPhoneNumber = manager.PhoneNumber;
+            summary.ManagerBankName = manager.BankName;
+            summary.ManagerBankAccountNumber = manager.BankAccountNumber;
+            summary.ManagerBankAccountName = manager.BankAccountName;
+        }
+
+        return summaries;
+    }
+
     public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branchId, int month, int year)
     {
         var rule = await _context.LuongSalaryRules
@@ -260,14 +368,14 @@ public class SalaryService
         return await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
     }
 
-    public async Task<SalaryDto?> MarkPaidAsync(int salaryId)
+    public async Task<SalaryDto?> MarkPaidAsync(int salaryId, int branchId)
     {
         var salary = await _context.LuongMonthlySalaries
             .Include(s => s.User)
             .ThenInclude(u => u.Branch)
             .Include(s => s.User)
             .ThenInclude(u => u.NsUserBankAccounts)
-            .FirstOrDefaultAsync(s => s.Id == salaryId);
+            .FirstOrDefaultAsync(s => s.Id == salaryId && s.User.BranchId == branchId);
 
         if (salary == null)
             return null;

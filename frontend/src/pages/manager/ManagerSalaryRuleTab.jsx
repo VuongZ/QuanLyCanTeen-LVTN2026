@@ -254,7 +254,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
         ) : (
           <p className="sd-status sd-status-error">Cơ sở này chưa có salary rule.</p>
         )}
-        {isAdmin && selectedBranchId && (
+        {!isAdmin && selectedBranchId && (
           <form className="sd-modal-grid" onSubmit={handleRuleSubmit}>
             <div className="sd-field">
               <label>Ngày công đạt thưởng</label>

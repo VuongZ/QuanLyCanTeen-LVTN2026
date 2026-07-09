@@ -12,6 +12,11 @@ export async function getAllSalaries() {
   return response.data;
 }
 
+export async function getBranchSalaries() {
+  const response = await axios.get(`${BASE_URL}/branch`);
+  return response.data;
+}
+
 export async function markSalaryPaid(salaryId) {
   const response = await axios.put(`${BASE_URL}/${salaryId}/pay`);
   return response.data;
