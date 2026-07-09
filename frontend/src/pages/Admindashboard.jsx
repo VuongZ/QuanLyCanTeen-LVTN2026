@@ -16,6 +16,7 @@ import { ManagerSalaryRuleTab } from './manager/ManagerSalaryRuleTab'
 import { AdminSupplierTab } from './admin/AdminSupplierTab';
 import { AdminSalaryTab } from './admin/AdminSalaryTab';
 import { InventoryTab } from './shared/InventoryTab';
+import { ManagerExportTab } from './manager/ManagerExportTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -163,6 +164,9 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
       case 'salaryRules': return { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
+      case 'inventoryReport': return isAdmin
+  ? { eyebrow: 'Báo cáo kho', title: 'Tồn kho toàn hệ thống' }
+  : { eyebrow: 'Báo cáo kho', title: 'Tồn kho cơ sở' }
       case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
       case 'salaries': return isAdmin
         ? { eyebrow: 'Tài chính', title: 'Tổng lương theo cơ sở' }
@@ -191,6 +195,7 @@ NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
 NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Trả lương' })
 NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
 NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// Manager xem tồn kho cơ sở của mình
+NAV_ITEMS.push({ id: 'exportStock', icon: '📤', label: 'Xuất hàng ra quầy' })
 }
 NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
 
@@ -266,6 +271,10 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
                 </div>
               </div>
             )}
+
+            {activeTab === 'exportStock' && isManager && (
+  <ManagerExportTab user={user} branches={branches} />
+)}
 
             {/* QUẢN LÝ NHÂN VIÊN */}
             {activeTab === 'users' && canViewUsers && (

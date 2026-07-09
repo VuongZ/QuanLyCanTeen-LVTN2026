@@ -1,6 +1,6 @@
-using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.backend.Models.Entities;
-using Microsoft.EntityFrameworkCore; // 👉 Bắt buộc phải có thư viện này để dùng ToListAsync() và Include()
+using LuanVanTotNghiep.DTOs;
+using Microsoft.EntityFrameworkCore;
 
 namespace LuanVanTotNghiep.Repositories
 {
@@ -13,37 +13,50 @@ namespace LuanVanTotNghiep.Repositories
             _context = context;
         }
 
-        // Lấy tồn kho toàn hệ thống (dành cho Admin) - ĐÃ KẾT NỐI DB
-        public async Task<IEnumerable<InventoryDto>> GetAllInventoryAsync()
+        public async Task<List<InventoryDto>> GetAllInventoryAsync()
         {
             return await _context.KhoBranchInventories
+                .AsNoTracking()
                 .Include(i => i.Branch)
                 .Include(i => i.Product)
+                    .ThenInclude(p => p.Supplier)
+                .OrderBy(i => i.Branch.Name)
+                .ThenBy(i => i.Product.ProductName)
                 .Select(i => new InventoryDto
                 {
-                    Id = i.Id, 
-                    BranchName = i.Branch != null ? i.Branch.Name : "Chưa xác định", 
-                    ProductName = i.Product != null ? i.Product.ProductName : "Chưa xác định",
+                    Id = i.Id,
+                    BranchId = i.BranchId,
+                    BranchName = i.Branch.Name,
+                    ProductId = i.ProductId,
+                    ProductCode = i.Product.ProductCode,
+                    ProductName = i.Product.ProductName,
+                    Unit = i.Product.Unit,
                     Quantity = i.Quantity,
-                    Unit = i.Product != null ? i.Product.Unit : "Cái"
+                    SupplierName = i.Product.Supplier != null ? i.Product.Supplier.SupplierName : null
                 })
                 .ToListAsync();
         }
 
-        // Lấy tồn kho lọc theo cơ sở (dành cho Manager / Staff) - ĐÃ KẾT NỐI DB
-        public async Task<IEnumerable<InventoryDto>> GetInventoryByBranchIdAsync(int branchId)
+        public async Task<List<InventoryDto>> GetInventoryByBranchIdAsync(int branchId)
         {
             return await _context.KhoBranchInventories
-                .Where(i => i.BranchId == branchId) // 👉 Lọc chặt chẽ theo ID cơ sở
+                .AsNoTracking()
                 .Include(i => i.Branch)
                 .Include(i => i.Product)
+                    .ThenInclude(p => p.Supplier)
+                .Where(i => i.BranchId == branchId)
+                .OrderBy(i => i.Product.ProductName)
                 .Select(i => new InventoryDto
                 {
-                    Id = i.Id, 
-                    BranchName = i.Branch != null ? i.Branch.Name : "Chưa xác định", 
-                    ProductName = i.Product != null ? i.Product.ProductName : "Chưa xác định",
+                    Id = i.Id,
+                    BranchId = i.BranchId,
+                    BranchName = i.Branch.Name,
+                    ProductId = i.ProductId,
+                    ProductCode = i.Product.ProductCode,
+                    ProductName = i.Product.ProductName,
+                    Unit = i.Product.Unit,
                     Quantity = i.Quantity,
-                    Unit = i.Product != null ? i.Product.Unit : "Cái"
+                    SupplierName = i.Product.Supplier != null ? i.Product.Supplier.SupplierName : null
                 })
                 .ToListAsync();
         }

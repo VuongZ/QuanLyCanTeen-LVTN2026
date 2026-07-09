@@ -58,16 +58,14 @@ public partial class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
-            .UseCollation("utf8mb4_0900_ai_ci")
+            .UseCollation("utf8mb4_unicode_ci")
             .HasCharSet("utf8mb4");
 
         modelBuilder.Entity<CaAttendance>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ca_attendance")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ca_attendance");
 
             entity.HasIndex(e => e.SalaryId, "fk_att_salary");
 
@@ -101,9 +99,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ca_branch_shift_config")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ca_branch_shift_config");
 
             entity.HasIndex(e => e.ShiftId, "fk_config_shift");
 
@@ -130,9 +126,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ca_final_schedule")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ca_final_schedule");
 
             entity.HasIndex(e => e.ShiftId, "fk_final_shift");
 
@@ -160,9 +154,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ca_schedule_period")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ca_schedule_period");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
@@ -182,9 +174,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ca_shift")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ca_shift");
 
             entity.HasIndex(e => e.BranchId, "fk_branch_shift");
 
@@ -220,9 +210,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ca_staff_registration")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ca_staff_registration");
 
             entity.HasIndex(e => e.PeriodId, "fk_reg_period");
 
@@ -258,9 +246,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("dm_branch")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("dm_branch");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Address)
@@ -281,13 +267,13 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_branch_front_stock")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_branch_front_stock");
 
             entity.HasIndex(e => e.BranchId, "fk_front_branch");
 
             entity.HasIndex(e => e.ProductId, "fk_front_product");
+
+            entity.HasIndex(e => new { e.BranchId, e.ProductId }, "uq_front_stock_branch_product").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
@@ -309,13 +295,13 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_branch_inventory")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_branch_inventory");
 
             entity.HasIndex(e => e.BranchId, "branch_id");
 
             entity.HasIndex(e => e.ProductId, "product_id");
+
+            entity.HasIndex(e => new { e.BranchId, e.ProductId }, "uq_inventory_branch_product").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
@@ -339,9 +325,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_export_detail")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_export_detail");
 
             entity.HasIndex(e => e.ExportId, "fk_det_export");
 
@@ -365,13 +349,13 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_export_ticket")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_export_ticket");
 
             entity.HasIndex(e => e.BranchId, "fk_exp_branch");
 
             entity.HasIndex(e => e.ManagerId, "fk_exp_manager");
+
+            entity.HasIndex(e => e.ScheduleId, "idx_export_schedule");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
@@ -380,6 +364,10 @@ public partial class AppDbContext : DbContext
                 .HasColumnType("datetime")
                 .HasColumnName("export_date");
             entity.Property(e => e.ManagerId).HasColumnName("manager_id");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasColumnName("note");
+            entity.Property(e => e.ScheduleId).HasColumnName("schedule_id");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.KhoExportTickets)
                 .HasForeignKey(d => d.BranchId)
@@ -388,15 +376,18 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.Manager).WithMany(p => p.KhoExportTickets)
                 .HasForeignKey(d => d.ManagerId)
                 .HasConstraintName("fk_exp_manager");
+
+            entity.HasOne(d => d.Schedule).WithMany(p => p.KhoExportTickets)
+                .HasForeignKey(d => d.ScheduleId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_export_schedule");
         });
 
         modelBuilder.Entity<KhoImportDetail>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_import_detail")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_import_detail");
 
             entity.HasIndex(e => e.ImportId, "fk_impdet_import");
 
@@ -406,6 +397,9 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.ImportId).HasColumnName("import_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.Quantity).HasColumnName("quantity");
+            entity.Property(e => e.UnitAtTime)
+                .HasMaxLength(50)
+                .HasColumnName("unit_at_time");
             entity.Property(e => e.UnitPrice)
                 .HasPrecision(10, 2)
                 .HasDefaultValueSql("'0.00'")
@@ -424,9 +418,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_import_ticket")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_import_ticket");
 
             entity.HasIndex(e => e.BranchId, "fk_imp_branch");
 
@@ -434,14 +426,26 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => e.SupplierId, "fk_imp_supplier");
 
+            entity.HasIndex(e => new { e.SupplierId, e.InvoiceCode }, "uq_import_supplier_invoice").IsUnique();
+
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
             entity.Property(e => e.ImportDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("import_date");
+            entity.Property(e => e.InvoiceCode)
+                .HasMaxLength(50)
+                .HasColumnName("invoice_code");
+            entity.Property(e => e.InvoiceDate).HasColumnName("invoice_date");
             entity.Property(e => e.ManagerId).HasColumnName("manager_id");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasColumnName("note");
             entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
+            entity.Property(e => e.TotalAmount)
+                .HasPrecision(15, 2)
+                .HasColumnName("total_amount");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.KhoImportTickets)
                 .HasForeignKey(d => d.BranchId)
@@ -460,16 +464,19 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_product")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_product");
 
             entity.HasIndex(e => e.SupplierId, "fk_product_supplier");
 
+            entity.HasIndex(e => e.ProductName, "idx_product_name");
+
+            entity.HasIndex(e => e.ProductCode, "uq_product_code").IsUnique();
+
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.ProductName)
-                .HasMaxLength(255)
-                .HasColumnName("product_name");
+            entity.Property(e => e.ProductCode)
+                .HasMaxLength(50)
+                .HasColumnName("product_code");
+            entity.Property(e => e.ProductName).HasColumnName("product_name");
             entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
             entity.Property(e => e.Unit)
                 .HasMaxLength(50)
@@ -485,9 +492,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_shift_closing_detail")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_shift_closing_detail");
 
             entity.HasIndex(e => e.ProductId, "fk_detail_product");
 
@@ -511,25 +516,34 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_shift_closing_report")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_shift_closing_report");
 
             entity.HasIndex(e => e.BranchId, "fk_report_branch");
 
             entity.HasIndex(e => e.UserId, "fk_report_user");
 
+            entity.HasIndex(e => e.ScheduleId, "idx_report_schedule").IsUnique();
+
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
+            entity.Property(e => e.Note)
+                .HasMaxLength(255)
+                .HasColumnName("note");
             entity.Property(e => e.ReportDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("report_date");
+            entity.Property(e => e.ScheduleId).HasColumnName("schedule_id");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.KhoShiftClosingReports)
                 .HasForeignKey(d => d.BranchId)
                 .HasConstraintName("fk_report_branch");
+
+            entity.HasOne(d => d.Schedule).WithOne(p => p.KhoShiftClosingReport)
+                .HasForeignKey<KhoShiftClosingReport>(d => d.ScheduleId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_report_schedule");
 
             entity.HasOne(d => d.User).WithMany(p => p.KhoShiftClosingReports)
                 .HasForeignKey(d => d.UserId)
@@ -540,9 +554,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("kho_supplier")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("kho_supplier");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Address)
@@ -560,9 +572,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("luong_monthly_salary")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("luong_monthly_salary");
 
             entity.HasIndex(e => new { e.UserId, e.Month, e.Year }, "unique_user_month_year").IsUnique();
 
@@ -611,9 +621,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("luong_salary_rule")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("luong_salary_rule");
 
             entity.HasIndex(e => e.BranchId, "branch_id");
 
@@ -647,9 +655,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ns_role")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ns_role");
 
             entity.HasIndex(e => e.RoleName, "role_name").IsUnique();
 
@@ -674,9 +680,7 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity
-                .ToTable("ns_user")
-                .UseCollation("utf8mb4_unicode_ci");
+            entity.ToTable("ns_user");
 
             entity.HasIndex(e => e.BranchId, "fk_user_branch");
 
@@ -743,7 +747,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.User).WithMany(p => p.NsUserBankAccounts)
                 .HasForeignKey(d => d.UserId)
-                .HasConstraintName("fk_bank_user");
+                .HasConstraintName("fk_bank_account_user");
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -57,7 +57,7 @@ public class SchedulePeriodController(SchedulePeriodService service) : Controlle
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "MANAGER")] // 👈 Ổ KHÓA LỚP 2: Tránh Staff tự xóa đợt
+    [Authorize(Roles = "MANAGER")] 
     public async Task<IActionResult> Delete(int id)
     {
         await service.DeleteAsync(id);

@@ -1,12 +1,13 @@
 using LuanVanTotNghiep.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LuanVanTotNghiep.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize] // 👈 Khóa bảo mật
+    [Authorize]
     public class InventoryController : ControllerBase
     {
         private readonly InventoryRepo _inventoryRepo;
@@ -16,46 +17,58 @@ namespace LuanVanTotNghiep.Controllers
             _inventoryRepo = inventoryRepo;
         }
 
-        // Lấy báo cáo tồn kho
         [HttpGet]
-        public async Task<IActionResult> Get([FromQuery] int? branchId) // 👈 Nhận tham số branchId từ React
+        public async Task<IActionResult> Get([FromQuery] int? branchId)
         {
             try
             {
-                // 1. Đọc quyền từ Token
-                var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value?.ToUpper();
+                var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
 
-                // 2. Logic dành cho MANAGER / STAFF
-                if (userRole != "ADMIN")
+                var isAdmin =
+                    role == "ADMIN" ||
+                    role == "QUẢN TRỊ" ||
+                    role == "QUAN TRI";
+
+                if (!isAdmin)
                 {
-                    // Tự động ép lấy BranchId từ trong Token, không cho phép truyền branchId tùy tiện
-                    var tokenBranchIdStr = User.Claims.FirstOrDefault(c => c.Type == "BranchId")?.Value;
-                    if (int.TryParse(tokenBranchIdStr, out int tokenBranchId))
+                    var tokenBranchIdStr = GetClaimValue("BranchId", "branchId", "branch_id");
+
+                    if (!int.TryParse(tokenBranchIdStr, out var tokenBranchId) || tokenBranchId <= 0)
                     {
-                        var data = await _inventoryRepo.GetInventoryByBranchIdAsync(tokenBranchId);
-                        return Ok(data);
+                        return Unauthorized(new { message = "Không tìm thấy thông tin chi nhánh trong token." });
                     }
-                    return Unauthorized(new { message = "Lỗi phân quyền chi nhánh!" });
+
+                    var branchData = await _inventoryRepo.GetInventoryByBranchIdAsync(tokenBranchId);
+                    return Ok(branchData);
                 }
 
-                // 3. Logic dành cho ADMIN
                 if (branchId.HasValue && branchId.Value > 0)
                 {
-                    // Trạng thái 3a: Admin có chọn dropdown để lọc theo cơ sở cụ thể
-                    var data = await _inventoryRepo.GetInventoryByBranchIdAsync(branchId.Value);
-                    return Ok(data);
+                    var branchData = await _inventoryRepo.GetInventoryByBranchIdAsync(branchId.Value);
+                    return Ok(branchData);
                 }
-                else
-                {
-                    // Trạng thái 3b: Admin chọn "Tất cả cơ sở" (branchId rỗng)
-                    var data = await _inventoryRepo.GetAllInventoryAsync();
-                    return Ok(data);
-                }
+
+                var allData = await _inventoryRepo.GetAllInventoryAsync();
+                return Ok(allData);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi hệ thống: " + ex.Message });
             }
+        }
+
+        private string? GetClaimValue(params string[] claimTypes)
+        {
+            foreach (var claimType in claimTypes)
+            {
+                var value = User.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
         }
     }
 }
