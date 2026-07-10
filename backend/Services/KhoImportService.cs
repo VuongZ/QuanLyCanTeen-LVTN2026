@@ -151,6 +151,118 @@ namespace LuanVanTotNghiep.Services
             }
         }
 
+   public async Task<List<InventoryImportTicketListDto>> GetInventoryImportTicketsAsync(int? branchId)
+{
+    var query = _context.KhoImportTickets
+        .AsNoTracking()
+        .Include(t => t.Branch)
+        .Include(t => t.Manager)
+        .Include(t => t.Supplier)
+        .Include(t => t.KhoImportDetails)
+        .AsQueryable();
+
+    if (branchId.HasValue && branchId.Value > 0)
+    {
+        query = query.Where(t => t.BranchId == branchId.Value);
+    }
+
+    var tickets = await query
+        .OrderByDescending(t => t.Id)
+        .ToListAsync();
+
+    return tickets.Select(t => new InventoryImportTicketListDto
+    {
+        Id = t.Id,
+        BranchId = t.BranchId,
+        BranchName = t.Branch?.Name ?? "Chưa rõ cơ sở",
+        ManagerName = t.Manager?.FullName ?? "Chưa rõ người nhập",
+        SupplierName = t.Supplier?.SupplierName ?? "Chưa rõ NCC",
+        InvoiceCode = t.InvoiceCode,
+        InvoiceDate = FormatDate(t.InvoiceDate),
+        ImportDate = FormatDateTime(t.ImportDate),
+        TotalAmount = Convert.ToDecimal(t.TotalAmount),
+        TotalQuantity = t.KhoImportDetails.Sum(d => Convert.ToInt32(d.Quantity)),
+        ItemCount = t.KhoImportDetails.Count,
+        Note = t.Note
+    }).ToList();
+}
+
+public async Task<InventoryImportTicketDetailDto?> GetInventoryImportTicketDetailAsync(int id, int? branchId)
+{
+    var query = _context.KhoImportTickets
+        .AsNoTracking()
+        .Include(t => t.Branch)
+        .Include(t => t.Manager)
+        .Include(t => t.Supplier)
+        .Include(t => t.KhoImportDetails)
+            .ThenInclude(d => d.Product)
+        .AsQueryable();
+
+    if (branchId.HasValue && branchId.Value > 0)
+    {
+        query = query.Where(t => t.BranchId == branchId.Value);
+    }
+
+    var ticket = await query.FirstOrDefaultAsync(t => t.Id == id);
+
+    if (ticket == null) return null;
+
+    return new InventoryImportTicketDetailDto
+    {
+        Id = ticket.Id,
+        BranchId = ticket.BranchId,
+        BranchName = ticket.Branch?.Name ?? "Chưa rõ cơ sở",
+        ManagerName = ticket.Manager?.FullName ?? "Chưa rõ người nhập",
+        SupplierName = ticket.Supplier?.SupplierName ?? "Chưa rõ NCC",
+        InvoiceCode = ticket.InvoiceCode,
+        InvoiceDate = FormatDate(ticket.InvoiceDate),
+        ImportDate = FormatDateTime(ticket.ImportDate),
+        TotalAmount = Convert.ToDecimal(ticket.TotalAmount),
+        TotalQuantity = ticket.KhoImportDetails.Sum(d => Convert.ToInt32(d.Quantity)),
+        ItemCount = ticket.KhoImportDetails.Count,
+        Note = ticket.Note,
+        Items = ticket.KhoImportDetails.Select(d => new InventoryImportTicketItemDto
+        {
+            ProductId = d.ProductId,
+            ProductCode = d.Product?.ProductCode,
+            ProductName = d.Product?.ProductName ?? "Chưa rõ sản phẩm",
+            Unit = d.UnitAtTime ?? d.Product?.Unit,
+            Quantity = Convert.ToInt32(d.Quantity),
+            UnitPrice = Convert.ToDecimal(d.UnitPrice),
+            LineTotal = Convert.ToInt32(d.Quantity) * Convert.ToDecimal(d.UnitPrice)
+        }).ToList()
+    };
+}
+
+private static string FormatDateTime(object? value)
+{
+    if (value == null) return "";
+
+    if (value is DateTime dateTime)
+        return dateTime.ToString("dd/MM/yyyy HH:mm");
+
+    if (DateTime.TryParse(value.ToString(), out var parsed))
+        return parsed.ToString("dd/MM/yyyy HH:mm");
+
+    return value.ToString() ?? "";
+}
+
+private static string? FormatDate(object? value)
+{
+    if (value == null) return null;
+
+    if (value is DateOnly dateOnly)
+        return dateOnly.ToString("dd/MM/yyyy");
+
+    if (value is DateTime dateTime)
+        return dateTime.ToString("dd/MM/yyyy");
+
+    if (DateTime.TryParse(value.ToString(), out var parsed))
+        return parsed.ToString("dd/MM/yyyy");
+
+    return value.ToString();
+}
+
         private async Task<KhoProduct> FindOrCreateProductAsync(ImportItemDto item, int supplierId)
         {
             var productName = item.ProductName?.Trim();
@@ -214,5 +326,7 @@ namespace LuanVanTotNghiep.Services
 
             return newProduct;
         }
+
+        
     }
 }

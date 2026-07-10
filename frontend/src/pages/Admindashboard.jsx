@@ -11,12 +11,14 @@ import { AdminBranchTab } from './admin/AdminBranchTab'
 import { AdminSystemScheduleTab } from './admin/AdminSystemScheduleTab'
 import { ManagerPeriodTab } from './manager/ManagerPeriodTab'
 import { ManagerQrAttendanceTab } from './manager/ManagerQrAttendanceTab'
-import {ManagerImportTab} from './manager/ManagerImportTab'
+import { ManagerImportTab } from './manager/ManagerImportTab'
 import { ManagerSalaryRuleTab } from './manager/ManagerSalaryRuleTab'
 import { AdminSupplierTab } from './admin/AdminSupplierTab';
 import { AdminSalaryTab } from './admin/AdminSalaryTab';
 import { InventoryTab } from './shared/InventoryTab';
 import { ManagerExportTab } from './manager/ManagerExportTab';
+import { FrontStockTab } from './shared/FrontStockTab';
+import { ShiftClosingManagementTab } from './shared/ShiftClosingManagementTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -52,7 +54,7 @@ const ROLE_COLORS = {
 }
 
 export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: initUsers }) {
-const rawRoleName = normalizeText(user.roleName || user.role || '')
+  const rawRoleName = normalizeText(user.roleName || user.role || '')
   const isAdmin = rawRoleName.includes('ADMIN') || rawRoleName.includes('QUAN TRI')
   const isManager = rawRoleName.includes('MANAGER') || rawRoleName.includes('QUAN LY')
   const canViewUsers = isAdmin || isManager
@@ -165,39 +167,53 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
       case 'inventoryReport': return isAdmin
-  ? { eyebrow: 'Báo cáo kho', title: 'Tồn kho toàn hệ thống' }
-  : { eyebrow: 'Báo cáo kho', title: 'Tồn kho cơ sở' }
+        ? { eyebrow: 'Báo cáo kho', title: 'Tồn kho toàn hệ thống' }
+        : { eyebrow: 'Báo cáo kho', title: 'Tồn kho cơ sở' }
       case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
       case 'salaries': return isAdmin
         ? { eyebrow: 'Tài chính', title: 'Tổng lương theo cơ sở' }
         : { eyebrow: 'Tài chính', title: 'Trả lương nhân viên' }
+
+      case 'frontStock':
+        return isAdmin
+          ? { eyebrow: 'Tồn quầy', title: 'Tồn quầy toàn hệ thống' }
+          : { eyebrow: 'Tồn quầy', title: 'Tồn quầy cơ sở' };
+
+          case 'shiftClosingReports':
+  return isAdmin
+    ? { eyebrow: 'Báo cáo kết ca', title: 'Báo cáo kết ca toàn hệ thống' }
+    : { eyebrow: 'Báo cáo kết ca', title: 'Báo cáo kết ca cơ sở' };
       default: return { eyebrow: '', title: '' }
     }
   }
 
   const headerInfo = getHeaderInfo()
 
- const NAV_ITEMS = []
-if (isAdmin) {
-NAV_ITEMS.push({ id: 'overview', icon: '📊', label: 'Tổng quan' })
-NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
-NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
-NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
-NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
-NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
-NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
-}
-if (isManager) {
-  NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
-NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
-NAV_ITEMS.push({ id: 'scanQr', icon: '📷', label: 'Quét QR' })
-NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
-NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Trả lương' })
-NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
-NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// Manager xem tồn kho cơ sở của mình
-NAV_ITEMS.push({ id: 'exportStock', icon: '📤', label: 'Xuất hàng ra quầy' })
-}
-NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
+  const NAV_ITEMS = []
+  if (isAdmin) {
+    NAV_ITEMS.push({ id: 'overview', icon: '📊', label: 'Tổng quan' })
+    NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
+    NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
+    NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+    NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
+    NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
+    NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
+    NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
+    NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca toàn cục' });
+  }
+  if (isManager) {
+    NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
+    NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
+    NAV_ITEMS.push({ id: 'scanQr', icon: '📷', label: 'Quét QR' })
+    NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
+    NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Trả lương' })
+    NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
+    NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// Manager xem tồn kho cơ sở của mình
+    NAV_ITEMS.push({ id: 'exportStock', icon: '📤', label: 'Xuất hàng ra quầy' })
+    NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy cơ sở' })
+    NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca' });
+  }
+  NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
 
   return (
     <div className="sd-root sd-root--left-nav">
@@ -273,8 +289,8 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             )}
 
             {activeTab === 'exportStock' && isManager && (
-  <ManagerExportTab user={user} branches={branches} />
-)}
+              <ManagerExportTab user={user} branches={branches} />
+            )}
 
             {/* QUẢN LÝ NHÂN VIÊN */}
             {activeTab === 'users' && canViewUsers && (
@@ -380,11 +396,17 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             {activeTab === 'salaryRules' && isManager && (
               <ManagerSalaryRuleTab user={user} isAdmin={isAdmin} branches={branches} />
             )}
-            {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches}/>}
+            {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches} />}
             {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
             {activeTab === 'salaries' && (isAdmin || isManager) && <AdminSalaryTab isAdmin={isAdmin} />}
             {activeTab === 'suppliers' && isAdmin && <AdminSupplierTab />}
             {activeTab === 'inventoryReport' && <InventoryTab currentUser={user} branches={branches} />}
+            {activeTab === 'frontStock' && (isAdmin || isManager) && (
+              <FrontStockTab currentUser={user} branches={branches} />
+            )}
+            {activeTab === 'shiftClosingReports' && (isAdmin || isManager) && (
+  <ShiftClosingManagementTab currentUser={user} branches={branches} />
+)}
 
             {/* TÀI KHOẢN VÀ BẢO MẬT */}
             {activeTab === 'account' && (

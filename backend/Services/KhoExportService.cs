@@ -313,5 +313,120 @@ private static string FormatTime(TimeSpan time)
 {
     return $"{time.Hours:D2}:{time.Minutes:D2}";
 }
+
+private static string FormatDateTime(object? value)
+{
+    if (value == null) return "";
+
+    if (value is DateTime dateTime)
+        return dateTime.ToString("dd/MM/yyyy HH:mm");
+
+    if (DateTime.TryParse(value.ToString(), out var parsed))
+        return parsed.ToString("dd/MM/yyyy HH:mm");
+
+    return value.ToString() ?? "";
+}
+
+private static string? FormatDate(object? value)
+{
+    if (value == null) return null;
+
+    if (value is DateOnly dateOnly)
+        return dateOnly.ToString("dd/MM/yyyy");
+
+    if (value is DateTime dateTime)
+        return dateTime.ToString("dd/MM/yyyy");
+
+    if (DateTime.TryParse(value.ToString(), out var parsed))
+        return parsed.ToString("dd/MM/yyyy");
+
+    return value.ToString();
+}
+public async Task<List<FrontStockExportTicketListDto>> GetFrontStockExportTicketsAsync(int? branchId)
+{
+    var query = _context.KhoExportTickets
+        .AsNoTracking()
+        .Include(t => t.Branch)
+        .Include(t => t.Manager)
+        .Include(t => t.Schedule)
+            .ThenInclude(s => s.Shift)
+        .Include(t => t.KhoExportDetails)
+        .AsQueryable();
+
+    if (branchId.HasValue && branchId.Value > 0)
+    {
+        query = query.Where(t => t.BranchId == branchId.Value);
+    }
+
+    var tickets = await query
+        .OrderByDescending(t => t.Id)
+        .ToListAsync();
+
+    return tickets.Select(t => new FrontStockExportTicketListDto
+    {
+        Id = t.Id,
+        BranchId = t.BranchId,
+        BranchName = t.Branch?.Name ?? "Chưa rõ cơ sở",
+        ManagerName = t.Manager?.FullName ?? "Chưa rõ người xuất",
+        ScheduleId = t.ScheduleId,
+        ShiftName = t.Schedule?.Shift?.ShiftName,
+        WorkDate = FormatDate(t.Schedule?.WorkDate),
+        ShiftTime = t.Schedule?.Shift == null
+            ? null
+            : $"{FormatTime(ToTimeSpan(t.Schedule.Shift.StartTime))} - {FormatTime(ToTimeSpan(t.Schedule.Shift.EndTime))}",
+        ExportDate = FormatDateTime(t.ExportDate),
+        TotalQuantity = t.KhoExportDetails.Sum(d => Convert.ToInt32(d.Quantity)),
+        ItemCount = t.KhoExportDetails.Count,
+        Note = t.Note
+    }).ToList();
+}
+
+public async Task<FrontStockExportTicketDetailDto?> GetFrontStockExportTicketDetailAsync(int id, int? branchId)
+{
+    var query = _context.KhoExportTickets
+        .AsNoTracking()
+        .Include(t => t.Branch)
+        .Include(t => t.Manager)
+        .Include(t => t.Schedule)
+            .ThenInclude(s => s.Shift)
+        .Include(t => t.KhoExportDetails)
+            .ThenInclude(d => d.Product)
+        .AsQueryable();
+
+    if (branchId.HasValue && branchId.Value > 0)
+    {
+        query = query.Where(t => t.BranchId == branchId.Value);
+    }
+
+    var ticket = await query.FirstOrDefaultAsync(t => t.Id == id);
+
+    if (ticket == null) return null;
+
+    return new FrontStockExportTicketDetailDto
+    {
+        Id = ticket.Id,
+        BranchId = ticket.BranchId,
+        BranchName = ticket.Branch?.Name ?? "Chưa rõ cơ sở",
+        ManagerName = ticket.Manager?.FullName ?? "Chưa rõ người xuất",
+        ScheduleId = ticket.ScheduleId,
+        ShiftName = ticket.Schedule?.Shift?.ShiftName,
+        WorkDate = FormatDate(ticket.Schedule?.WorkDate),
+        ShiftTime = ticket.Schedule?.Shift == null
+            ? null
+            : $"{FormatTime(ToTimeSpan(ticket.Schedule.Shift.StartTime))} - {FormatTime(ToTimeSpan(ticket.Schedule.Shift.EndTime))}",
+        ExportDate = FormatDateTime(ticket.ExportDate),
+        TotalQuantity = ticket.KhoExportDetails.Sum(d => Convert.ToInt32(d.Quantity)),
+        ItemCount = ticket.KhoExportDetails.Count,
+        Note = ticket.Note,
+        Items = ticket.KhoExportDetails.Select(d => new FrontStockExportTicketItemDto
+        {
+            ProductId = d.ProductId,
+            ProductCode = d.Product?.ProductCode,
+            ProductName = d.Product?.ProductName ?? "Chưa rõ sản phẩm",
+            Unit = d.Product?.Unit,
+            Quantity = Convert.ToInt32(d.Quantity)
+        }).ToList()
+    };
+}
     }
 }

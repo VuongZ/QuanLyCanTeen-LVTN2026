@@ -11,6 +11,8 @@ public partial class KhoShiftClosingDetail
 
     public int ProductId { get; set; }
 
+    public int SystemCount { get; set; }
+
     public int ActualCount { get; set; }
 
     public virtual KhoProduct Product { get; set; } = null!;

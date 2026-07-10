@@ -498,10 +498,13 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => e.ReportId, "fk_detail_report");
 
+            entity.HasIndex(e => new { e.ReportId, e.ProductId }, "uq_closing_detail_report_product").IsUnique();
+
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.ActualCount).HasColumnName("actual_count");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.ReportId).HasColumnName("report_id");
+            entity.Property(e => e.SystemCount).HasColumnName("system_count");
 
             entity.HasOne(d => d.Product).WithMany(p => p.KhoShiftClosingDetails)
                 .HasForeignKey(d => d.ProductId)

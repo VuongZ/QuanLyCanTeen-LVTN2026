@@ -78,6 +78,9 @@ builder.Services.AddScoped<InventoryRepo>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<SalaryService>();
 builder.Services.AddScoped<KhoExportService>();
+builder.Services.AddScoped<FrontStockRepo>();
+builder.Services.AddScoped<ShiftClosingService>();
+
 
 var app = builder.Build();
 

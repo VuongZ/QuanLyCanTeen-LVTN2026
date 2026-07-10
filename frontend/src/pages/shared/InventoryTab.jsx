@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { TicketHistoryModal } from './TicketHistoryModal';
 
 function normalizeText(value = '') {
   return String(value || '')
@@ -147,8 +148,8 @@ export function InventoryTab({ currentUser, branches = [] }) {
 
   const [inventory, setInventory] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState(
-  isAdmin ? 'ALL' : String(getUserBranchId(currentUser) || '')
-);
+    isAdmin ? 'ALL' : String(getUserBranchId(currentUser) || '')
+  );
   const [search, setSearch] = useState('');
   const [lowThreshold, setLowThreshold] = useState(10);
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -156,60 +157,61 @@ export function InventoryTab({ currentUser, branches = [] }) {
   const [error, setError] = useState('');
 
   const userBranchId = getUserBranchId(currentUser);
+  const [showImportTickets, setShowImportTickets] = useState(false);
 
-const currentBranch = branches.find(
-  (branch) => String(branch.id) === String(userBranchId)
-);
+  const currentBranch = branches.find(
+    (branch) => String(branch.id) === String(userBranchId)
+  );
 
- useEffect(() => {
-  if (!isAdmin) {
-    setSelectedBranchId(String(userBranchId || ''));
-  }
-}, [userBranchId, isAdmin]);
-
-async function loadInventory() {
-  setLoading(true);
-  setError('');
-
-  try {
-    let rawData = [];
-
-    if (isAdmin && selectedBranchId === 'ALL') {
-      rawData = await fetchInventoryByCandidates([
-        '/api/Inventory',
-      ]);
-    } else if (isAdmin) {
-      rawData = await fetchInventoryByCandidates([
-        `/api/Inventory?branchId=${selectedBranchId}`,
-      ]);
-    } else {
-      rawData = await fetchInventoryByCandidates([
-        '/api/Inventory',
-      ]);
+  useEffect(() => {
+    if (!isAdmin) {
+      setSelectedBranchId(String(userBranchId || ''));
     }
+  }, [userBranchId, isAdmin]);
 
-   const normalized = rawData.map((item) =>
-  normalizeInventoryItem(item, branches, userBranchId)
-);
+  async function loadInventory() {
+    setLoading(true);
+    setError('');
+
+    try {
+      let rawData = [];
+
+      if (isAdmin && selectedBranchId === 'ALL') {
+        rawData = await fetchInventoryByCandidates([
+          '/api/Inventory',
+        ]);
+      } else if (isAdmin) {
+        rawData = await fetchInventoryByCandidates([
+          `/api/Inventory?branchId=${selectedBranchId}`,
+        ]);
+      } else {
+        rawData = await fetchInventoryByCandidates([
+          '/api/Inventory',
+        ]);
+      }
+
+      const normalized = rawData.map((item) =>
+        normalizeInventoryItem(item, branches, userBranchId)
+      );
 
 
 
-setInventory(normalized);
-  } catch (err) {
-    console.error('Lỗi tải tồn kho:', err);
-    setError(err.response?.data?.message || 'Không tải được dữ liệu tồn kho.');
-    setInventory([]);
-  } finally {
-    setLoading(false);
+      setInventory(normalized);
+    } catch (err) {
+      console.error('Lỗi tải tồn kho:', err);
+      setError(err.response?.data?.message || 'Không tải được dữ liệu tồn kho.');
+      setInventory([]);
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
- useEffect(() => {
-  if (!currentUser?.id && !currentUser?.Id) return;
+  useEffect(() => {
+    if (!currentUser?.id && !currentUser?.Id) return;
 
-  loadInventory();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [currentUser?.id, currentUser?.Id, userBranchId, selectedBranchId, branches.length]);
+    loadInventory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.Id, userBranchId, selectedBranchId, branches.length]);
 
   const filteredInventory = useMemo(() => {
     const keyword = normalizeText(search);
@@ -220,9 +222,9 @@ setInventory(normalized);
           return false;
         }
 
-     if (!isAdmin && userBranchId && item.branchId && String(item.branchId) !== String(userBranchId)) {
-  return false;
-}
+        if (!isAdmin && userBranchId && item.branchId && String(item.branchId) !== String(userBranchId)) {
+          return false;
+        }
 
         const status = getStockStatus(item.quantity, lowThreshold);
 
@@ -289,6 +291,13 @@ setInventory(normalized);
             <p>{pageSubtitle}</p>
           </div>
         </div>
+        <button
+          type="button"
+          className="sd-inventory-refresh secondary"
+          onClick={() => setShowImportTickets(true)}
+        >
+          Xem phiếu nhập kho
+        </button>
 
         <button
           type="button"
@@ -509,6 +518,13 @@ setInventory(normalized);
           </div>
         </>
       )}
+      <TicketHistoryModal
+  open={showImportTickets}
+  onClose={() => setShowImportTickets(false)}
+  type="inventoryImport"
+  branchId={isAdmin ? selectedBranchId : userBranchId}
+/>
     </div>
+    
   );
 }

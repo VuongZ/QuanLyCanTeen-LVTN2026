@@ -1331,3 +1331,321 @@
   font-size: 12px;
   font-weight: 700;
 }
+/* ===== Staff Shift Closing Report ===== */
+
+.staff-closing-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.staff-closing-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid #fed7aa;
+  border-radius: 20px;
+  background: #fffaf5;
+}
+
+.staff-closing-hero h2 {
+  margin: 4px 0;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.staff-closing-hero span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.staff-closing-hero button,
+.staff-closing-actions button,
+.staff-section-head button {
+  border: none;
+  border-radius: 12px;
+  padding: 11px 16px;
+  background: #f97316;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.staff-closing-hero button:disabled,
+.staff-closing-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.staff-eyebrow {
+  margin: 0;
+  color: #f97316;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.staff-status {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.staff-status.error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.staff-status.success {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.staff-closing-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 18px;
+}
+
+.staff-closing-card {
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.staff-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.staff-section-head h3 {
+  margin: 4px 0 0;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.staff-shift-box {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.staff-shift-box div,
+.staff-summary-row div {
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.staff-shift-box span,
+.staff-summary-row span {
+  display: block;
+  margin-bottom: 5px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.staff-shift-box strong,
+.staff-summary-row strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.staff-shift-box strong.ok {
+  color: #16a34a;
+}
+
+.staff-shift-box strong.danger {
+  color: #dc2626;
+}
+
+.staff-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.staff-closing-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.staff-closing-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.staff-closing-table th {
+  padding: 12px 14px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.staff-closing-table td {
+  padding: 12px 14px;
+  border-top: 1px solid #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+}
+
+.staff-closing-table td strong {
+  color: #0f172a;
+}
+
+.staff-closing-table input {
+  width: 100px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  text-align: right;
+  font-weight: 800;
+}
+
+.staff-closing-table input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.staff-closing-note {
+  margin-top: 16px;
+}
+
+.staff-closing-note label {
+  display: block;
+  margin-bottom: 7px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.staff-closing-note textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.staff-closing-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.staff-empty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.staff-report-list {
+  display: grid;
+  gap: 10px;
+}
+
+.staff-report-card {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.staff-report-card.active,
+.staff-report-card:hover {
+  border-color: #fb923c;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.12);
+}
+
+.staff-report-card div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.staff-report-card strong {
+  color: #0f172a;
+}
+
+.staff-report-card span,
+.staff-report-card small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.staff-report-card p {
+  margin: 0 0 6px;
+  color: #334155;
+  font-weight: 800;
+}
+
+.staff-report-detail {
+  margin-top: 16px;
+}
+
+.staff-report-detail h4 {
+  margin: 0 0 12px;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+@media (max-width: 900px) {
+  .staff-closing-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .staff-closing-grid,
+  .staff-shift-box,
+  .staff-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-closing-actions {
+    justify-content: stretch;
+  }
+
+  .staff-closing-actions button {
+    width: 100%;
+  }
+}
