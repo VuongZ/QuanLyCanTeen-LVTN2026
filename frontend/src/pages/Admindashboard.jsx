@@ -448,9 +448,9 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                 <div className="sd-field"><label>Họ và tên *</label><input name="fullName" value={form.fullName} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>Email</label><input name="email" value={form.email || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>SĐT</label><input name="phoneNumber" value={form.phoneNumber || form.phone || ''} onChange={handleFormChange} /></div>
-                <div className="sd-field"><label>Ngân hàng</label><input name="bankName" value={form.bankName || ''} onChange={handleFormChange} /></div>
-                <div className="sd-field"><label>Số tài khoản</label><input name="bankAccountNumber" value={form.bankAccountNumber || ''} onChange={handleFormChange} /></div>
-                <div className="sd-field"><label>Tên tài khoản</label><input name="bankAccountName" value={form.bankAccountName || ''} onChange={handleFormChange} /></div>
+                {modal === 'edit' && <div className="sd-field"><label>Ngân hàng</label><input name="bankName" value={form.bankName || ''} onChange={handleFormChange} /></div>}
+                {modal === 'edit' && <div className="sd-field"><label>Số tài khoản</label><input name="bankAccountNumber" value={form.bankAccountNumber || ''} onChange={handleFormChange} /></div>}
+                {modal === 'edit' && <div className="sd-field"><label>Tên tài khoản</label><input name="bankAccountName" value={form.bankAccountName || ''} onChange={handleFormChange} /></div>}
                 <div className="sd-field"><label>{modal === 'add' ? 'Password *' : 'Password mới'}</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder={modal === 'add' ? '••••••' : 'Để trống nếu giữ nguyên'} /></div>
                 <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field">
