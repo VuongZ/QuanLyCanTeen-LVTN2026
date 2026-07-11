@@ -191,35 +191,13 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
 
   const headerInfo = getHeaderInfo()
 
-<<<<<<< HEAD
- const NAV_ITEMS = []
-if (isAdmin) {
-NAV_ITEMS.push({ id: 'overview', icon: '📊', label: 'Tổng quan' })
-NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
-NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
-NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
-NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Salary rule' })
-NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
-NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
-NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
-}
-if (isManager) {
-  NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
-NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
-NAV_ITEMS.push({ id: 'scanQr', icon: '📷', label: 'Quét QR' })
-NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Thưởng phạt' })
-NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Trả lương' })
-NAV_ITEMS.push({ id: 'inventory', icon: '📥', label: 'Nhập kho hàng' })
-NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho cơ sở' })// Manager xem tồn kho cơ sở của mình
-}
-NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
-=======
   const NAV_ITEMS = []
   if (isAdmin) {
     NAV_ITEMS.push({ id: 'overview', icon: '📊', label: 'Tổng quan' })
     NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
     NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
     NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+    NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Salary rule' })
     NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
     NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
     NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
@@ -239,7 +217,6 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca' });
   }
   NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
->>>>>>> d793d3e4aaaaf251f3185d39e78d086a9528cb79
 
   return (
     <div className="sd-root sd-root--left-nav">
