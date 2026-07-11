@@ -90,7 +90,7 @@ public class SalaryController : ControllerBase
         if (currentUser == null)
             return Unauthorized(new { message = "Không Xác Địng Được Người Dùng." });
 
-        if (!IsManager())
+        if (!IsAdminOrManager())
             return Forbid();
 
         var resolvedBranch = ResolveBranchId(currentUser, branchId);
@@ -108,13 +108,7 @@ public class SalaryController : ControllerBase
         if (currentUser == null)
             return Unauthorized(new { message = "Không Xác Định Được Người Dùng." });
 
-        if (!IsManager())
-            return Forbid();
-
-        if (currentUser.BranchId == null)
-            return BadRequest(new { message = "Tài Khoản Quản Lý Chưa Được Gắn cơ sở." });
-
-        if (dto.BranchId != currentUser.BranchId.Value)
+        if (!IsAdmin())
             return Forbid();
 
         try
@@ -214,6 +208,11 @@ public class SalaryController : ControllerBase
     {
         var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
         return string.Equals(role, "MANAGER", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsAdminOrManager()
+    {
+        return IsAdmin() || IsManager();
     }
 
     private int? ResolveBranchId(NsUser currentUser, int? requestedBranchId)

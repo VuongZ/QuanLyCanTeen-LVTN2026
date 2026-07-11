@@ -160,7 +160,9 @@ const rawRoleName = normalizeText(user.roleName || user.role || '')
       case 'branches': return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
-      case 'salaryRules': return { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
+      case 'salaryRules': return isAdmin
+        ? { eyebrow: 'Lương', title: 'Salary rule theo cơ sở' }
+        : { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
       case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
@@ -179,6 +181,7 @@ NAV_ITEMS.push({ id: 'overview', icon: '📊', label: 'Tổng quan' })
 NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
 NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
 NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
+NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Salary rule' })
 NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
 NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
 NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
@@ -201,7 +204,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
         <div className="sd-brand">
           <button className="sd-hamburger" onClick={() => setIsMenuOpen(true)}>☰</button>
           <span className="sd-brand-icon">CT</span>
-          <span className="sd-brand-name">Canteen Admin</span>
+          <span className="sd-brand-name">Canteen</span>
         </div>
         <div className="sd-flex-center">
           <div className="sd-branch-badge" style={{ marginRight: 12 }}>{user.roleName}</div>
@@ -368,7 +371,7 @@ NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
             {activeTab === 'branches' && isAdmin && <AdminBranchTab branches={branches} setBranches={setBranches} />}
             {activeTab === 'periods' && isManager && <ManagerPeriodTab user={user} isManager={isManager} branches={branches} />}
             {activeTab === 'scanQr' && isManager && <ManagerQrAttendanceTab user={user} />}
-            {activeTab === 'salaryRules' && isManager && (
+            {activeTab === 'salaryRules' && (isAdmin || isManager) && (
               <ManagerSalaryRuleTab user={user} isAdmin={isAdmin} branches={branches} />
             )}
             {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches}/>}

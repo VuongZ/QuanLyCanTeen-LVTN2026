@@ -254,7 +254,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
         ) : (
           <p className="sd-status sd-status-error">Cơ sở này chưa có salary rule.</p>
         )}
-        {!isAdmin && selectedBranchId && (
+        {isAdmin && selectedBranchId && (
           <form className="sd-modal-grid" onSubmit={handleRuleSubmit}>
             <div className="sd-field">
               <label>Ngày công đạt thưởng</label>
@@ -319,14 +319,14 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
               <th>Thưởng</th>
               <th>Phạt</th>
               <th>Lương hiện tại</th>
-              <th>Thao tác</th>
+              {!isAdmin && <th>Thao tác</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="sd-td-empty">Đang tải danh sách thưởng phạt...</td></tr>
+              <tr><td colSpan={isAdmin ? 7 : 8} className="sd-td-empty">Đang tải danh sách thưởng phạt...</td></tr>
             ) : filteredEmployees.length === 0 ? (
-              <tr><td colSpan={8} className="sd-td-empty">Không có nhân viên phù hợp.</td></tr>
+              <tr><td colSpan={isAdmin ? 7 : 8} className="sd-td-empty">Không có nhân viên phù hợp.</td></tr>
             ) : filteredEmployees.map((employee) => {
               const isPaid = (employee.status || '').toUpperCase() === 'PAID';
               const isSaving = savingUserId === employee.userId;
@@ -352,16 +352,18 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                     <strong>{formatMoney(employee.totalSalary)}</strong>
                     <span className="sd-subline">{formatNumber(employee.totalHours)} giờ</span>
                   </td>
-                  <td>
-                    <button
-                      className="sd-btn-primary"
-                      disabled={isPaid || isSaving}
-                      onClick={() => openManualAdjustment(employee)}
-                      type="button"
-                    >
-                      {isPaid ? 'Đã trả' : isSaving ? 'Đang lưu...' : 'Thưởng phạt'}
-                    </button>
-                  </td>
+                  {!isAdmin && (
+                    <td>
+                      <button
+                        className="sd-btn-primary"
+                        disabled={isPaid || isSaving}
+                        onClick={() => openManualAdjustment(employee)}
+                        type="button"
+                      >
+                        {isPaid ? 'Đã trả' : isSaving ? 'Đang lưu...' : 'Thưởng phạt'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
