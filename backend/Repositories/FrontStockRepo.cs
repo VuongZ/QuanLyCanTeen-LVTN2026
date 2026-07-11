@@ -4,18 +4,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LuanVanTotNghiep.Repositories
 {
-    public class InventoryRepo
+    public class FrontStockRepo
     {
         private readonly AppDbContext _context;
 
-        public InventoryRepo(AppDbContext context)
+        public FrontStockRepo(AppDbContext context)
         {
             _context = context;
         }
 
-        public async Task<List<InventoryDto>> GetAllInventoryAsync()
+        public async Task<List<InventoryDto>> GetAllFrontStockAsync()
         {
-            return await _context.KhoBranchInventories
+            return await _context.KhoBranchFrontStocks
                 .AsNoTracking()
                 .Include(i => i.Branch)
                 .Include(i => i.Product)
@@ -37,9 +37,9 @@ namespace LuanVanTotNghiep.Repositories
                 .ToListAsync();
         }
 
-        public async Task<List<InventoryDto>> GetInventoryByBranchIdAsync(int branchId)
+        public async Task<List<InventoryDto>> GetFrontStockByBranchIdAsync(int branchId)
         {
-            return await _context.KhoBranchInventories
+            return await _context.KhoBranchFrontStocks
                 .AsNoTracking()
                 .Include(i => i.Branch)
                 .Include(i => i.Product)

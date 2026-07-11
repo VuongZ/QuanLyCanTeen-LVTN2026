@@ -13,7 +13,15 @@ public partial class KhoImportTicket
 
     public int SupplierId { get; set; }
 
+    public string? InvoiceCode { get; set; }
+
+    public DateOnly? InvoiceDate { get; set; }
+
     public DateTime? ImportDate { get; set; }
+
+    public decimal TotalAmount { get; set; }
+
+    public string? Note { get; set; }
 
     public virtual DmBranch Branch { get; set; } = null!;
 

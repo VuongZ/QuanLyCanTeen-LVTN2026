@@ -17,6 +17,10 @@ public partial class CaFinalSchedule
 
     public virtual ICollection<CaAttendance> CaAttendances { get; set; } = new List<CaAttendance>();
 
+    public virtual ICollection<KhoExportTicket> KhoExportTickets { get; set; } = new List<KhoExportTicket>();
+
+    public virtual KhoShiftClosingReport? KhoShiftClosingReport { get; set; }
+
     public virtual CaShift Shift { get; set; } = null!;
 
     public virtual NsUser User { get; set; } = null!;

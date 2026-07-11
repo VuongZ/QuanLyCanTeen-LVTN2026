@@ -19,7 +19,7 @@ namespace LuanVanTotNghiep.Controllers
 
         // 👉 CHỈ CÓ ADMIN MỚI ĐƯỢC CRUD (Thêm, Sửa, Xóa)
         [HttpPost]
-        [Authorize(Roles = "ADMIN")] 
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> CreateSupplier([FromBody] KhoSupplier supplier)
         {
             await _repo.AddAsync(supplier);

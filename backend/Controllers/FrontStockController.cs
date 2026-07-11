@@ -8,13 +8,13 @@ namespace LuanVanTotNghiep.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class InventoryController : ControllerBase
+    public class FrontStockController : ControllerBase
     {
-        private readonly InventoryRepo _inventoryRepo;
+        private readonly FrontStockRepo _frontStockRepo;
 
-        public InventoryController(InventoryRepo inventoryRepo)
+        public FrontStockController(FrontStockRepo frontStockRepo)
         {
-            _inventoryRepo = inventoryRepo;
+            _frontStockRepo = frontStockRepo;
         }
 
         [HttpGet]
@@ -23,11 +23,7 @@ namespace LuanVanTotNghiep.Controllers
             try
             {
                 var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
-
-                var isAdmin =
-                    role == "ADMIN" ||
-                    role == "QUẢN TRỊ" ||
-                    role == "QUAN TRI";
+                var isAdmin = role == "ADMIN" || role == "QUẢN TRỊ" || role == "QUAN TRI";
 
                 if (!isAdmin)
                 {
@@ -38,17 +34,17 @@ namespace LuanVanTotNghiep.Controllers
                         return Unauthorized(new { message = "Không tìm thấy thông tin chi nhánh trong token." });
                     }
 
-                    var branchData = await _inventoryRepo.GetInventoryByBranchIdAsync(tokenBranchId);
+                    var branchData = await _frontStockRepo.GetFrontStockByBranchIdAsync(tokenBranchId);
                     return Ok(branchData);
                 }
 
                 if (branchId.HasValue && branchId.Value > 0)
                 {
-                    var branchData = await _inventoryRepo.GetInventoryByBranchIdAsync(branchId.Value);
+                    var branchData = await _frontStockRepo.GetFrontStockByBranchIdAsync(branchId.Value);
                     return Ok(branchData);
                 }
 
-                var allData = await _inventoryRepo.GetAllInventoryAsync();
+                var allData = await _frontStockRepo.GetAllFrontStockAsync();
                 return Ok(allData);
             }
             catch (Exception ex)
@@ -62,6 +58,7 @@ namespace LuanVanTotNghiep.Controllers
             foreach (var claimType in claimTypes)
             {
                 var value = User.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+
                 if (!string.IsNullOrWhiteSpace(value))
                 {
                     return value;

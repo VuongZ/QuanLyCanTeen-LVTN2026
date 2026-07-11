@@ -11,6 +11,8 @@ public partial class KhoImportDetail
 
     public int ProductId { get; set; }
 
+    public string? UnitAtTime { get; set; }
+
     public int Quantity { get; set; }
 
     public decimal? UnitPrice { get; set; }
