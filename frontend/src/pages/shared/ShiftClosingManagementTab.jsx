@@ -260,10 +260,7 @@ export function ShiftClosingManagementTab({ currentUser, branches = [] }) {
                   <strong>{selectedReport.shiftName || '—'}</strong>
                 </div>
 
-                <div>
-                  <span>Ngày làm</span>
-                  <strong>{selectedReport.workDate || '—'}</strong>
-                </div>
+                
 
                 <div>
                   <span>Ngày báo cáo</span>

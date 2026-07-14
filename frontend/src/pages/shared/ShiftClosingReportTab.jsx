@@ -71,18 +71,58 @@ const displayTotalDifference =
     : totalDifference;
 
   function normalizeShift(data) {
-    if (!data) return null;
+  if (!data) return null;
 
-    return {
-      scheduleId: Number(getValue(data, ['scheduleId', 'ScheduleId'], 0)),
-      shiftId: Number(getValue(data, ['shiftId', 'ShiftId'], 0)),
-      shiftName: getValue(data, ['shiftName', 'ShiftName'], 'Ca làm'),
-      workDate: getValue(data, ['workDate', 'WorkDate'], ''),
-      startTime: getValue(data, ['startTime', 'StartTime'], ''),
-      endTime: getValue(data, ['endTime', 'EndTime'], ''),
-      alreadyReported: Boolean(getValue(data, ['alreadyReported', 'AlreadyReported'], false)),
-    };
-  }
+  return {
+    scheduleId: Number(
+      getValue(data, ['scheduleId', 'ScheduleId'], 0)
+    ),
+    shiftId: Number(
+      getValue(data, ['shiftId', 'ShiftId'], 0)
+    ),
+    shiftName: getValue(
+      data,
+      ['shiftName', 'ShiftName'],
+      'Ca làm'
+    ),
+    workDate: getValue(
+      data,
+      ['workDate', 'WorkDate'],
+      ''
+    ),
+    startTime: getValue(
+      data,
+      ['startTime', 'StartTime'],
+      ''
+    ),
+    endTime: getValue(
+      data,
+      ['endTime', 'EndTime'],
+      ''
+    ),
+    alreadyReported: Boolean(
+      getValue(data, ['alreadyReported', 'AlreadyReported'], false)
+    ),
+
+    hasCheckedIn: Boolean(
+      getValue(data, ['hasCheckedIn', 'HasCheckedIn'], false)
+    ),
+    hasCheckedOut: Boolean(
+      getValue(data, ['hasCheckedOut', 'HasCheckedOut'], false)
+    ),
+    isShiftEnded: Boolean(
+      getValue(data, ['isShiftEnded', 'IsShiftEnded'], false)
+    ),
+    canSubmit: Boolean(
+      getValue(data, ['canSubmit', 'CanSubmit'], false)
+    ),
+    submitBlockReason: getValue(
+      data,
+      ['submitBlockReason', 'SubmitBlockReason'],
+      ''
+    ),
+  };
+}
 
   function normalizeItem(item) {
     const systemCount = Number(getValue(item, ['systemCount', 'SystemCount'], 0) || 0);
@@ -177,6 +217,13 @@ const displayTotalDifference =
   }
 
   async function submitReport() {
+    if (!shiftInfo?.canSubmit) {
+  setError(
+    shiftInfo?.submitBlockReason ||
+      'Bạn chưa đủ điều kiện báo cáo kết ca.'
+  );
+  return;
+}
     if (!shiftInfo?.scheduleId) {
       setError('Không tìm thấy ca cần báo cáo.');
       return;
@@ -246,7 +293,9 @@ const displayTotalDifference =
     loadData();
   }, []);
 
-  const canSubmit = shiftInfo && !shiftInfo.alreadyReported && items.length > 0;
+const canSubmit =
+  Boolean(shiftInfo?.canSubmit) &&
+  items.length > 0;
 
   return (
     <div className="staff-closing-page">
@@ -270,7 +319,7 @@ const displayTotalDifference =
           <div className="staff-section-head">
             <div>
               <p className="staff-eyebrow">Ca làm</p>
-              <h3>Thông tin ca hôm nay</h3>
+              <h3>Thông tin ca làm</h3>
             </div>
           </div>
 
@@ -342,11 +391,17 @@ const displayTotalDifference =
     </div>
   </div>
 
-  {shiftInfo?.alreadyReported ? (
-    <div className="staff-empty">
-      Ca này đã gửi báo cáo kết ca. Bạn có thể xem chi tiết trong phần lịch sử bên dưới.
-    </div>
-  ) : (
+{shiftInfo?.alreadyReported ? (
+  <div className="staff-empty">
+    Ca này đã gửi báo cáo kết ca. Bạn có thể xem chi tiết
+    trong phần lịch sử bên dưới.
+  </div>
+) : !shiftInfo?.canSubmit ? (
+  <div className="staff-empty">
+    {shiftInfo?.submitBlockReason ||
+      'Bạn chưa đủ điều kiện báo cáo kết ca.'}
+  </div>
+) : (
     <>
       {items.length === 0 ? (
         <div className="staff-empty">Quầy hiện chưa có mặt hàng nào.</div>

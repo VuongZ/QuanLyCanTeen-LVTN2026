@@ -108,6 +108,59 @@ namespace LuanVanTotNghiep.Services
             if (ToDateOnly(schedule.WorkDate) != today)
                 throw new InvalidOperationException("Chỉ được báo cáo kết ca cho ca làm trong ngày hiện tại.");
 
+                // Chỉ lịch đã được công bố mới được báo cáo kết ca
+if (!string.Equals(
+        schedule.Status,
+        "PUBLISHED",
+        StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "Ca làm chưa được công bố chính thức."
+    );
+}
+
+// Kiểm tra nhân viên đã check-in hay chưa
+var attendance = await _context.CaAttendances
+    .AsNoTracking()
+    .FirstOrDefaultAsync(a => a.ScheduleId == schedule.Id);
+
+if (attendance == null || attendance.CheckInTime == null)
+{
+    throw new InvalidOperationException(
+        "Bạn chưa được điểm danh vào ca này nên không thể báo cáo kết ca."
+    );
+}
+
+// Kiểm tra ca đã kết thúc theo giờ quy định hay chưa
+var workDate = ToDateOnly(schedule.WorkDate);
+
+if (!workDate.HasValue)
+{
+    throw new InvalidOperationException(
+        "Ngày làm việc của ca không hợp lệ."
+    );
+}
+
+var startTime = ToTimeSpan(schedule.Shift.StartTime);
+var endTime = ToTimeSpan(schedule.Shift.EndTime);
+
+var shiftEndDateTime = workDate.Value
+    .ToDateTime(TimeOnly.MinValue)
+    .Add(endTime);
+
+// Trường hợp ca qua đêm, ví dụ 22:00 - 06:00
+if (endTime < startTime)
+{
+    shiftEndDateTime = shiftEndDateTime.AddDays(1);
+}
+
+if (DateTime.Now < shiftEndDateTime)
+{
+    throw new InvalidOperationException(
+        $"Chưa đến giờ kết thúc ca. Ca này kết thúc lúc {FormatTime(endTime)}."
+    );
+}
+
             var alreadyReported = await _context.KhoShiftClosingReports
                 .AnyAsync(r => r.ScheduleId == dto.ScheduleId);
 

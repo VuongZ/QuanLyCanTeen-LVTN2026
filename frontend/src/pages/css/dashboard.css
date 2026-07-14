@@ -706,12 +706,29 @@
 
 /* Nhãn tên Ca (Sáng, Trưa, Chiều...) nằm ngang */
 .sd-grid-shift-col-label {
-  flex: 1; /* Chia đều không gian ngang */
+  flex: 1;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   color: #475569;
-  padding-bottom: 4px;
+  padding: 8px 4px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.sd-grid-shift-col-label strong {
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sd-grid-shift-col-label small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* Nhãn Ngày (Thứ 2, Thứ 3...) nằm dọc bên trái */
@@ -1648,4 +1665,59 @@
   .staff-closing-actions button {
     width: 100%;
   }
+}
+
+/* ===== Registration board hiển thị giống lịch chính thức ===== */
+
+.sd-registration-board {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sd-registration-board th {
+  background: #f8fafc;
+  text-align: center;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sd-registration-cell {
+  min-width: 170px;
+  vertical-align: top;
+  background: #fff;
+}
+
+.sd-registration-cell .sd-shift-cell-v {
+  width: 100%;
+  min-height: 92px;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 8px;
+}
+
+.sd-registration-cell .sd-shift-cell-v:hover {
+  background: #fff7ed;
+}
+
+.sd-registration-cell .sd-shift-cell-v.selected {
+  background: #fff7ed;
+  border: none;
+  box-shadow: none;
+}
+
+.sd-registration-cell .sd-shift-cell-v.disabled {
+  background: #f8fafc !important;
+}
+
+.sd-registration-cell .sd-slot-list {
+  width: 100%;
+}
+
+.sd-registration-cell .sd-slot-person,
+.sd-registration-cell .sd-slot-empty {
+  min-height: 30px;
 }
