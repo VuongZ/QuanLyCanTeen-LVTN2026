@@ -15,6 +15,16 @@ public partial class KhoProduct
 
     public int? SupplierId { get; set; }
 
+    public bool? IsActive { get; set; }
+
+    public DateTime? InactiveAt { get; set; }
+
+    public int? InactiveBy { get; set; }
+
+    public string? InactiveReason { get; set; }
+
+    public virtual NsUser? InactiveByNavigation { get; set; }
+
     public virtual ICollection<KhoBranchFrontStock> KhoBranchFrontStocks { get; set; } = new List<KhoBranchFrontStock>();
 
     public virtual ICollection<KhoBranchInventory> KhoBranchInventories { get; set; } = new List<KhoBranchInventory>();

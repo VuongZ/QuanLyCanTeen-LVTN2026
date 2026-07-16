@@ -6,6 +6,10 @@ namespace LuanVanTotNghiep.Services
 {
     public class ShiftClosingService
     {
+        private const string StatusPending = "PENDING";
+        private const string StatusApproved = "APPROVED";
+        private const string StatusRejected = "REJECTED";
+
         private readonly AppDbContext _context;
 
         public ShiftClosingService(AppDbContext context)
@@ -36,27 +40,175 @@ namespace LuanVanTotNghiep.Services
             if (todaySchedules.Count == 0)
                 return null;
 
-            var selectedSchedule =
-                todaySchedules.FirstOrDefault(s =>
-                {
-                    var start = ToTimeSpan(s.Shift!.StartTime);
-                    var end = ToTimeSpan(s.Shift.EndTime);
-                    return IsNowInShiftOrAfter(now, start, end);
-                })
+            var selectedSchedule = todaySchedules
+                .Where(s => now >= ToTimeSpan(s.Shift!.StartTime))
+                .OrderByDescending(s => ToTimeSpan(s.Shift!.StartTime))
+                .FirstOrDefault()
                 ?? todaySchedules.First();
 
-            var alreadyReported = await _context.KhoShiftClosingReports
-                .AnyAsync(r => r.ScheduleId == selectedSchedule.Id);
+            var attendance = await _context.CaAttendances
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.ScheduleId == selectedSchedule.Id);
+
+            // Báo cáo thuộc lịch của chính nhân viên hiện tại.
+            // Dùng để cho phép nhân viên sửa và gửi lại khi báo cáo của họ bị từ chối.
+            var ownReport = await _context.KhoShiftClosingReports
+                .AsNoTracking()
+                .Where(r => r.ScheduleId == selectedSchedule.Id)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.ScheduleId,
+                    r.Status,
+                    r.RejectReason
+                })
+                .FirstOrDefaultAsync();
+
+            // Chỉ cho phép một báo cáo đang hoạt động cho cùng cơ sở + ngày + ca.
+            // PENDING hoặc APPROVED của bất kỳ nhân viên nào đều khóa quyền gửi của các nhân viên khác.
+            // REJECTED không khóa, vì sau khi Manager từ chối thì mọi nhân viên trong ca được gửi lại.
+            var activeShiftReport = await _context.KhoShiftClosingReports
+                .AsNoTracking()
+                .Where(r =>
+                    r.BranchId == staff.BranchId!.Value &&
+                    r.Schedule != null &&
+                    r.Schedule.ShiftId == selectedSchedule.ShiftId &&
+                    r.Schedule.WorkDate == selectedSchedule.WorkDate &&
+                    (
+                        r.Status == StatusPending ||
+                        r.Status == StatusApproved
+                    )
+                )
+                .OrderBy(r => r.Status == StatusPending ? 0 : 1)
+                .ThenByDescending(r => r.Id)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.ScheduleId,
+                    r.Status
+                })
+                .FirstOrDefaultAsync();
+
+            var activeReportIsOwn =
+                activeShiftReport?.ScheduleId == selectedSchedule.Id;
+
+            string reportStatus;
+            int? reportId;
+            string? rejectReason;
+
+            if (activeShiftReport != null)
+            {
+                reportStatus = NormalizeStatus(
+                    activeShiftReport.Status,
+                    StatusPending
+                );
+
+                // Không trả ID báo cáo của nhân viên khác cho Staff hiện tại.
+                reportId = activeReportIsOwn
+                    ? activeShiftReport.Id
+                    : null;
+
+                rejectReason = null;
+            }
+            else
+            {
+                var ownStatus = NormalizeStatus(
+                    ownReport?.Status,
+                    "NONE"
+                );
+
+                if (ownStatus == StatusRejected)
+                {
+                    reportStatus = StatusRejected;
+                    reportId = ownReport?.Id;
+                    rejectReason = ownReport?.RejectReason;
+                }
+                else
+                {
+                    reportStatus = "NONE";
+                    reportId = null;
+                    rejectReason = null;
+                }
+            }
+
+            var alreadyReported = activeShiftReport != null;
+
+            var hasCheckedIn = attendance?.CheckInTime != null;
+            var hasCheckedOut = attendance?.CheckOutTime != null;
+
+            var startTime = ToTimeSpan(selectedSchedule.Shift!.StartTime);
+            var endTime = ToTimeSpan(selectedSchedule.Shift.EndTime);
+
+            var selectedWorkDate =
+                ToDateOnly(selectedSchedule.WorkDate) ?? today;
+
+            var shiftEndDateTime = selectedWorkDate
+                .ToDateTime(TimeOnly.MinValue)
+                .Add(endTime);
+
+            if (endTime < startTime)
+                shiftEndDateTime = shiftEndDateTime.AddDays(1);
+
+            var isShiftEnded = DateTime.Now >= shiftEndDateTime;
+
+            var isPublished = string.Equals(
+                selectedSchedule.Status,
+                "PUBLISHED",
+                StringComparison.OrdinalIgnoreCase
+            );
+
+            // Chỉ cần đã check-in, không bắt buộc check-out.
+            // Một báo cáo PENDING/APPROVED của bất kỳ nhân viên nào trong ca sẽ khóa gửi mới.
+            var canSubmit =
+                isPublished &&
+                hasCheckedIn &&
+                activeShiftReport == null;
+
+            string? submitBlockReason = null;
+
+            if (!isPublished)
+            {
+                submitBlockReason =
+                    "Ca làm chưa được công bố chính thức.";
+            }
+            else if (activeShiftReport != null &&
+                     reportStatus == StatusPending)
+            {
+                submitBlockReason = activeReportIsOwn
+                    ? "Báo cáo của bạn đang chờ Quản lý duyệt."
+                    : "Ca này đã có nhân viên khác gửi báo cáo và đang chờ Quản lý duyệt.";
+            }
+            else if (activeShiftReport != null &&
+                     reportStatus == StatusApproved)
+            {
+                submitBlockReason = activeReportIsOwn
+                    ? "Báo cáo của bạn đã được Quản lý duyệt."
+                    : "Ca này đã có báo cáo được Quản lý duyệt.";
+            }
+            else if (!hasCheckedIn)
+            {
+                submitBlockReason =
+                    "Bạn chưa được điểm danh vào ca này.";
+            }
 
             return new ClosingShiftInfoDto
             {
                 ScheduleId = selectedSchedule.Id,
                 ShiftId = selectedSchedule.ShiftId,
-                ShiftName = selectedSchedule.Shift?.ShiftName ?? $"Ca #{selectedSchedule.ShiftId}",
-                WorkDate = today.ToString("yyyy-MM-dd"),
-                StartTime = FormatTime(ToTimeSpan(selectedSchedule.Shift?.StartTime)),
-                EndTime = FormatTime(ToTimeSpan(selectedSchedule.Shift?.EndTime)),
-                AlreadyReported = alreadyReported
+                ShiftName = selectedSchedule.Shift.ShiftName
+                    ?? $"Ca #{selectedSchedule.ShiftId}",
+                WorkDate = selectedWorkDate.ToString("yyyy-MM-dd"),
+                StartTime = FormatTime(startTime),
+                EndTime = FormatTime(endTime),
+                ReportId = reportId,
+                ReportStatus = reportStatus,
+                RejectReason = rejectReason,
+                AlreadyReported = alreadyReported,
+                HasCheckedIn = hasCheckedIn,
+                HasCheckedOut = hasCheckedOut,
+                IsShiftEnded = isShiftEnded,
+                CanSubmit = canSubmit,
+                SubmitBlockReason = submitBlockReason
             };
         }
 
@@ -66,8 +218,10 @@ namespace LuanVanTotNghiep.Services
 
             return await _context.KhoBranchFrontStocks
                 .AsNoTracking()
-                .Include(f => f.Product)
-                .Where(f => f.BranchId == staff.BranchId)
+                .Where(f =>
+                    f.BranchId == staff.BranchId &&
+                    f.Product.IsActive == true
+                )
                 .OrderBy(f => f.Product.ProductName)
                 .Select(f => new ClosingFrontStockItemDto
                 {
@@ -81,7 +235,9 @@ namespace LuanVanTotNghiep.Services
                 .ToListAsync();
         }
 
-        public async Task<int> SubmitShiftClosingReportAsync(int staffId, SubmitShiftClosingDto dto)
+        public async Task<int> SubmitShiftClosingReportAsync(
+            int staffId,
+            SubmitShiftClosingDto dto)
         {
             var staff = await GetValidStaffAsync(staffId);
 
@@ -91,9 +247,19 @@ namespace LuanVanTotNghiep.Services
             if (dto.Items == null || dto.Items.Count == 0)
                 throw new InvalidOperationException("Báo cáo kết ca chưa có sản phẩm nào.");
 
+            var note = string.IsNullOrWhiteSpace(dto.Note)
+                ? null
+                : dto.Note.Trim();
+
+            if (note?.Length > 255)
+                throw new InvalidOperationException("Ghi chú không được vượt quá 255 ký tự.");
+
             var schedule = await _context.CaFinalSchedules
                 .Include(s => s.Shift)
-                .FirstOrDefaultAsync(s => s.Id == dto.ScheduleId && s.UserId == staffId);
+                .FirstOrDefaultAsync(s =>
+                    s.Id == dto.ScheduleId &&
+                    s.UserId == staffId
+                );
 
             if (schedule == null)
                 throw new InvalidOperationException("Không tìm thấy ca làm chính thức của nhân viên.");
@@ -105,67 +271,28 @@ namespace LuanVanTotNghiep.Services
                 throw new InvalidOperationException("Ca làm không thuộc cơ sở của nhân viên.");
 
             var today = DateOnly.FromDateTime(DateTime.Today);
+
             if (ToDateOnly(schedule.WorkDate) != today)
                 throw new InvalidOperationException("Chỉ được báo cáo kết ca cho ca làm trong ngày hiện tại.");
 
-                // Chỉ lịch đã được công bố mới được báo cáo kết ca
-if (!string.Equals(
-        schedule.Status,
-        "PUBLISHED",
-        StringComparison.OrdinalIgnoreCase))
-{
-    throw new InvalidOperationException(
-        "Ca làm chưa được công bố chính thức."
-    );
-}
+            if (!string.Equals(
+                    schedule.Status,
+                    "PUBLISHED",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Ca làm chưa được công bố chính thức.");
+            }
 
-// Kiểm tra nhân viên đã check-in hay chưa
-var attendance = await _context.CaAttendances
-    .AsNoTracking()
-    .FirstOrDefaultAsync(a => a.ScheduleId == schedule.Id);
+            var attendance = await _context.CaAttendances
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.ScheduleId == schedule.Id);
 
-if (attendance == null || attendance.CheckInTime == null)
-{
-    throw new InvalidOperationException(
-        "Bạn chưa được điểm danh vào ca này nên không thể báo cáo kết ca."
-    );
-}
-
-// Kiểm tra ca đã kết thúc theo giờ quy định hay chưa
-var workDate = ToDateOnly(schedule.WorkDate);
-
-if (!workDate.HasValue)
-{
-    throw new InvalidOperationException(
-        "Ngày làm việc của ca không hợp lệ."
-    );
-}
-
-var startTime = ToTimeSpan(schedule.Shift.StartTime);
-var endTime = ToTimeSpan(schedule.Shift.EndTime);
-
-var shiftEndDateTime = workDate.Value
-    .ToDateTime(TimeOnly.MinValue)
-    .Add(endTime);
-
-// Trường hợp ca qua đêm, ví dụ 22:00 - 06:00
-if (endTime < startTime)
-{
-    shiftEndDateTime = shiftEndDateTime.AddDays(1);
-}
-
-if (DateTime.Now < shiftEndDateTime)
-{
-    throw new InvalidOperationException(
-        $"Chưa đến giờ kết thúc ca. Ca này kết thúc lúc {FormatTime(endTime)}."
-    );
-}
-
-            var alreadyReported = await _context.KhoShiftClosingReports
-                .AnyAsync(r => r.ScheduleId == dto.ScheduleId);
-
-            if (alreadyReported)
-                throw new InvalidOperationException("Ca này đã có báo cáo kết ca.");
+            if (attendance?.CheckInTime == null)
+            {
+                throw new InvalidOperationException(
+                    "Bạn chưa được điểm danh vào ca này nên không thể báo cáo kết ca."
+                );
+            }
 
             var submittedItems = dto.Items
                 .Where(i => i.ProductId > 0)
@@ -186,58 +313,196 @@ if (DateTime.Now < shiftEndDateTime)
                     throw new InvalidOperationException("Số lượng thực tế không được âm.");
             }
 
-            var productIds = submittedItems.Select(i => i.ProductId).ToList();
+            var productIds = submittedItems
+                .Select(i => i.ProductId)
+                .Distinct()
+                .ToList();
 
             var frontStocks = await _context.KhoBranchFrontStocks
                 .Include(f => f.Product)
-                .Where(f => f.BranchId == staff.BranchId && productIds.Contains(f.ProductId))
+                .Where(f =>
+                    f.BranchId == staff.BranchId &&
+                    productIds.Contains(f.ProductId) &&
+                    f.Product.IsActive == true
+                )
                 .ToListAsync();
 
-            if (frontStocks.Count != submittedItems.Count)
-                throw new InvalidOperationException("Có sản phẩm không tồn tại trong tồn quầy của cơ sở.");
+            if (frontStocks.Count != productIds.Count)
+            {
+                throw new InvalidOperationException(
+                    "Có sản phẩm không tồn tại trong tồn quầy hoặc đã ngừng kinh doanh."
+                );
+            }
 
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            foreach (var submittedItem in submittedItems)
+            {
+                var frontStock = frontStocks.First(
+                    f => f.ProductId == submittedItem.ProductId
+                );
+
+                var systemCount = Convert.ToInt32(frontStock.Quantity);
+
+                if (submittedItem.ActualCount > systemCount)
+                {
+                    throw new InvalidOperationException(
+                        $"Sản phẩm '{frontStock.Product.ProductName}' có số lượng thực tế lớn hơn số lượng hệ thống. " +
+                        $"Hệ thống: {systemCount}, thực tế: {submittedItem.ActualCount}."
+                    );
+                }
+            }
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
             try
             {
-                var report = new KhoShiftClosingReport
-                {
-                    BranchId = staff.BranchId!.Value,
-                    UserId = staffId,
-                    ScheduleId = dto.ScheduleId,
-                    ReportDate = DateTime.Now,
-                    Note = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim()
-                };
+                // Khóa bản ghi ca làm chung để hai nhân viên cùng ca không thể
+                // đồng thời vượt qua bước kiểm tra và cùng tạo báo cáo PENDING.
+                await _context.CaShifts
+                    .FromSqlInterpolated(
+                        $"SELECT * FROM ca_shift WHERE id = {schedule.ShiftId} FOR UPDATE"
+                    )
+                    .AsNoTracking()
+                    .SingleAsync();
 
-                _context.KhoShiftClosingReports.Add(report);
-                await _context.SaveChangesAsync();
+                var activeShiftReport = await _context.KhoShiftClosingReports
+                    .AsNoTracking()
+                    .Where(r =>
+                        r.BranchId == staff.BranchId!.Value &&
+                        r.Schedule != null &&
+                        r.Schedule.ShiftId == schedule.ShiftId &&
+                        r.Schedule.WorkDate == schedule.WorkDate &&
+                        (
+                            r.Status == StatusPending ||
+                            r.Status == StatusApproved
+                        )
+                    )
+                    .OrderBy(r => r.Status == StatusPending ? 0 : 1)
+                    .ThenByDescending(r => r.Id)
+                    .Select(r => new
+                    {
+                        r.Id,
+                        r.ScheduleId,
+                        r.Status
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (activeShiftReport != null)
+                {
+                    var activeStatus = NormalizeStatus(
+                        activeShiftReport.Status,
+                        StatusPending
+                    );
+
+                    var isOwnActiveReport =
+                        activeShiftReport.ScheduleId == dto.ScheduleId;
+
+                    if (activeStatus == StatusPending)
+                    {
+                        throw new InvalidOperationException(
+                            isOwnActiveReport
+                                ? "Báo cáo của bạn đang chờ Quản lý duyệt."
+                                : "Ca này đã có nhân viên khác gửi báo cáo và đang chờ Quản lý duyệt."
+                        );
+                    }
+
+                    throw new InvalidOperationException(
+                        isOwnActiveReport
+                            ? "Báo cáo của bạn đã được Quản lý duyệt."
+                            : "Ca này đã có báo cáo được Quản lý duyệt."
+                    );
+                }
+
+                var existingReport = await _context.KhoShiftClosingReports
+                    .Include(r => r.KhoShiftClosingDetails)
+                    .FirstOrDefaultAsync(r => r.ScheduleId == dto.ScheduleId);
+
+                KhoShiftClosingReport report;
+
+                if (existingReport == null)
+                {
+                    report = new KhoShiftClosingReport
+                    {
+                        BranchId = staff.BranchId!.Value,
+                        UserId = staffId,
+                        ScheduleId = dto.ScheduleId,
+                        ReportDate = DateTime.Now,
+                        Note = note,
+                        Status = StatusPending,
+                        ReviewedBy = null,
+                        ReviewedAt = null,
+                        RejectReason = null
+                    };
+
+                    _context.KhoShiftClosingReports.Add(report);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    var currentStatus = NormalizeStatus(
+                        existingReport.Status,
+                        StatusPending
+                    );
+
+                    if (currentStatus == StatusPending)
+                    {
+                        throw new InvalidOperationException(
+                            "Báo cáo của ca này đang chờ Quản lý duyệt."
+                        );
+                    }
+
+                    if (currentStatus == StatusApproved)
+                    {
+                        throw new InvalidOperationException(
+                            "Báo cáo của ca này đã được Quản lý duyệt."
+                        );
+                    }
+
+                    if (currentStatus != StatusRejected)
+                    {
+                        throw new InvalidOperationException(
+                            "Trạng thái báo cáo hiện tại không hợp lệ."
+                        );
+                    }
+
+                    // Gửi lại báo cáo bị từ chối: dùng lại cùng bản ghi vì schedule_id là duy nhất.
+                    _context.KhoShiftClosingDetails.RemoveRange(
+                        existingReport.KhoShiftClosingDetails
+                    );
+
+                    existingReport.ReportDate = DateTime.Now;
+                    existingReport.Note = note;
+                    existingReport.Status = StatusPending;
+                    existingReport.ReviewedBy = null;
+                    existingReport.ReviewedAt = null;
+                    existingReport.RejectReason = null;
+
+                    report = existingReport;
+
+                    // Xóa chi tiết cũ trước để không vướng khóa duy nhất
+                    // (report_id, product_id) khi thêm lại dữ liệu mới.
+                    await _context.SaveChangesAsync();
+                }
 
                 foreach (var submittedItem in submittedItems)
                 {
-                    var frontStock = frontStocks.First(f => f.ProductId == submittedItem.ProductId);
-                    var systemCount = Convert.ToInt32(frontStock.Quantity);
-
-                    if (submittedItem.ActualCount > systemCount)
-                    {
-                        throw new InvalidOperationException(
-                            $"Sản phẩm '{frontStock.Product.ProductName}' có số lượng thực tế lớn hơn số lượng hệ thống. " +
-                            $"Hệ thống: {systemCount}, thực tế: {submittedItem.ActualCount}."
-                        );
-                    }
+                    var frontStock = frontStocks.First(
+                        f => f.ProductId == submittedItem.ProductId
+                    );
 
                     var detail = new KhoShiftClosingDetail
                     {
                         ReportId = report.Id,
                         ProductId = submittedItem.ProductId,
-                        SystemCount = systemCount,
+                        SystemCount = Convert.ToInt32(frontStock.Quantity),
                         ActualCount = submittedItem.ActualCount
                     };
 
                     _context.KhoShiftClosingDetails.Add(detail);
-
-                    frontStock.Quantity = submittedItem.ActualCount;
                 }
 
+                // Không cập nhật tồn quầy tại đây.
+                // Tồn quầy chỉ thay đổi khi Manager duyệt báo cáo.
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -250,15 +515,179 @@ if (DateTime.Now < shiftEndDateTime)
             }
         }
 
-        public async Task<List<ShiftClosingReportListDto>> GetMyReportsAsync(int staffId)
+        public async Task ApproveReportAsync(int managerId, int reportId)
         {
+            var manager = await GetValidManagerAsync(managerId);
+
+            if (reportId <= 0)
+                throw new InvalidOperationException("Mã báo cáo không hợp lệ.");
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var report = await _context.KhoShiftClosingReports
+                    .Include(r => r.KhoShiftClosingDetails)
+                        .ThenInclude(d => d.Product)
+                    .FirstOrDefaultAsync(r => r.Id == reportId);
+
+                if (report == null)
+                    throw new InvalidOperationException("Không tìm thấy báo cáo kết ca.");
+
+                if (report.BranchId != manager.BranchId)
+                {
+                    throw new InvalidOperationException(
+                        "Bạn không được duyệt báo cáo của cơ sở khác."
+                    );
+                }
+
+                var currentStatus = NormalizeStatus(
+                    report.Status,
+                    StatusPending
+                );
+
+                if (currentStatus == StatusApproved)
+                    throw new InvalidOperationException("Báo cáo này đã được duyệt.");
+
+                if (currentStatus == StatusRejected)
+                {
+                    throw new InvalidOperationException(
+                        "Báo cáo này đã bị từ chối. Nhân viên cần gửi lại trước khi duyệt."
+                    );
+                }
+
+                if (currentStatus != StatusPending)
+                    throw new InvalidOperationException("Trạng thái báo cáo không hợp lệ.");
+
+                if (report.KhoShiftClosingDetails.Count == 0)
+                    throw new InvalidOperationException("Báo cáo không có chi tiết kiểm kê.");
+
+                var productIds = report.KhoShiftClosingDetails
+                    .Select(d => d.ProductId)
+                    .Distinct()
+                    .ToList();
+
+                var frontStocks = await _context.KhoBranchFrontStocks
+                    .Where(f =>
+                        f.BranchId == report.BranchId &&
+                        productIds.Contains(f.ProductId)
+                    )
+                    .ToListAsync();
+
+                if (frontStocks.Count != productIds.Count)
+                {
+                    throw new InvalidOperationException(
+                        "Một số sản phẩm trong báo cáo không còn tồn tại tại quầy."
+                    );
+                }
+
+                foreach (var detail in report.KhoShiftClosingDetails)
+                {
+                    var frontStock = frontStocks.First(
+                        f => f.ProductId == detail.ProductId
+                    );
+
+                    var currentQuantity = Convert.ToInt32(frontStock.Quantity);
+
+                    if (currentQuantity != detail.SystemCount)
+                    {
+                        var productName =
+                            detail.Product?.ProductName ??
+                            $"Sản phẩm #{detail.ProductId}";
+
+                        throw new InvalidOperationException(
+                            $"Tồn quầy của '{productName}' đã thay đổi sau khi nhân viên gửi báo cáo. " +
+                            $"Khi gửi: {detail.SystemCount}, hiện tại: {currentQuantity}. " +
+                            "Hãy từ chối báo cáo để nhân viên kiểm kê và gửi lại."
+                        );
+                    }
+                }
+
+                foreach (var detail in report.KhoShiftClosingDetails)
+                {
+                    var frontStock = frontStocks.First(
+                        f => f.ProductId == detail.ProductId
+                    );
+
+                    frontStock.Quantity = detail.ActualCount;
+                }
+
+                report.Status = StatusApproved;
+                report.ReviewedBy = managerId;
+                report.ReviewedAt = DateTime.Now;
+                report.RejectReason = null;
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task RejectReportAsync(
+            int managerId,
+            int reportId,
+            string? reason)
+        {
+            var manager = await GetValidManagerAsync(managerId);
+
+            if (reportId <= 0)
+                throw new InvalidOperationException("Mã báo cáo không hợp lệ.");
+
+            var normalizedReason = string.IsNullOrWhiteSpace(reason)
+                ? null
+                : reason.Trim();
+
+            if (normalizedReason == null)
+                throw new InvalidOperationException("Vui lòng nhập lý do từ chối.");
+
+            if (normalizedReason.Length > 500)
+                throw new InvalidOperationException("Lý do từ chối không được vượt quá 500 ký tự.");
+
+            var report = await _context.KhoShiftClosingReports
+                .FirstOrDefaultAsync(r => r.Id == reportId);
+
+            if (report == null)
+                throw new InvalidOperationException("Không tìm thấy báo cáo kết ca.");
+
+            if (report.BranchId != manager.BranchId)
+            {
+                throw new InvalidOperationException(
+                    "Bạn không được từ chối báo cáo của cơ sở khác."
+                );
+            }
+
+            var currentStatus = NormalizeStatus(report.Status, StatusPending);
+
+            if (currentStatus == StatusApproved)
+                throw new InvalidOperationException("Báo cáo đã được duyệt nên không thể từ chối.");
+
+            if (currentStatus == StatusRejected)
+                throw new InvalidOperationException("Báo cáo này đã bị từ chối trước đó.");
+
+            if (currentStatus != StatusPending)
+                throw new InvalidOperationException("Trạng thái báo cáo không hợp lệ.");
+
+            report.Status = StatusRejected;
+            report.ReviewedBy = managerId;
+            report.ReviewedAt = DateTime.Now;
+            report.RejectReason = normalizedReason;
+
+            // Từ chối không cập nhật tồn quầy.
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<ShiftClosingReportListDto>> GetMyReportsAsync(
+            int staffId)
+        {
+            await GetValidStaffAsync(staffId);
+
             return await _context.KhoShiftClosingReports
                 .AsNoTracking()
-                .Include(r => r.Branch)
-                .Include(r => r.User)
-                .Include(r => r.Schedule)
-                    .ThenInclude(s => s.Shift)
-                .Include(r => r.KhoShiftClosingDetails)
                 .Where(r => r.UserId == staffId)
                 .OrderByDescending(r => r.Id)
                 .Select(r => new ShiftClosingReportListDto
@@ -267,79 +696,65 @@ if (DateTime.Now < shiftEndDateTime)
                     BranchId = r.BranchId,
                     BranchName = r.Branch.Name,
                     UserId = r.UserId,
-                    StaffName = r.User.FullName,
+                    StaffName = r.User.FullName ?? string.Empty,
                     ScheduleId = r.ScheduleId,
-                    ShiftName = r.Schedule != null && r.Schedule.Shift != null ? r.Schedule.Shift.ShiftName : null,
-                    WorkDate = r.Schedule != null ? FormatDate(r.Schedule.WorkDate) : null,
+                    ShiftName = r.Schedule != null && r.Schedule.Shift != null
+                        ? r.Schedule.Shift.ShiftName
+                        : null,
+                    WorkDate = r.Schedule != null
+                        ? FormatDate(r.Schedule.WorkDate)
+                        : null,
                     ReportDate = FormatDateTime(r.ReportDate),
                     ItemCount = r.KhoShiftClosingDetails.Count,
                     TotalSystemCount = r.KhoShiftClosingDetails.Sum(d => d.SystemCount),
                     TotalActualCount = r.KhoShiftClosingDetails.Sum(d => d.ActualCount),
-                    TotalDifference = r.KhoShiftClosingDetails.Sum(d => d.SystemCount - d.ActualCount),
-                    Note = r.Note
+                    TotalDifference = r.KhoShiftClosingDetails.Sum(
+                        d => d.SystemCount - d.ActualCount
+                    ),
+                    Note = r.Note,
+                    Status = r.Status,
+                    ReviewedBy = r.ReviewedBy,
+                    ReviewerName = r.ReviewedByNavigation != null
+                        ? r.ReviewedByNavigation.FullName
+                        : null,
+                    ReviewedAt = FormatNullableDateTime(r.ReviewedAt),
+                    RejectReason = r.RejectReason
                 })
                 .ToListAsync();
         }
 
-        public async Task<ShiftClosingReportDetailDto?> GetMyReportDetailAsync(int staffId, int reportId)
+        public async Task<ShiftClosingReportDetailDto?> GetMyReportDetailAsync(
+            int staffId,
+            int reportId)
         {
+            await GetValidStaffAsync(staffId);
+
             var report = await _context.KhoShiftClosingReports
                 .AsNoTracking()
                 .Include(r => r.Branch)
                 .Include(r => r.User)
+                .Include(r => r.ReviewedByNavigation)
                 .Include(r => r.Schedule)
                     .ThenInclude(s => s.Shift)
                 .Include(r => r.KhoShiftClosingDetails)
                     .ThenInclude(d => d.Product)
-                .FirstOrDefaultAsync(r => r.Id == reportId && r.UserId == staffId);
+                .FirstOrDefaultAsync(r =>
+                    r.Id == reportId &&
+                    r.UserId == staffId
+                );
 
-            if (report == null)
-                return null;
-
-            return new ShiftClosingReportDetailDto
-            {
-                Id = report.Id,
-                BranchId = report.BranchId,
-                BranchName = report.Branch.Name,
-                UserId = report.UserId,
-                StaffName = report.User.FullName,
-                ScheduleId = report.ScheduleId,
-                ShiftName = report.Schedule?.Shift?.ShiftName,
-                WorkDate = report.Schedule != null ? FormatDate(report.Schedule.WorkDate) : null,
-                ReportDate = FormatDateTime(report.ReportDate),
-                ItemCount = report.KhoShiftClosingDetails.Count,
-                TotalSystemCount = report.KhoShiftClosingDetails.Sum(d => d.SystemCount),
-                TotalActualCount = report.KhoShiftClosingDetails.Sum(d => d.ActualCount),
-                TotalDifference = report.KhoShiftClosingDetails.Sum(d => d.SystemCount - d.ActualCount),
-                Note = report.Note,
-                Items = report.KhoShiftClosingDetails.Select(d => new ShiftClosingReportItemDto
-                {
-                    ProductId = d.ProductId,
-                    ProductCode = d.Product.ProductCode,
-                    ProductName = d.Product.ProductName,
-                    Unit = d.Product.Unit,
-                    SystemCount = d.SystemCount,
-                    ActualCount = d.ActualCount,
-                    Difference = d.SystemCount - d.ActualCount
-                }).ToList()
-            };
+            return report == null ? null : MapReportDetail(report);
         }
 
-        public async Task<List<ShiftClosingReportListDto>> GetReportsForManagementAsync(int? branchId)
+        public async Task<List<ShiftClosingReportListDto>>
+            GetReportsForManagementAsync(int? branchId)
         {
             var query = _context.KhoShiftClosingReports
                 .AsNoTracking()
-                .Include(r => r.Branch)
-                .Include(r => r.User)
-                .Include(r => r.Schedule)
-                    .ThenInclude(s => s.Shift)
-                .Include(r => r.KhoShiftClosingDetails)
                 .AsQueryable();
 
             if (branchId.HasValue && branchId.Value > 0)
-            {
                 query = query.Where(r => r.BranchId == branchId.Value);
-            }
 
             return await query
                 .OrderByDescending(r => r.Id)
@@ -349,26 +764,43 @@ if (DateTime.Now < shiftEndDateTime)
                     BranchId = r.BranchId,
                     BranchName = r.Branch.Name,
                     UserId = r.UserId,
-                    StaffName = r.User.FullName,
+                    StaffName = r.User.FullName ?? string.Empty,
                     ScheduleId = r.ScheduleId,
-                    ShiftName = r.Schedule != null && r.Schedule.Shift != null ? r.Schedule.Shift.ShiftName : null,
-                    WorkDate = r.Schedule != null ? FormatDate(r.Schedule.WorkDate) : null,
+                    ShiftName = r.Schedule != null && r.Schedule.Shift != null
+                        ? r.Schedule.Shift.ShiftName
+                        : null,
+                    WorkDate = r.Schedule != null
+                        ? FormatDate(r.Schedule.WorkDate)
+                        : null,
                     ReportDate = FormatDateTime(r.ReportDate),
                     ItemCount = r.KhoShiftClosingDetails.Count,
                     TotalSystemCount = r.KhoShiftClosingDetails.Sum(d => d.SystemCount),
                     TotalActualCount = r.KhoShiftClosingDetails.Sum(d => d.ActualCount),
-                    TotalDifference = r.KhoShiftClosingDetails.Sum(d => d.SystemCount - d.ActualCount),
-                    Note = r.Note
+                    TotalDifference = r.KhoShiftClosingDetails.Sum(
+                        d => d.SystemCount - d.ActualCount
+                    ),
+                    Note = r.Note,
+                    Status = r.Status,
+                    ReviewedBy = r.ReviewedBy,
+                    ReviewerName = r.ReviewedByNavigation != null
+                        ? r.ReviewedByNavigation.FullName
+                        : null,
+                    ReviewedAt = FormatNullableDateTime(r.ReviewedAt),
+                    RejectReason = r.RejectReason
                 })
                 .ToListAsync();
         }
 
-        public async Task<ShiftClosingReportDetailDto?> GetReportDetailForManagementAsync(int reportId, int? branchId)
+        public async Task<ShiftClosingReportDetailDto?>
+            GetReportDetailForManagementAsync(
+                int reportId,
+                int? branchId)
         {
             var query = _context.KhoShiftClosingReports
                 .AsNoTracking()
                 .Include(r => r.Branch)
                 .Include(r => r.User)
+                .Include(r => r.ReviewedByNavigation)
                 .Include(r => r.Schedule)
                     .ThenInclude(s => s.Shift)
                 .Include(r => r.KhoShiftClosingDetails)
@@ -376,41 +808,59 @@ if (DateTime.Now < shiftEndDateTime)
                 .AsQueryable();
 
             if (branchId.HasValue && branchId.Value > 0)
-            {
                 query = query.Where(r => r.BranchId == branchId.Value);
-            }
 
-            var report = await query.FirstOrDefaultAsync(r => r.Id == reportId);
+            var report = await query.FirstOrDefaultAsync(
+                r => r.Id == reportId
+            );
 
-            if (report == null)
-                return null;
+            return report == null ? null : MapReportDetail(report);
+        }
 
+        private static ShiftClosingReportDetailDto MapReportDetail(
+            KhoShiftClosingReport report)
+        {
             return new ShiftClosingReportDetailDto
             {
                 Id = report.Id,
                 BranchId = report.BranchId,
                 BranchName = report.Branch.Name,
                 UserId = report.UserId,
-                StaffName = report.User.FullName,
+                StaffName = report.User.FullName ?? string.Empty,
                 ScheduleId = report.ScheduleId,
                 ShiftName = report.Schedule?.Shift?.ShiftName,
-                WorkDate = report.Schedule != null ? FormatDate(report.Schedule.WorkDate) : null,
+                WorkDate = report.Schedule != null
+                    ? FormatDate(report.Schedule.WorkDate)
+                    : null,
                 ReportDate = FormatDateTime(report.ReportDate),
                 ItemCount = report.KhoShiftClosingDetails.Count,
-                TotalSystemCount = report.KhoShiftClosingDetails.Sum(d => d.SystemCount),
-                TotalActualCount = report.KhoShiftClosingDetails.Sum(d => d.ActualCount),
-                TotalDifference = report.KhoShiftClosingDetails.Sum(d => d.SystemCount - d.ActualCount),
+                TotalSystemCount = report.KhoShiftClosingDetails.Sum(
+                    d => d.SystemCount
+                ),
+                TotalActualCount = report.KhoShiftClosingDetails.Sum(
+                    d => d.ActualCount
+                ),
+                TotalDifference = report.KhoShiftClosingDetails.Sum(
+                    d => d.SystemCount - d.ActualCount
+                ),
                 Note = report.Note,
-                Items = report.KhoShiftClosingDetails.Select(d => new ShiftClosingReportItemDto
-                {
-                    ProductId = d.ProductId,
-                    ProductCode = d.Product.ProductCode,
-                    ProductName = d.Product.ProductName,
-                    Unit = d.Product.Unit,
-                    SystemCount = d.SystemCount,
-                    ActualCount = d.ActualCount,
-                    Difference = d.SystemCount - d.ActualCount
-                }).ToList()
+                Status = report.Status,
+                ReviewedBy = report.ReviewedBy,
+                ReviewerName = report.ReviewedByNavigation?.FullName,
+                ReviewedAt = FormatNullableDateTime(report.ReviewedAt),
+                RejectReason = report.RejectReason,
+                Items = report.KhoShiftClosingDetails
+                    .Select(d => new ShiftClosingReportItemDto
+                    {
+                        ProductId = d.ProductId,
+                        ProductCode = d.Product.ProductCode,
+                        ProductName = d.Product.ProductName,
+                        Unit = d.Product.Unit,
+                        SystemCount = d.SystemCount,
+                        ActualCount = d.ActualCount,
+                        Difference = d.SystemCount - d.ActualCount
+                    })
+                    .ToList()
             };
         }
 
@@ -421,7 +871,10 @@ if (DateTime.Now < shiftEndDateTime)
 
             var staff = await _context.NsUsers
                 .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Id == staffId);
+                .FirstOrDefaultAsync(u =>
+                    u.Id == staffId &&
+                    u.IsDeleted != true
+                );
 
             if (staff == null)
                 throw new InvalidOperationException("Không tìm thấy tài khoản nhân viên.");
@@ -430,6 +883,7 @@ if (DateTime.Now < shiftEndDateTime)
                 throw new InvalidOperationException("Nhân viên chưa được gán cơ sở.");
 
             var roleName = staff.Role?.RoleName?.ToUpperInvariant() ?? "";
+
             var isStaff =
                 roleName == "STAFF" ||
                 roleName.Contains("NHÂN VIÊN") ||
@@ -441,9 +895,50 @@ if (DateTime.Now < shiftEndDateTime)
             return staff;
         }
 
+        private async Task<NsUser> GetValidManagerAsync(int managerId)
+        {
+            if (managerId <= 0)
+                throw new InvalidOperationException("Không tìm thấy thông tin Quản lý.");
+
+            var manager = await _context.NsUsers
+                .Include(u => u.Role)
+                .FirstOrDefaultAsync(u =>
+                    u.Id == managerId &&
+                    u.IsDeleted != true
+                );
+
+            if (manager == null)
+                throw new InvalidOperationException("Không tìm thấy tài khoản Quản lý.");
+
+            if (!manager.BranchId.HasValue || manager.BranchId.Value <= 0)
+                throw new InvalidOperationException("Quản lý chưa được gán cơ sở.");
+
+            var roleName = manager.Role?.RoleName?.ToUpperInvariant() ?? "";
+
+            var isManager =
+                roleName == "MANAGER" ||
+                roleName.Contains("QUẢN LÝ") ||
+                roleName.Contains("QUAN LY");
+
+            if (!isManager)
+                throw new InvalidOperationException("Chỉ Quản lý mới được duyệt báo cáo kết ca.");
+
+            return manager;
+        }
+
+        private static string NormalizeStatus(
+            string? value,
+            string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? fallback
+                : value.Trim().ToUpperInvariant();
+        }
+
         private static DateOnly? ToDateOnly(object? value)
         {
-            if (value == null) return null;
+            if (value == null)
+                return null;
 
             if (value is DateOnly dateOnly)
                 return dateOnly;
@@ -459,7 +954,8 @@ if (DateTime.Now < shiftEndDateTime)
 
         private static TimeSpan ToTimeSpan(object? value)
         {
-            if (value == null) return TimeSpan.Zero;
+            if (value == null)
+                return TimeSpan.Zero;
 
             if (value is TimeOnly timeOnly)
                 return timeOnly.ToTimeSpan();
@@ -476,14 +972,6 @@ if (DateTime.Now < shiftEndDateTime)
             return TimeSpan.Zero;
         }
 
-        private static bool IsNowInShiftOrAfter(TimeSpan now, TimeSpan start, TimeSpan end)
-        {
-            if (end >= start)
-                return now >= start;
-
-            return now >= start || now <= end;
-        }
-
         private static string FormatTime(TimeSpan time)
         {
             return $"{time.Hours:D2}:{time.Minutes:D2}";
@@ -491,7 +979,8 @@ if (DateTime.Now < shiftEndDateTime)
 
         private static string FormatDateTime(object? value)
         {
-            if (value == null) return "";
+            if (value == null)
+                return string.Empty;
 
             if (value is DateTime dateTime)
                 return dateTime.ToString("dd/MM/yyyy HH:mm");
@@ -499,12 +988,18 @@ if (DateTime.Now < shiftEndDateTime)
             if (DateTime.TryParse(value.ToString(), out var parsed))
                 return parsed.ToString("dd/MM/yyyy HH:mm");
 
-            return value.ToString() ?? "";
+            return value.ToString() ?? string.Empty;
+        }
+
+        private static string? FormatNullableDateTime(DateTime? value)
+        {
+            return value?.ToString("dd/MM/yyyy HH:mm");
         }
 
         private static string? FormatDate(object? value)
         {
-            if (value == null) return null;
+            if (value == null)
+                return null;
 
             if (value is DateOnly dateOnly)
                 return dateOnly.ToString("dd/MM/yyyy");

@@ -14,22 +14,26 @@ namespace LuanVanTotNghiep.DTOs
 
         public string EndTime { get; set; } = string.Empty;
 
-        // Ca này đã gửi báo cáo kết ca hay chưa
+        // ID báo cáo của ca hiện tại, nếu đã từng gửi
+        public int? ReportId { get; set; }
+
+        // NONE, PENDING, APPROVED hoặc REJECTED
+        public string ReportStatus { get; set; } = "NONE";
+
+        // Lý do Manager từ chối báo cáo gần nhất
+        public string? RejectReason { get; set; }
+
+        // PENDING/APPROVED được xem là đã gửi và không được gửi thêm
         public bool AlreadyReported { get; set; }
 
-        // Nhân viên đã được điểm danh vào ca hay chưa
         public bool HasCheckedIn { get; set; }
 
-        // Nhân viên đã được điểm danh ra ca hay chưa
         public bool HasCheckedOut { get; set; }
 
-        // Ca đã đến giờ kết thúc hay chưa
         public bool IsShiftEnded { get; set; }
 
-        // Nhân viên hiện có được phép gửi báo cáo hay không
         public bool CanSubmit { get; set; }
 
-        // Lý do không được phép gửi báo cáo
         public string? SubmitBlockReason { get; set; }
     }
 
@@ -64,6 +68,11 @@ namespace LuanVanTotNghiep.DTOs
         public int ActualCount { get; set; }
     }
 
+    public class RejectShiftClosingDto
+    {
+        public string Reason { get; set; } = string.Empty;
+    }
+
     public class ShiftClosingReportListDto
     {
         public int Id { get; set; }
@@ -93,6 +102,16 @@ namespace LuanVanTotNghiep.DTOs
         public int TotalDifference { get; set; }
 
         public string? Note { get; set; }
+
+        public string Status { get; set; } = "PENDING";
+
+        public int? ReviewedBy { get; set; }
+
+        public string? ReviewerName { get; set; }
+
+        public string? ReviewedAt { get; set; }
+
+        public string? RejectReason { get; set; }
     }
 
     public class ShiftClosingReportDetailDto : ShiftClosingReportListDto

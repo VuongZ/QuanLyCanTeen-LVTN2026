@@ -25,6 +25,10 @@ public partial class NsUser
 
     public DateTime? ResetPasswordExpiry { get; set; }
 
+    public bool? IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual DmBranch? Branch { get; set; }
 
     public virtual ICollection<CaFinalSchedule> CaFinalSchedules { get; set; } = new List<CaFinalSchedule>();
@@ -35,7 +39,11 @@ public partial class NsUser
 
     public virtual ICollection<KhoImportTicket> KhoImportTickets { get; set; } = new List<KhoImportTicket>();
 
-    public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReports { get; set; } = new List<KhoShiftClosingReport>();
+    public virtual ICollection<KhoProduct> KhoProducts { get; set; } = new List<KhoProduct>();
+
+    public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReportReviewedByNavigations { get; set; } = new List<KhoShiftClosingReport>();
+
+    public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReportUsers { get; set; } = new List<KhoShiftClosingReport>();
 
     public virtual ICollection<LuongMonthlySalary> LuongMonthlySalaries { get; set; } = new List<LuongMonthlySalary>();
 
