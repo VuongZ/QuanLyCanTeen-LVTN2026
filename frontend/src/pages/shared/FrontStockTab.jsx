@@ -259,22 +259,22 @@ export function FrontStockTab({ currentUser, branches = [] }) {
           </div>
         </div>
 
-        <button
-          type="button"
-          className="sd-front-stock-refresh"
-          onClick={loadFrontStock}
-          disabled={loading}
-        >
-          {loading ? 'Đang tải...' : 'Làm mới'}
-        </button>
+   <button
+  type="button"
+  className="sd-front-stock-refresh secondary"
+  onClick={() => setShowExportTickets(true)}
+>
+  Xem phiếu xuất ra quầy
+</button>
 
-        <button
-          type="button"
-          className="sd-front-stock-refresh secondary"
-          onClick={() => setShowExportTickets(true)}
-        >
-          Xem phiếu xuất ra quầy
-        </button>
+<button
+  type="button"
+  className="sd-front-stock-refresh"
+  onClick={loadFrontStock}
+  disabled={loading}
+>
+  {loading ? 'Đang tải...' : 'Làm mới'}
+</button>
       </div>
 
       <div className="sd-front-stock-stats">

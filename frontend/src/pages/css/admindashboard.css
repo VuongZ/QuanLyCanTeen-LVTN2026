@@ -4224,3 +4224,85 @@
   color: #15803d;
 }
 }
+/* =========================================
+   THANH TÌM KIẾM LỊCH SỬ PHIẾU
+   Dùng chung cho phiếu nhập kho và phiếu xuất ra quầy
+   ========================================= */
+
+.sd-ticket-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 10px 0 6px;
+}
+
+.sd-ticket-search-icon {
+  position: absolute;
+  left: 12px;
+  color: #94a3b8;
+  font-size: 17px;
+  pointer-events: none;
+}
+
+.sd-ticket-search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  background: #fff;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.sd-ticket-search input::placeholder {
+  color: #94a3b8;
+}
+
+.sd-ticket-search input:focus {
+  border-color: #f97316;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+.sd-ticket-search-clear {
+  position: absolute;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sd-ticket-search-clear:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.sd-ticket-result-count {
+  margin-bottom: 10px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .sd-ticket-search input {
+    min-height: 42px;
+    font-size: 13px;
+  }
+}

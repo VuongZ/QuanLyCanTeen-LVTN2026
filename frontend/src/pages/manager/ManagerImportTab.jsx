@@ -36,6 +36,72 @@ function parseNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+
+
+function extractInvoiceCodeFromRawText(rawText = '') {
+  const normalized = String(rawText || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\r/g, '\n')
+    .toUpperCase();
+
+  const lines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  // Ưu tiên dòng có nhãn mã/số hóa đơn
+  for (const line of lines) {
+    const isInvoiceLine =
+      /MA\s*HOA\s*DON/.test(line) ||
+      /SO\s*HOA\s*DON/.test(line) ||
+      /MA\s*HD/.test(line) ||
+      /SO\s*HD/.test(line) ||
+      /INVOICE/.test(line);
+
+    if (!isInvoiceLine) continue;
+
+    const match = line.match(
+      /\b(?:HD|INV|INVOICE)[\s._/-]*[A-Z0-9]+(?:[\s._/-]*[A-Z0-9]+){0,4}\b/i
+    );
+
+    if (match) {
+      return match[0]
+        .replace(/\s*-\s*/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/-{2,}/g, '-');
+    }
+
+    // Lấy phần sau dấu hai chấm khi OCR làm mất tiền tố
+    const valueAfterLabel = line
+      .replace(
+        /.*?(?:MA\s*HOA\s*DON|SO\s*HOA\s*DON|MA\s*HD|SO\s*HD|INVOICE(?:\s*(?:NO|NUMBER|CODE))?)/,
+        ''
+      )
+      .replace(/^[:#\s-]+/, '')
+      .trim();
+
+    if (/^[A-Z0-9][A-Z0-9._/\s-]{2,30}$/.test(valueAfterLabel)) {
+      return valueAfterLabel
+        .replace(/\s*-\s*/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/-{2,}/g, '-');
+    }
+  }
+
+  // Tìm trực tiếp ở toàn bộ nội dung, kể cả khi nhãn bị OCR sai
+  const fallbackMatch = normalized.match(
+    /\b(?:HD|INV)[\s._/-]*[A-Z0-9]+(?:[\s._/-]*[A-Z0-9]+){0,4}\b/i
+  );
+
+  if (!fallbackMatch) return '';
+
+  return fallbackMatch[0]
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-{2,}/g, '-');
+}
+
 function parseExcelDate(value) {
   if (!value) return '';
 
@@ -281,13 +347,28 @@ export function ManagerImportTab({ user, branches }) {
 });
 
       const data = response.data || {};
+      const rawText = data.rawText || '';
+
+      const detectedInvoiceCode =
+        String(data.invoiceCode || '').trim() ||
+        extractInvoiceCodeFromRawText(rawText);
+
+      const nextWarnings = Array.isArray(data.warnings)
+        ? [...data.warnings]
+        : [];
+
+      if (!detectedInvoiceCode) {
+        nextWarnings.push(
+          'OCR chưa nhận diện được mã hóa đơn. Vui lòng nhập thủ công và kiểm tra lại ảnh.'
+        );
+      }
 
       setDetectedSupplierName(data.detectedSupplierName || '');
-      setInvoiceCode(data.invoiceCode || '');
+      setInvoiceCode(detectedInvoiceCode);
       setInvoiceDate(data.invoiceDate || '');
       setExcelTotal(Number(data.totalAmount || 0));
-      setOcrRawText(data.rawText || '');
-      setOcrWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+      setOcrRawText(rawText);
+      setOcrWarnings(nextWarnings);
       setOcrConfidence(data.confidence ?? null);
 
       const parsedItems = Array.isArray(data.items) ? data.items : [];
