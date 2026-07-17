@@ -19,6 +19,10 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         if (user == null) return null;
         return user;
     }
+    public async Task<IEnumerable<NsUser>> GetDaXoa()
+    {
+        return await userRepo.GetDaXoa();
+    }
 
     public async Task<NsUser> AddUser(UserDto dto)
     {
@@ -61,8 +65,13 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         var us1 = await userRepo.GetbyId(id);
         if (us1 != null)
         {
-            await userRepo.Delete(id);
+            await userRepo.SoftDelete(id);
         }
+    }
+
+    public async Task<bool> RestoreUser(int id)
+    {
+        return await userRepo.Restore(id);
     }
 
     public async Task<(bool Success, string Message)> ChangePasswordAsync(int id, string currentPassword, string newPassword, string otp)

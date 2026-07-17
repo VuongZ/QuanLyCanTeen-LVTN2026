@@ -7,6 +7,16 @@ export async function getUserPageData() {
   return response.data
 }
 
+export async function getDeletedUserPageData() {
+  const response = await axios.get(`${BASE_URL}/deleted`)
+  return response.data
+}
+
+export async function restoreUser(id) {
+  const response = await axios.patch(`${BASE_URL}/${id}/restore`)
+  return response.data
+}
+
 export async function getUserById(id) {
   const response = await axios.get(`${BASE_URL}/${id}`)
   return response.data

@@ -33,6 +33,8 @@ public class BranchSalarySummaryDto
     public string? ManagerBankName { get; set; }
     public string? ManagerBankAccountNumber { get; set; }
     public string? ManagerBankAccountName { get; set; }
+    public int Month { get; set; }
+    public int Year { get; set; }
     public int SalaryCount { get; set; }
     public decimal PendingTotal { get; set; }
     public decimal PaidTotal { get; set; }
@@ -40,4 +42,9 @@ public class BranchSalarySummaryDto
     public int PendingCount { get; set; }
     public int PaidCount { get; set; }
     public int EmployeeCount { get; set; }
+    public int? TransferId { get; set; }
+    public bool IsTransferred { get; set; }
+    public decimal TransferredAmount { get; set; }
+    public DateTime? TransferredAt { get; set; }
+    public string? TransferredByName { get; set; }
 }

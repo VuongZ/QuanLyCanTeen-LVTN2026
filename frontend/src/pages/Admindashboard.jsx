@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { updateUser } from '../api/UserApi'
+import { getDeletedUserPageData, restoreUser, updateUser } from '../api/UserApi'
 import { getAllBranches } from '../api/BranchApi'
 import './css/admindashboard.css'
 
@@ -61,7 +61,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const canManageUsers = isAdmin
 
   const [activeTab, setActiveTab] = useState(isAdmin ? 'overview' : 'periods')
-  const [localUsers, setLocalUsers] = useState([])
+  const [localUsers, setLocalUsers] = useState(null)
   const [branches, setBranches] = useState([])
   const [modal, setModal] = useState(null)
   const [modalUser, setModalUser] = useState(null)
@@ -70,6 +70,11 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState('ALL')
+  const [employmentStatus, setEmploymentStatus] = useState('ACTIVE')
+  const [deletedUsers, setDeletedUsers] = useState([])
+  const [deletedUsersLoaded, setDeletedUsersLoaded] = useState(false)
+  const [deletedUsersLoading, setDeletedUsersLoading] = useState(false)
+  const [deletedUsersError, setDeletedUsersError] = useState('')
   const [sortCol, setSortCol] = useState('fullName')
   const [sortDir, setSortDir] = useState('asc')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -78,8 +83,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   useEffect(() => {
     getAllBranches().then((data) => setBranches(Array.isArray(data) ? data : [])).catch(() => setBranches([]))
   }, [])
+
   const branch = branches.find((b) => b.id === user.branchId)
-  const users = localUsers.length > 0 ? localUsers : initUsers
+  const activeUsers = localUsers ?? initUsers ?? []
+  const users = employmentStatus === 'DELETED' ? deletedUsers : activeUsers
   const visibleUsers = isManager && !isAdmin
     ? users.filter((u) => String(u.branchId || '') === String(user.branchId || ''))
     : users
@@ -103,9 +110,28 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     else { setSortCol(col); setSortDir('asc') }
   }
 
+  async function showDeletedUsers() {
+    setEmploymentStatus('DELETED')
+    setSelectedUser(null)
+    if (deletedUsersLoaded || deletedUsersLoading) return
+
+    setDeletedUsersLoading(true)
+    setDeletedUsersError('')
+    try {
+      const data = await getDeletedUserPageData()
+      setDeletedUsers(Array.isArray(data?.users) ? data.users : [])
+      setDeletedUsersLoaded(true)
+    } catch {
+      setDeletedUsersError('Không thể tải danh sách nhân viên đã xóa.')
+    } finally {
+      setDeletedUsersLoading(false)
+    }
+  }
+
   function openAdd() { setForm(EMPTY_FORM); setFormErr(''); setModal('add') }
   function openEdit(u) { setForm({ ...u, password: '' }); setFormErr(''); setModalUser(u); setModal('edit') }
   function openDelete(u) { setModalUser(u); setFormErr(''); setModal('delete') }
+  function openRestore(u) { setModalUser(u); setFormErr(''); setModal('restore') }
   function closeModal() { setModal(null); setModalUser(null) }
 
   function handleFormChange(e) {
@@ -124,7 +150,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     setSaving(true); setFormErr('')
     try {
       const res = await axios.post('/api/User', form)
-      setLocalUsers((prev) => [...(prev.length > 0 ? prev : users), res.data]); closeModal()
+      setLocalUsers((prev) => [...(prev ?? activeUsers), res.data]); closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể thêm nhân viên') } finally { setSaving(false) }
   }
 
@@ -136,7 +162,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       await updateUser(form.id, form)
       const publicForm = { ...form }
       delete publicForm.password
-      setLocalUsers((prev) => (prev.length > 0 ? prev : users).map((u) => (u.id === form.id ? { ...u, ...publicForm } : u)))
+      setLocalUsers((prev) => (prev ?? activeUsers).map((u) => (u.id === form.id ? { ...u, ...publicForm } : u)))
       if (selectedUser && selectedUser.id === form.id) setSelectedUser({ ...selectedUser, ...publicForm })
       if (form.id === user.id) onUserUpdated({ ...user, ...publicForm })
       closeModal()
@@ -147,10 +173,28 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     setSaving(true)
     try {
       await axios.delete(`/api/User/${modalUser.id}`)
-      setLocalUsers((prev) => (prev.length > 0 ? prev : users).filter((u) => u.id !== modalUser.id))
+      setLocalUsers((prev) => (prev ?? activeUsers).filter((u) => u.id !== modalUser.id))
+      setDeletedUsersLoaded(false)
       if (selectedUser && selectedUser.id === modalUser.id) setSelectedUser(null)
       closeModal()
     } catch (err) { setFormErr(err.message || 'Không thể xóa') } finally { setSaving(false) }
+  }
+
+  async function handleRestore() {
+    setSaving(true)
+    setFormErr('')
+    try {
+      await restoreUser(modalUser.id)
+      setDeletedUsers((prev) => prev.filter((u) => u.id !== modalUser.id))
+      setDeletedUsersLoaded(true)
+      setLocalUsers((prev) => [...(prev ?? activeUsers), modalUser])
+      if (selectedUser?.id === modalUser.id) setSelectedUser(null)
+      closeModal()
+    } catch (err) {
+      setFormErr(err.response?.data?.message || err.message || 'Không thể khôi phục nhân viên')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const countByRole = (r) => visibleUsers.filter((u) => u.roleName?.toUpperCase() === r).length
@@ -272,14 +316,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'overview' && isAdmin && (
               <div className="sd-profile-layout">
                 <div className="sd-stat-grid">
-                  <div className="sd-stat-card"><span className="sd-stat-icon">●</span><h3>{users.length}</h3><p>Tổng nhân viên</p></div>
+                  <div className="sd-stat-card"><span className="sd-stat-icon">●</span><h3>{activeUsers.length}</h3><p>Tổng nhân viên</p></div>
                   <div className="sd-stat-card"><span className="sd-stat-icon">⊞</span><h3>{branches.length}</h3><p>Chi nhánh</p></div>
                 </div>
                 <div className="sd-card">
                   <div className="sd-card-header"><p className="sd-eyebrow">Thống kê</p><h2>Phân bổ chức vụ</h2></div>
                   {roles.filter((r) => r.roleName !== 'ADMIN').map((r) => {
-                    const cnt = countByRole(r.roleName)
-                    const pct = users.length ? Math.round((cnt / users.length) * 100) : 0
+                    const cnt = activeUsers.filter((u) => u.roleName?.toUpperCase() === r.roleName?.toUpperCase()).length
+                    const pct = activeUsers.length ? Math.round((cnt / activeUsers.length) * 100) : 0
                     return (
                       <div key={r.id} className="sd-role-bar">
                         <div className="sd-role-bar-head"><strong>{r.roleName}</strong><span>{cnt} người · {pct}%</span></div>
@@ -308,6 +352,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                           {search && <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>}
                         </div>
                         <div className="sd-filter-chips">
+                          <button className={`sd-filter-chip ${employmentStatus === 'ACTIVE' ? 'active' : ''}`} onClick={() => { setEmploymentStatus('ACTIVE'); setSelectedUser(null) }}>
+                            Đang làm
+                          </button>
+                          <button className={`sd-filter-chip sd-filter-chip-deleted ${employmentStatus === 'DELETED' ? 'active' : ''}`} disabled={deletedUsersLoading} onClick={showDeletedUsers}>
+                            Đã xóa
+                          </button>
+                        </div>
+                        <div className="sd-filter-chips">
                           {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
                             <button key={r} className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`} onClick={() => setFilterRole(r)}>
                               {r === 'ALL' ? 'Tất cả' : r}
@@ -318,7 +370,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                       </div>
                       <div className="sd-users-toolbar-right">
                         <span className="sd-result-count">{displayed.length} nhân viên</span>
-                        {canManageUsers && <button className="sd-btn-add" onClick={openAdd}><span>＋</span> Thêm nhân viên</button>}
+                        {canManageUsers && employmentStatus === 'ACTIVE' && <button className="sd-btn-add" onClick={openAdd}><span>＋</span> Thêm nhân viên</button>}
                       </div>
                     </div>
                     <div className="sd-table-wrap">
@@ -333,13 +385,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon active={sortCol === 'roleName'} direction={sortDir} /></th>
                             <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon active={sortCol === 'branchName'} direction={sortDir} /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon active={sortCol === 'hireDate'} direction={sortDir} /></th>
+                            {canManageUsers && employmentStatus === 'DELETED' && <th className="sd-th sd-th-action">Thao tác</th>}
                           </tr>
                         </thead>
                         <tbody>
-                          {displayed.length === 0 && (
-                            <tr><td colSpan={8} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">●</span><p>Không tìm thấy nhân sự</p></div></td></tr>
+                          {(deletedUsersLoading || deletedUsersError || displayed.length === 0) && (
+                            <tr><td colSpan={canManageUsers && employmentStatus === 'DELETED' ? 9 : 8} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">●</span><p>{deletedUsersLoading ? 'Đang tải danh sách...' : deletedUsersError || (employmentStatus === 'DELETED' ? 'Không có nhân viên đã xóa' : 'Không tìm thấy nhân sự')}</p></div></td></tr>
                           )}
-                          {displayed.map((u, idx) => {
+                          {!deletedUsersLoading && !deletedUsersError && displayed.map((u, idx) => {
                             const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
                             return (
                               <tr key={u.id} className="sd-tr" style={{ animationDelay: `${idx * 30}ms`, cursor: 'pointer' }} onClick={() => setSelectedUser(u)}>
@@ -351,6 +404,11 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                                 <td className="sd-td sd-hide-mobile"><span className="sd-role-pill" style={{ background: roleColor.bg, color: roleColor.color }}>{u.roleName || '—'}</span></td>
                                 <td className="sd-td sd-td-info-col"><span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span></td>
                                 <td className="sd-td sd-hide-mobile"><span className="sd-td-date">{formatDate(u.hireDate)}</span></td>
+                                {canManageUsers && employmentStatus === 'DELETED' && (
+                                  <td className="sd-td sd-td-action">
+                                    <button className="sd-btn-restore" type="button" onClick={(e) => { e.stopPropagation(); openRestore(u) }}>↻ Khôi phục</button>
+                                  </td>
+                                )}
                               </tr>
                             )
                           })}
@@ -381,10 +439,17 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                           <InfoRow label="Chi nhánh" value={selectedUser.branchName || 'Chưa gán'} />
                           <InfoRow label="Ngày vào làm" value={formatDate(selectedUser.hireDate)} />
                         </dl>
-                        <div className="sd-detail-actions">
-                          {canManageUsers && <button className="sd-btn-ghost btn-edit" onClick={() => openEdit(selectedUser)}>✎ Chỉnh sửa</button>}
-                          {canManageUsers && selectedUser.id !== user.id && <button className="sd-btn-ghost btn-delete" onClick={() => openDelete(selectedUser)}>✕ Xóa nhân sự</button>}
-                        </div>
+                        {employmentStatus === 'ACTIVE' && (
+                          <div className="sd-detail-actions">
+                            {canManageUsers && <button className="sd-btn-ghost btn-edit" onClick={() => openEdit(selectedUser)}>✎ Chỉnh sửa</button>}
+                            {canManageUsers && selectedUser.id !== user.id && <button className="sd-btn-ghost btn-delete" onClick={() => openDelete(selectedUser)}>✕ Xóa nhân sự</button>}
+                          </div>
+                        )}
+                        {canManageUsers && employmentStatus === 'DELETED' && (
+                          <div className="sd-detail-actions">
+                            <button className="sd-btn-ghost btn-restore" onClick={() => openRestore(selectedUser)}>↻ Khôi phục nhân viên</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -489,6 +554,22 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={closeModal}>Hủy</button>
               <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDelete}>{saving ? 'Đang xoá...' : 'Xoá ngay'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'restore' && (
+        <div className="sd-overlay" onClick={closeModal}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>Xác nhận khôi phục</h2><button onClick={closeModal}>✕</button></div>
+            <div className="sd-modal-body">
+              <p>Bạn có chắc muốn khôi phục nhân viên <strong>{modalUser?.fullName}</strong>?</p>
+              {formErr && <p className="sd-status sd-status-error">{formErr}</p>}
+            </div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={closeModal}>Hủy</button>
+              <button className="sd-btn-primary btn-restore" disabled={saving} onClick={handleRestore}>{saving ? 'Đang khôi phục...' : 'Khôi phục'}</button>
             </div>
           </div>
         </div>

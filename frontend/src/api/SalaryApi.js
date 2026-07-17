@@ -22,6 +22,11 @@ export async function markSalaryPaid(salaryId) {
   return response.data;
 }
 
+export async function markBranchSalaryTransferred(branchId, month, year) {
+  const response = await axios.put(`${BASE_URL}/branch/${branchId}/period/${year}/${month}/transfer`);
+  return response.data;
+}
+
 export async function getSalaryRuleAdjustments(month, year, branchId) {
   const response = await axios.get(`${BASE_URL}/rule-adjustments`, {
     params: { month, year, branchId: branchId || undefined },

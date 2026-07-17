@@ -193,10 +193,52 @@ namespace LuanVanTotNghiep.Controllers
             return NoContent();
         }
 
-        // =========================================================
-        // 👉 BỔ SUNG API LOGIN BÊN DƯỚI
-        // =========================================================
+        [HttpPatch("{id}/restore")]
+        public async Task<IActionResult> RestoreUser(int id)
+        {
+            var restored = await userService.RestoreUser(id);
+            if (!restored)
+                return NotFound(new { message = "Không tìm thấy nhân viên đã xóa." });
 
+            return Ok(new { message = "Khôi phục nhân viên thành công." });
+        }
+
+        [HttpGet("deleted")]
+        public async Task<IActionResult> GetNhanVienDaXoa()
+        {
+            var users = await userService.GetDaXoa();
+            var roles = await roleService.GetAllRole();
+            var branch = await branchService.GettAllBranchAsync();
+            var result = new UserPageDataDto
+            {
+                Users = users.Select(u => new UserDto
+                {
+                    Id = u.Id,
+                    Username = GetLoginDisplay(u),
+                    Email = u.Email,
+                    FullName = u.FullName,
+                    Phone = u.PhoneNumber,
+                    PhoneNumber = u.PhoneNumber,
+                    BankName = u.NsUserBankAccounts.FirstOrDefault()?.BankName,
+                    BankAccountNumber = u.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
+                    BankAccountName = u.NsUserBankAccounts.FirstOrDefault()?.BankAccountName,
+                    BranchId = u.BranchId,
+                    BranchName = u.Branch?.Name,
+                    RoleId = u.RoleId,
+                    RoleName = u.Role?.RoleName,
+                    HireDate = u.HireDate
+                }),
+                Roles = roles.Select(r => new RoleDto
+                {
+                    Id = r.Id,
+                    RoleName = r.RoleName,
+                    Description = r.Description,
+                    HourlyWage = r.HourlyWage,
+                    SeniorWage = r.SeniorWage
+                }),
+            };
+            return Ok(result);
+        }
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginRequest model)
@@ -323,4 +365,3 @@ namespace LuanVanTotNghiep.Controllers
         }
     }
 }
-

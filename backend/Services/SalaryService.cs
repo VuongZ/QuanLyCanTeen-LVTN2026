@@ -122,12 +122,16 @@ public class SalaryService
             .GroupBy(s => new
             {
                 s.User.BranchId,
-                BranchName = s.User.Branch != null ? s.User.Branch.Name : null
+                BranchName = s.User.Branch != null ? s.User.Branch.Name : null,
+                s.Month,
+                s.Year
             })
             .Select(g => new BranchSalarySummaryDto
             {
                 BranchId = g.Key.BranchId,
                 BranchName = g.Key.BranchName,
+                Month = g.Key.Month,
+                Year = g.Key.Year,
                 SalaryCount = g.Count(),
                 PendingTotal = g.Sum(s => (s.Status ?? "").ToUpper() == "PAID" ? 0 : s.TotalSalary),
                 PaidTotal = g.Sum(s => (s.Status ?? "").ToUpper() == "PAID" ? s.TotalSalary : 0),
@@ -136,7 +140,9 @@ public class SalaryService
                 PaidCount = g.Count(s => (s.Status ?? "").ToUpper() == "PAID"),
                 EmployeeCount = g.Select(s => s.UserId).Distinct().Count()
             })
-            .OrderBy(s => s.BranchName ?? "Chua gan co so")
+            .OrderByDescending(s => s.Year)
+            .ThenByDescending(s => s.Month)
+            .ThenBy(s => s.BranchName ?? "Chua gan co so")
             .ToListAsync();
 
         var branchIds = summaries
@@ -170,6 +176,16 @@ public class SalaryService
             .GroupBy(m => m.BranchId!.Value)
             .ToDictionary(g => g.Key, g => g.First());
 
+        var transfers = await _context.LuongSalaryTransfers
+            .AsNoTracking()
+            .Include(t => t.TransferredByUser)
+            .Where(t => branchIds.Contains(t.BranchId))
+            .ToListAsync();
+
+        var transferByPeriod = transfers.ToDictionary(
+            t => (t.BranchId, t.Month, t.Year),
+            t => t);
+
         foreach (var summary in summaries)
         {
             if (summary.BranchId == null || !managerByBranch.TryGetValue(summary.BranchId.Value, out var manager))
@@ -182,9 +198,72 @@ public class SalaryService
             summary.ManagerBankName = manager.BankName;
             summary.ManagerBankAccountNumber = manager.BankAccountNumber;
             summary.ManagerBankAccountName = manager.BankAccountName;
+
+            if (transferByPeriod.TryGetValue((summary.BranchId.Value, summary.Month, summary.Year), out var transfer))
+            {
+                summary.TransferId = transfer.Id;
+                summary.IsTransferred = true;
+                summary.TransferredAmount = transfer.TotalAmount;
+                summary.TransferredAt = transfer.TransferredAt;
+                summary.TransferredByName = transfer.TransferredByUser.FullName
+                    ?? transfer.TransferredByUser.Email
+                    ?? transfer.TransferredByUser.PhoneNumber;
+            }
         }
 
         return summaries;
+    }
+
+    public async Task<BranchSalarySummaryDto?> MarkBranchTransferredAsync(
+        int branchId,
+        int month,
+        int year,
+        int adminUserId)
+    {
+        if (month < 1 || month > 12 || year < 2000)
+            throw new InvalidOperationException("Kỳ lương không hợp lệ.");
+
+        var existingTransfer = await _context.LuongSalaryTransfers
+            .AsNoTracking()
+            .AnyAsync(t => t.BranchId == branchId && t.Month == month && t.Year == year);
+
+        if (!existingTransfer)
+        {
+            var salaries = await _context.LuongMonthlySalaries
+                .Where(s => s.User.BranchId == branchId && s.Month == month && s.Year == year)
+                .ToListAsync();
+
+            if (salaries.Count == 0)
+                return null;
+
+            var manager = await _context.NsUsers
+                .AsNoTracking()
+                .Include(u => u.Role)
+                .Where(u => u.BranchId == branchId && u.IsDeleted != true)
+                .Where(u => u.Role != null && u.Role.RoleName.ToUpper().Contains("MANAGER"))
+                .OrderBy(u => u.Id)
+                .FirstOrDefaultAsync();
+
+            if (manager == null)
+                throw new InvalidOperationException("Cơ sở chưa có quản lý để nhận quỹ lương.");
+
+            _context.LuongSalaryTransfers.Add(new LuongSalaryTransfer
+            {
+                BranchId = branchId,
+                ManagerId = manager.Id,
+                TransferredByUserId = adminUserId,
+                Month = month,
+                Year = year,
+                SalaryCount = salaries.Count,
+                TotalAmount = salaries.Sum(s => s.TotalSalary),
+                TransferredAt = DateTime.Now
+            });
+
+            await _context.SaveChangesAsync();
+        }
+
+        return (await GetBranchSummariesAsync())
+            .FirstOrDefault(s => s.BranchId == branchId && s.Month == month && s.Year == year);
     }
 
     public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branchId, int month, int year)

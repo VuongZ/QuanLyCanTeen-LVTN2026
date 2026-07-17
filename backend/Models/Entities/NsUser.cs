@@ -25,6 +25,10 @@ public partial class NsUser
 
     public DateTime? ResetPasswordExpiry { get; set; }
 
+    public bool? IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual DmBranch? Branch { get; set; }
 
     public virtual ICollection<CaFinalSchedule> CaFinalSchedules { get; set; } = new List<CaFinalSchedule>();

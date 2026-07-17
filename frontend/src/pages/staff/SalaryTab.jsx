@@ -15,13 +15,17 @@ function formatNumber(value) {
   }).format(Number(value || 0));
 }
 
+function getMonthKey(item) {
+  return `${item.year}-${String(item.month).padStart(2, '0')}`;
+}
+
 function formatStatus(status) {
   const map = {
-    PENDING: 'Chưa Thanh Toán',
-    PAID: 'Đã Thanh Toán',
-    CANCELLED: 'Đã Huỷ',
+    PENDING: 'Chưa thanh toán',
+    PAID: 'Đã thanh toán',
+    CANCELLED: 'Đã huỷ',
   };
-  return map[status] || status;
+  return map[(status || 'PENDING').toUpperCase()] || status;
 }
 
 function getStatusClass(status) {
@@ -56,7 +60,7 @@ export function SalaryTab({ user }) {
         const data = await getSalaryByUser(user.id);
         const nextSalaries = Array.isArray(data) ? data : [];
         setSalaries(nextSalaries);
-        setSelectedMonthKey((current) => current || (nextSalaries[0] ? `${nextSalaries[0].year}-${String(nextSalaries[0].month).padStart(2, '0')}` : ''));
+        setSelectedMonthKey(nextSalaries[0] ? getMonthKey(nextSalaries[0]) : '');
       } catch (err) {
         setError(err.response?.data?.message || 'Không tải được dữ liệu lương.');
       } finally {
@@ -69,30 +73,22 @@ export function SalaryTab({ user }) {
 
   const monthOptions = useMemo(() => {
     return salaries.map((item) => ({
-      key: `${item.year}-${String(item.month).padStart(2, '0')}`,
+      key: getMonthKey(item),
       label: `Tháng ${item.month}/${item.year}`,
     }));
   }, [salaries]);
 
-  const filteredSalaries = useMemo(() => {
-    if (!selectedMonthKey) return [];
-    return salaries.filter((item) => `${item.year}-${String(item.month).padStart(2, '0')}` === selectedMonthKey);
+  const selectedSalary = useMemo(() => {
+    return salaries.find((item) => getMonthKey(item) === selectedMonthKey) || null;
   }, [salaries, selectedMonthKey]);
 
-  const summary = useMemo(() => {
-    return filteredSalaries.reduce(
-      (total, item) => ({
-        hours: total.hours + Number(item.totalHours || 0),
-        salary: total.salary + Number(item.totalSalary || 0),
-        bonus: total.bonus + Number(item.totalBonus || 0),
-        penalty: total.penalty + Number(item.totalPenalty || 0),
-      }),
-      { hours: 0, salary: 0, bonus: 0, penalty: 0 }
-    );
-  }, [filteredSalaries]);
+  const summary = useMemo(() => ({
+    hours: Number(selectedSalary?.totalHours || 0),
+    salary: Number(selectedSalary?.totalSalary || 0),
+    bonus: Number(selectedSalary?.totalBonus || 0),
+    penalty: Number(selectedSalary?.totalPenalty || 0),
+  }), [selectedSalary]);
 
-  const selectedSalary = filteredSalaries[0] || salaries[0];
-  
   return (
     <div className="sd-profile-layout">
       <div className="sd-salary-summary">
@@ -110,7 +106,7 @@ export function SalaryTab({ user }) {
           </div>
           {monthOptions.length > 0 && (
             <div className="sd-field sd-salary-filter">
-              <label>Tháng</label>
+              <label>Chọn kỳ lương</label>
               <select value={selectedMonthKey} onChange={(event) => setSelectedMonthKey(event.target.value)}>
                 {monthOptions.map((month) => (
                   <option key={month.key} value={month.key}>{month.label}</option>
@@ -124,7 +120,7 @@ export function SalaryTab({ user }) {
 
         {loading ? (
           <p className="sd-salary-empty">Đang tải dữ liệu lương...</p>
-        ) : filteredSalaries.length === 0 ? (
+        ) : !selectedSalary ? (
           <p className="sd-salary-empty">Chưa có dữ liệu lương. Bảng lương sẽ được tạo sau khi ca làm được check-out.</p>
         ) : (
           <div className="sd-salary-table-wrap">
@@ -141,27 +137,25 @@ export function SalaryTab({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredSalaries.map((item) => (
-                  <tr key={item.id}>
-                    <td><strong>{item.month}/{item.year}</strong></td>
-                    <td>{formatNumber(item.totalHours)} giờ</td>
-                    <td>{formatMoney(item.hourlyWageAtTime)}</td>
-                    <td>{formatMoney(item.totalBonus)}</td>
-                    <td>{formatMoney(item.totalPenalty)}</td>
-                    <td className="sd-salary-total">{formatMoney(item.totalSalary)}</td>
-                    <td>
-                      <span className={`sd-salary-status ${getStatusClass(item.status)}`}>
-                        {formatStatus(item.status || 'PENDING')}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                <tr>
+                  <td><strong>{selectedSalary.month}/{selectedSalary.year}</strong></td>
+                  <td>{formatNumber(selectedSalary.totalHours)} giờ</td>
+                  <td>{formatMoney(selectedSalary.hourlyWageAtTime)}</td>
+                  <td>{formatMoney(selectedSalary.totalBonus)}</td>
+                  <td>{formatMoney(selectedSalary.totalPenalty)}</td>
+                  <td className="sd-salary-total">{formatMoney(selectedSalary.totalSalary)}</td>
+                  <td>
+                    <span className={`sd-salary-status ${getStatusClass(selectedSalary.status)}`}>
+                      {formatStatus(selectedSalary.status)}
+                    </span>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
         )}
       </div>
+
     </div>
   );
-  
 }
