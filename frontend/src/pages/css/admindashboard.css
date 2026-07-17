@@ -612,6 +612,11 @@
   border-color: #ea580c;
 }
 
+.sd-filter-chip-deleted.active {
+  background: #64748b;
+  border-color: #64748b;
+}
+
 .sd-chip-count {
   background: rgba(255,255,255,0.25);
   padding: 1px 6px;
@@ -1530,9 +1535,54 @@
   margin-bottom: 4px;
 }
 
+.sd-salary-period-filter {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.sd-salary-period-filter label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-salary-period-filter select {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  color: #334155;
+  cursor: pointer;
+  font-size: 13px;
+  min-width: 160px;
+  padding: 8px 32px 8px 10px;
+}
+
+.sd-salary-period-filter select:focus {
+  border-color: #ea580c;
+  outline: none;
+}
+
 .sd-salary-admin-page .sd-table {
   min-width: 1360px;
   table-layout: fixed;
+}
+
+.sd-salary-admin-page--admin .sd-table {
+  min-width: 1640px;
+}
+
+.sd-salary-admin-page--admin .sd-table th:nth-child(8),
+.sd-salary-admin-page--admin .sd-table td:nth-child(8) {
+  min-width: 190px;
+}
+
+.sd-salary-admin-page--admin .sd-table th:nth-child(9),
+.sd-salary-admin-page--admin .sd-table td:nth-child(9) {
+  min-width: 220px;
+  padding-right: 28px;
+  text-align: center;
 }
 
 .sd-salary-admin-page .sd-table th,
@@ -1641,6 +1691,11 @@
 
 .sd-salary-pay-modal {
   max-width: 560px;
+}
+
+.sd-salary-admin-page .sd-salary-transfer-btn {
+  min-width: 190px;
+  width: 190px;
 }
 /* =========================================
    INVENTORY REPORT PAGE
@@ -4073,9 +4128,6 @@
 }
 
 .sd-closing-approve-btn {
-  background: #16a34a;
-  color: #fff;
-}
 
 .sd-closing-reject-btn {
   background: #dc2626;
@@ -4162,4 +4214,12 @@
   .sd-closing-modal-footer button {
     width: 100%;
   }
+}
+.sd-btn-primary.btn-restore:hover {
+  background: #15803d;
+}
+
+.sd-btn-ghost.btn-restore {
+  border-color: #86efac;
+  color: #15803d;
 }

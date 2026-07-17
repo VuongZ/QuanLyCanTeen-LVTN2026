@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
 
 namespace LuanVanTotNghiep.backend.Models.Entities;
 
 public partial class AppDbContext : DbContext
 {
+    public AppDbContext()
+    {
+    }
+
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {
@@ -49,23 +54,31 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<LuongSalaryRule> LuongSalaryRules { get; set; }
 
+    public virtual DbSet<LuongSalaryTransfer> LuongSalaryTransfers { get; set; }
+
     public virtual DbSet<NsRole> NsRoles { get; set; }
 
     public virtual DbSet<NsUser> NsUsers { get; set; }
 
     public virtual DbSet<NsUserBankAccount> NsUserBankAccounts { get; set; }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseMySql("server=localhost;port=3306;database=qlcanteen;uid=root", Microsoft.EntityFrameworkCore.ServerVersion.Parse("9.1.0-mysql"));
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
-            .UseCollation("utf8mb4_unicode_ci")
+            .UseCollation("utf8mb4_0900_ai_ci")
             .HasCharSet("utf8mb4");
 
         modelBuilder.Entity<CaAttendance>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ca_attendance");
+            entity
+                .ToTable("ca_attendance")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.SalaryId, "fk_att_salary");
 
@@ -99,7 +112,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ca_branch_shift_config");
+            entity
+                .ToTable("ca_branch_shift_config")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.ShiftId, "fk_config_shift");
 
@@ -126,7 +141,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ca_final_schedule");
+            entity
+                .ToTable("ca_final_schedule")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.ShiftId, "fk_final_shift");
 
@@ -154,7 +171,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ca_schedule_period");
+            entity
+                .ToTable("ca_schedule_period")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
@@ -174,7 +193,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ca_shift");
+            entity
+                .ToTable("ca_shift")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.BranchId, "fk_branch_shift");
 
@@ -210,7 +231,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ca_staff_registration");
+            entity
+                .ToTable("ca_staff_registration")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.PeriodId, "fk_reg_period");
 
@@ -246,7 +269,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("dm_branch");
+            entity
+                .ToTable("dm_branch")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Address)
@@ -351,7 +376,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("kho_export_ticket");
+            entity
+                .ToTable("kho_export_ticket")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.BranchId, "fk_exp_branch");
 
@@ -401,7 +428,8 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Quantity).HasColumnName("quantity");
             entity.Property(e => e.UnitAtTime)
                 .HasMaxLength(50)
-                .HasColumnName("unit_at_time");
+                .HasColumnName("unit_at_time")
+                .UseCollation("utf8mb4_unicode_ci");
             entity.Property(e => e.UnitPrice)
                 .HasPrecision(10, 2)
                 .HasDefaultValueSql("'0.00'")
@@ -439,12 +467,14 @@ public partial class AppDbContext : DbContext
                 .HasColumnName("import_date");
             entity.Property(e => e.InvoiceCode)
                 .HasMaxLength(50)
-                .HasColumnName("invoice_code");
+                .HasColumnName("invoice_code")
+                .UseCollation("utf8mb4_unicode_ci");
             entity.Property(e => e.InvoiceDate).HasColumnName("invoice_date");
             entity.Property(e => e.ManagerId).HasColumnName("manager_id");
             entity.Property(e => e.Note)
                 .HasMaxLength(255)
-                .HasColumnName("note");
+                .HasColumnName("note")
+                .UseCollation("utf8mb4_unicode_ci");
             entity.Property(e => e.SupplierId).HasColumnName("supplier_id");
             entity.Property(e => e.TotalAmount)
                 .HasPrecision(15, 2)
@@ -467,7 +497,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("kho_product");
+            entity
+                .ToTable("kho_product")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.SupplierId, "fk_product_supplier");
 
@@ -543,7 +575,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("kho_shift_closing_report");
+            entity
+                .ToTable("kho_shift_closing_report")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.BranchId, "fk_report_branch");
 
@@ -601,7 +635,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("kho_supplier");
+            entity
+                .ToTable("kho_supplier")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Address)
@@ -619,7 +655,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("luong_monthly_salary");
+            entity
+                .ToTable("luong_monthly_salary")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => new { e.UserId, e.Month, e.Year }, "unique_user_month_year").IsUnique();
 
@@ -668,7 +706,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("luong_salary_rule");
+            entity
+                .ToTable("luong_salary_rule")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.BranchId, "branch_id");
 
@@ -698,11 +738,49 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("luong_salary_rule_ibfk_1");
         });
 
+        modelBuilder.Entity<LuongSalaryTransfer>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("luong_salary_transfer");
+
+            entity.HasIndex(e => new { e.BranchId, e.Month, e.Year }, "uq_salary_transfer_branch_period").IsUnique();
+            entity.HasIndex(e => e.ManagerId, "idx_salary_transfer_manager");
+            entity.HasIndex(e => e.TransferredByUserId, "idx_salary_transfer_admin");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.BranchId).HasColumnName("branch_id");
+            entity.Property(e => e.ManagerId).HasColumnName("manager_id");
+            entity.Property(e => e.TransferredByUserId).HasColumnName("transferred_by_user_id");
+            entity.Property(e => e.Month).HasColumnName("month");
+            entity.Property(e => e.Year).HasColumnName("year");
+            entity.Property(e => e.SalaryCount).HasColumnName("salary_count");
+            entity.Property(e => e.TotalAmount).HasPrecision(15, 2).HasColumnName("total_amount");
+            entity.Property(e => e.TransferredAt).HasColumnType("datetime").HasColumnName("transferred_at");
+
+            entity.HasOne(d => d.Branch).WithMany()
+                .HasForeignKey(d => d.BranchId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_salary_transfer_branch");
+
+            entity.HasOne(d => d.Manager).WithMany()
+                .HasForeignKey(d => d.ManagerId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_salary_transfer_manager");
+
+            entity.HasOne(d => d.TransferredByUser).WithMany()
+                .HasForeignKey(d => d.TransferredByUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_salary_transfer_admin");
+        });
+
         modelBuilder.Entity<NsRole>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ns_role");
+            entity
+                .ToTable("ns_role")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.RoleName, "role_name").IsUnique();
 
@@ -727,7 +805,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ns_user");
+            entity
+                .ToTable("ns_user")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.BranchId, "fk_user_branch");
 
@@ -782,7 +862,9 @@ public partial class AppDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("ns_user_bank_account");
+            entity
+                .ToTable("ns_user_bank_account")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.UserId, "fk_bank_user");
 

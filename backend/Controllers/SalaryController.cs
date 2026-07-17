@@ -83,6 +83,30 @@ public class SalaryController : ControllerBase
         return Ok(salaries);
     }
 
+    [HttpPut("branch/{branchId}/period/{year}/{month}/transfer")]
+    public async Task<IActionResult> MarkBranchTransferred(int branchId, int year, int month)
+    {
+        if (!IsAdmin())
+            return Forbid();
+
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không xác định được người dùng." });
+
+        try
+        {
+            var result = await _salaryService.MarkBranchTransferredAsync(branchId, month, year, currentUser.Id);
+            if (result == null)
+                return NotFound(new { message = "Không tìm thấy bảng lương của cơ sở trong kỳ này." });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("rule-adjustments")]
     public async Task<IActionResult> GetRuleAdjustments([FromQuery] int month, [FromQuery] int year, [FromQuery] int? branchId)
     {
