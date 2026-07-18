@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>452f560a-3696-4612-8040-0ad193b77dc3</UserSecretsId>
+    <DefaultItemExcludes>$(DefaultItemExcludes);frontend\**;node_modules\**;tmp\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
