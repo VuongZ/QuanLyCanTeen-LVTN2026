@@ -80,6 +80,22 @@ builder.Services.AddScoped<SalaryService>();
 builder.Services.AddScoped<KhoExportService>();
 builder.Services.AddScoped<FrontStockRepo>();
 builder.Services.AddScoped<ShiftClosingService>();
+builder.Services.AddScoped<InvoiceOcrService>();    
+
+// Cho phép React/Vite frontend gọi API backend khi chạy local
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactDev", policy =>
+    {
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "http://127.0.0.1:5173"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 
 var app = builder.Build();
@@ -127,6 +143,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+app.UseCors("AllowReactDev");
 
 // 5. THỨ TỰ MIDDLEWARE BẮT BUỘC: Authentication phải đứng trước Authorization
 app.UseAuthentication(); 

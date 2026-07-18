@@ -313,6 +313,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.Product).WithMany(p => p.KhoBranchFrontStocks)
                 .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_front_product");
         });
 
@@ -367,6 +368,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.Product).WithMany(p => p.KhoExportDetails)
                 .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_expdet_product");
         });
 
@@ -439,6 +441,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.Product).WithMany(p => p.KhoImportDetails)
                 .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_impdet_product");
         });
 
@@ -500,11 +503,26 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => e.SupplierId, "fk_product_supplier");
 
+            entity.HasIndex(e => e.InactiveBy, "idx_product_inactive_by");
+
+            entity.HasIndex(e => e.IsActive, "idx_product_is_active");
+
             entity.HasIndex(e => e.ProductName, "idx_product_name");
 
             entity.HasIndex(e => e.ProductCode, "uq_product_code").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.InactiveAt)
+                .HasColumnType("datetime")
+                .HasColumnName("inactive_at");
+            entity.Property(e => e.InactiveBy).HasColumnName("inactive_by");
+            entity.Property(e => e.InactiveReason)
+                .HasMaxLength(255)
+                .HasColumnName("inactive_reason");
+            entity.Property(e => e.IsActive)
+                .IsRequired()
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("is_active");
             entity.Property(e => e.ProductCode)
                 .HasMaxLength(50)
                 .HasColumnName("product_code");
@@ -513,6 +531,11 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Unit)
                 .HasMaxLength(50)
                 .HasColumnName("unit");
+
+            entity.HasOne(d => d.InactiveByNavigation).WithMany(p => p.KhoProducts)
+                .HasForeignKey(d => d.InactiveBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_product_inactive_by");
 
             entity.HasOne(d => d.Supplier).WithMany(p => p.KhoProducts)
                 .HasForeignKey(d => d.SupplierId)
@@ -540,6 +563,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.Product).WithMany(p => p.KhoShiftClosingDetails)
                 .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_detail_product");
 
             entity.HasOne(d => d.Report).WithMany(p => p.KhoShiftClosingDetails)
@@ -559,6 +583,10 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => e.UserId, "fk_report_user");
 
+            entity.HasIndex(e => e.ReviewedBy, "idx_closing_report_reviewed_by");
+
+            entity.HasIndex(e => e.Status, "idx_closing_report_status");
+
             entity.HasIndex(e => e.ScheduleId, "idx_report_schedule").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
@@ -566,23 +594,39 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Note)
                 .HasMaxLength(255)
                 .HasColumnName("note");
+            entity.Property(e => e.RejectReason)
+                .HasMaxLength(500)
+                .HasColumnName("reject_reason");
             entity.Property(e => e.ReportDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime")
                 .HasColumnName("report_date");
+            entity.Property(e => e.ReviewedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("reviewed_at");
+            entity.Property(e => e.ReviewedBy).HasColumnName("reviewed_by");
             entity.Property(e => e.ScheduleId).HasColumnName("schedule_id");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'PENDING'")
+                .HasColumnName("status");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.KhoShiftClosingReports)
                 .HasForeignKey(d => d.BranchId)
                 .HasConstraintName("fk_report_branch");
 
+            entity.HasOne(d => d.ReviewedByNavigation).WithMany(p => p.KhoShiftClosingReportReviewedByNavigations)
+                .HasForeignKey(d => d.ReviewedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_closing_report_reviewed_by");
+
             entity.HasOne(d => d.Schedule).WithOne(p => p.KhoShiftClosingReport)
                 .HasForeignKey<KhoShiftClosingReport>(d => d.ScheduleId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("fk_report_schedule");
 
-            entity.HasOne(d => d.User).WithMany(p => p.KhoShiftClosingReports)
+            entity.HasOne(d => d.User).WithMany(p => p.KhoShiftClosingReportUsers)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_report_user");
         });

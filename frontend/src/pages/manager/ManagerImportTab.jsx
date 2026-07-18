@@ -3,6 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { getAllSuppliers } from '../../api/SupplierApi';
 
+
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -33,6 +34,72 @@ function parseNumber(value) {
 
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+
+
+function extractInvoiceCodeFromRawText(rawText = '') {
+  const normalized = String(rawText || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\r/g, '\n')
+    .toUpperCase();
+
+  const lines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  // Ưu tiên dòng có nhãn mã/số hóa đơn
+  for (const line of lines) {
+    const isInvoiceLine =
+      /MA\s*HOA\s*DON/.test(line) ||
+      /SO\s*HOA\s*DON/.test(line) ||
+      /MA\s*HD/.test(line) ||
+      /SO\s*HD/.test(line) ||
+      /INVOICE/.test(line);
+
+    if (!isInvoiceLine) continue;
+
+    const match = line.match(
+      /\b(?:HD|INV|INVOICE)[\s._/-]*[A-Z0-9]+(?:[\s._/-]*[A-Z0-9]+){0,4}\b/i
+    );
+
+    if (match) {
+      return match[0]
+        .replace(/\s*-\s*/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/-{2,}/g, '-');
+    }
+
+    // Lấy phần sau dấu hai chấm khi OCR làm mất tiền tố
+    const valueAfterLabel = line
+      .replace(
+        /.*?(?:MA\s*HOA\s*DON|SO\s*HOA\s*DON|MA\s*HD|SO\s*HD|INVOICE(?:\s*(?:NO|NUMBER|CODE))?)/,
+        ''
+      )
+      .replace(/^[:#\s-]+/, '')
+      .trim();
+
+    if (/^[A-Z0-9][A-Z0-9._/\s-]{2,30}$/.test(valueAfterLabel)) {
+      return valueAfterLabel
+        .replace(/\s*-\s*/g, '-')
+        .replace(/\s+/g, '-')
+        .replace(/-{2,}/g, '-');
+    }
+  }
+
+  // Tìm trực tiếp ở toàn bộ nội dung, kể cả khi nhãn bị OCR sai
+  const fallbackMatch = normalized.match(
+    /\b(?:HD|INV)[\s._/-]*[A-Z0-9]+(?:[\s._/-]*[A-Z0-9]+){0,4}\b/i
+  );
+
+  if (!fallbackMatch) return '';
+
+  return fallbackMatch[0]
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-{2,}/g, '-');
 }
 
 function parseExcelDate(value) {
@@ -92,6 +159,11 @@ export function ManagerImportTab({ user, branches }) {
   const [excelTotal, setExcelTotal] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
+  const [invoiceImage, setInvoiceImage] = useState(null);
+  const [ocrRawText, setOcrRawText] = useState('');
+  const [ocrWarnings, setOcrWarnings] = useState([]);
+  const [ocrConfidence, setOcrConfidence] = useState(null);
+  const [isReadingInvoice, setIsReadingInvoice] = useState(false);
 
   const currentBranch = branches?.find((branch) => String(branch.id) === String(user.branchId));
 
@@ -137,6 +209,15 @@ export function ManagerImportTab({ user, branches }) {
     setNote('');
     setExcelTotal(0);
     setPreviewData([]);
+
+    // Reset dữ liệu OCR cũ khi chuyển sang đọc Excel
+    setInvoiceImage(null);
+    setOcrRawText('');
+    setOcrWarnings([]);
+    setOcrConfidence(null);
+
+    const imageInput = document.getElementById('invoice-image-upload');
+    if (imageInput) imageInput.value = '';
 
     if (!uploadedFile) return;
 
@@ -229,6 +310,102 @@ export function ManagerImportTab({ user, branches }) {
     }
   }
 
+  async function handleInvoiceImageUpload(event) {
+    const uploadedFile = event.target.files?.[0];
+
+    setInvoiceImage(uploadedFile || null);
+    setMessage(null);
+    setOcrRawText('');
+    setOcrWarnings([]);
+    setOcrConfidence(null);
+    setPreviewData([]);
+    setExcelTotal(0);
+
+    // Xóa dữ liệu nhận diện cũ
+    setDetectedSupplierName('');
+    setInvoiceCode('');
+    setInvoiceDate('');
+
+    // Reset file Excel cũ khi chuyển sang đọc ảnh hóa đơn
+    setFile(null);
+
+    const excelInput = document.getElementById('excel-upload');
+    if (excelInput) excelInput.value = '';
+
+    if (!uploadedFile) return;
+
+    try {
+      setIsReadingInvoice(true);
+
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+
+      const response = await axios.post('http://localhost:5275/api/KhoImport/parse-invoice-image', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+});
+
+      const data = response.data || {};
+      const rawText = data.rawText || '';
+
+      const detectedInvoiceCode =
+        String(data.invoiceCode || '').trim() ||
+        extractInvoiceCodeFromRawText(rawText);
+
+      const nextWarnings = Array.isArray(data.warnings)
+        ? [...data.warnings]
+        : [];
+
+      if (!detectedInvoiceCode) {
+        nextWarnings.push(
+          'OCR chưa nhận diện được mã hóa đơn. Vui lòng nhập thủ công và kiểm tra lại ảnh.'
+        );
+      }
+
+      setDetectedSupplierName(data.detectedSupplierName || '');
+      setInvoiceCode(detectedInvoiceCode);
+      setInvoiceDate(data.invoiceDate || '');
+      setExcelTotal(Number(data.totalAmount || 0));
+      setOcrRawText(rawText);
+      setOcrWarnings(nextWarnings);
+      setOcrConfidence(data.confidence ?? null);
+
+      const parsedItems = Array.isArray(data.items) ? data.items : [];
+
+      setPreviewData(parsedItems.map((item, index) => ({
+        idId: `ocr-${index}-${item.productCode || item.productName || 'item'}`,
+        productId: 0,
+        productCode: item.productCode || '',
+        productName: item.productName || '',
+        unit: item.unit || 'Cái',
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unitPrice || 0),
+      })));
+
+      if (parsedItems.length === 0) {
+        setMessage({
+          type: 'error',
+          text: 'OCR chưa nhận diện được sản phẩm. Vui lòng thử ảnh rõ hơn hoặc nhập bằng Excel.',
+        });
+      } else {
+        setMessage({
+          type: 'success',
+          text: 'Đã đọc hóa đơn từ ảnh. Vui lòng kiểm tra lại dữ liệu trước khi xác nhận nhập kho.',
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi OCR hóa đơn:', error.response?.data || error);
+
+      setMessage({
+        type: 'error',
+        text: 'Không đọc được ảnh hóa đơn: ' + (error.response?.data?.message || error.message),
+      });
+    } finally {
+      setIsReadingInvoice(false);
+    }
+  }
+
   function handleEditItem(index, field, value) {
     setPreviewData((items) => {
       const updated = [...items];
@@ -259,8 +436,10 @@ export function ManagerImportTab({ user, branches }) {
     }
 
     const invalidItem = previewData.find((item) => {
-      return !item.productName || Number(item.quantity || 0) <= 0 || Number(item.unitPrice || 0) < 0;
-    });
+  return !String(item.productName || '').trim() ||
+    Number(item.quantity || 0) <= 0 ||
+    Number(item.unitPrice || 0) < 0;
+});
 
     if (invalidItem) {
       setMessage({
@@ -281,17 +460,17 @@ export function ManagerImportTab({ user, branches }) {
       invoiceDate: invoiceDate || null,
       note: note || null,
       items: previewData.map((item) => ({
-        productId: Number(item.productId || 0),
-        productCode: item.productCode || null,
-        productName: item.productName,
-        unit: item.unit || 'Cái',
-        quantity: Number(item.quantity || 0),
-        unitPrice: Number(item.unitPrice || 0),
-      })),
+  productId: Number(item.productId || 0),
+  productCode: String(item.productCode || '').trim() || null,
+  productName: String(item.productName || '').trim(),
+  unit: String(item.unit || 'Cái').trim() || 'Cái',
+  quantity: Number(item.quantity || 0),
+  unitPrice: Number(item.unitPrice || 0),
+})),
     };
 
     try {
-      const response = await axios.post('/api/KhoImport/submit-import', payload);
+    const response = await axios.post('http://localhost:5275/api/KhoImport/submit-import', payload);
 
       setMessage({
         type: 'success',
@@ -300,15 +479,22 @@ export function ManagerImportTab({ user, branches }) {
 
       setPreviewData([]);
       setFile(null);
+      setInvoiceImage(null);
       setDetectedSupplierName('');
       setSelectedSupplier('');
       setInvoiceCode('');
       setInvoiceDate('');
       setNote('');
       setExcelTotal(0);
+      setOcrRawText('');
+      setOcrWarnings([]);
+      setOcrConfidence(null);
 
-      const input = document.getElementById('excel-upload');
-      if (input) input.value = '';
+      const excelInput = document.getElementById('excel-upload');
+      if (excelInput) excelInput.value = '';
+
+      const imageInput = document.getElementById('invoice-image-upload');
+      if (imageInput) imageInput.value = '';
     } catch (error) {
       console.error('Lỗi chi tiết từ server:', error.response?.data);
 
@@ -323,10 +509,8 @@ export function ManagerImportTab({ user, branches }) {
 
   return (
     <div className="sd-card">
-      <div className="sd-card-header">
-        <p className="sd-eyebrow">Kho chi nhánh</p>
-        <h2>Nhập kho hàng hóa</h2>
-      </div>
+
+
 
       <div
         className="sd-info-hero"
@@ -363,7 +547,7 @@ export function ManagerImportTab({ user, branches }) {
         </div>
 
         <div className="sd-field">
-          <label>Nhà cung cấp nhận diện từ Excel</label>
+          <label>Nhà cung cấp nhận diện từ file</label>
           <input
             type="text"
             value={detectedSupplierName || 'Chưa tải file hoặc không tìm thấy'}
@@ -387,7 +571,7 @@ export function ManagerImportTab({ user, branches }) {
         </div>
 
         <div className="sd-field">
-          <label>Ngày hóa đơn</label>
+          <label>Ngày giao</label>
           <input
             type="date"
             value={invoiceDate}
@@ -406,7 +590,7 @@ export function ManagerImportTab({ user, branches }) {
         </div>
 
         <div className="sd-field">
-          <label>Tổng tiền tạm tính</label>
+          <label>Tổng giá trị</label>
           <input
             type="text"
             value={formatMoney(totalAmount || excelTotal)}
@@ -416,27 +600,83 @@ export function ManagerImportTab({ user, branches }) {
         </div>
       </div>
 
-      <div className="sd-field" style={{ marginBottom: 24 }}>
-        <label>Chọn file Excel hoá đơn giao hàng *</label>
-        <input
-          id="excel-upload"
-          type="file"
-          accept=".xlsx, .xls"
-          onChange={handleFileUpload}
-          style={{ padding: '10px', background: '#f8fafc' }}
-        />
-        {file && (
-          <p className="sd-text-muted" style={{ fontSize: 12, marginTop: 6 }}>
-            File đã chọn: {file.name}
-          </p>
-        )}
-        {detectedSupplierName && !selectedSupplier && (
-          <p className="sd-status sd-status-error" style={{ marginTop: 6, padding: '4px 8px' }}>
-            Hệ thống đọc được tên "{detectedSupplierName}" trong file nhưng không khớp với Nhà cung cấp nào trong cơ sở dữ liệu.
-            Vui lòng chọn thủ công bằng ô bên trên.
-          </p>
-        )}
+      <div className="sd-import-source-grid">
+        <div className="sd-import-upload-card">
+          <div className="sd-import-upload-head">
+            <span>📄</span>
+            <div>
+              <strong>Nhập từ Excel</strong>
+              <p>Đọc hóa đơn giao hàng từ file .xlsx hoặc .xls</p>
+            </div>
+          </div>
+
+          <input
+            id="excel-upload"
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            className="sd-import-file-input"
+          />
+
+          {file && (
+            <p className="sd-text-muted sd-import-file-name">
+              File đã chọn: {file.name}
+            </p>
+          )}
+        </div>
+
+        <div className="sd-import-upload-card">
+          <div className="sd-import-upload-head">
+            <span>📷</span>
+            <div>
+              <strong>Nhập từ ảnh hóa đơn</strong>
+              <p>Chụp hoặc tải ảnh hóa đơn JPG/PNG để hệ thống nhận diện dữ liệu</p>
+            </div>
+          </div>
+
+          <input
+            id="invoice-image-upload"
+            type="file"
+            accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+            capture="environment"
+            onChange={handleInvoiceImageUpload}
+            className="sd-import-file-input"
+          />
+
+          {invoiceImage && (
+            <p className="sd-text-muted sd-import-file-name">
+              Ảnh đã chọn: {invoiceImage.name}
+            </p>
+          )}
+
+          {isReadingInvoice && (
+            <p className="sd-import-reading">
+              Đang đọc hóa đơn từ ảnh...
+            </p>
+          )}
+
+          {ocrConfidence !== null && (
+            <p className="sd-import-confidence">
+              Độ tin cậy OCR: {Math.round(Number(ocrConfidence) * 100)}%
+            </p>
+          )}
+        </div>
       </div>
+
+      {detectedSupplierName && !selectedSupplier && (
+        <p className="sd-status sd-status-error sd-import-detected-warning">
+          Hệ thống đọc được tên "{detectedSupplierName}" trong file nhưng không khớp với Nhà cung cấp nào trong cơ sở dữ liệu.
+          Vui lòng chọn thủ công bằng ô bên trên.
+        </p>
+      )}
+
+      {ocrWarnings.length > 0 && (
+        <div className="sd-status sd-status-error sd-import-warning-list">
+          {ocrWarnings.map((warning, index) => (
+            <div key={index}>{warning}</div>
+          ))}
+        </div>
+      )}
 
       {previewData.length > 0 && (
         <>
@@ -461,12 +701,25 @@ export function ManagerImportTab({ user, branches }) {
               <tbody>
                 {previewData.map((item, index) => (
                   <tr key={item.idId} className="sd-tr">
-                    <td className="sd-td sd-text-center">
-                      {item.productCode || '—'}
-                    </td>
-                    <td className="sd-td" style={{ fontWeight: 500 }}>
-                      {item.productName}
-                    </td>
+                   <td className="sd-td sd-text-center">
+  <input
+    type="text"
+    value={item.productCode || ''}
+    onChange={(event) => handleEditItem(index, 'productCode', event.target.value)}
+    placeholder="Mã SP"
+    className="sd-import-edit-input sd-import-code-input"
+  />
+</td>
+
+<td className="sd-td">
+  <input
+    type="text"
+    value={item.productName}
+    onChange={(event) => handleEditItem(index, 'productName', event.target.value)}
+    placeholder="Tên mặt hàng"
+    className="sd-import-edit-input sd-import-name-input"
+  />
+</td>
                     <td className="sd-td">
                       <input
                         type="text"
@@ -512,6 +765,15 @@ export function ManagerImportTab({ user, branches }) {
             </table>
           </div>
         </>
+      )}
+
+      {ocrRawText && (
+        <details className="sd-ocr-raw-box">
+          <summary>
+            Xem nội dung OCR đọc được
+          </summary>
+          <pre>{ocrRawText}</pre>
+        </details>
       )}
 
       {message && (

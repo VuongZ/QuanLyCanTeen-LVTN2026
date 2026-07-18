@@ -125,6 +125,25 @@ public class SalaryController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("parse-invoice-image")]
+public async Task<IActionResult> ParseInvoiceImage(
+    IFormFile file,
+    [FromServices] InvoiceOcrService invoiceOcrService)
+{
+    try
+    {
+        var result = await invoiceOcrService.ParseInvoiceImageAsync(file);
+        return Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(new
+        {
+            message = ex.Message
+        });
+    }
+}
+
     [HttpPut("rule")]
     public async Task<IActionResult> UpdateSalaryRule([FromBody] UpdateSalaryRuleDto dto)
     {

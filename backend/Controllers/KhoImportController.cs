@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Services;
 using System;
-using System.Threading.Tasks;
+using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace LuanVanTotNghiep.Controllers
 {
@@ -23,99 +25,155 @@ namespace LuanVanTotNghiep.Controllers
         {
             if (dto.Items == null || dto.Items.Count == 0)
             {
-                return BadRequest(new { message = "Phiếu nhập từ file Excel không có sản phẩm nào hợp lệ." });
+                return BadRequest(new
+                {
+                    message = "Phiếu nhập từ file Excel không có sản phẩm nào hợp lệ."
+                });
             }
 
             try
             {
                 await _importService.CreateImportTicketAsync(dto);
-                return Ok(new { message = "Nhập kho thành công!" });
+
+                return Ok(new
+                {
+                    message = "Nhập kho thành công!"
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = ex.Message });
+                return StatusCode(500, new
+                {
+                    message = ex.Message
+                });
             }
         }
 
-       [HttpGet("inventory-tickets")]
-public async Task<IActionResult> GetInventoryImportTickets([FromQuery] int? branchId)
-{
-    try
-    {
-        var finalBranchId = ResolveBranchIdForQuery(branchId);
 
-        if (finalBranchId == -1)
-            return Unauthorized(new { message = "Không tìm thấy thông tin chi nhánh trong token." });
+        [HttpPost("parse-invoice-image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> ParseInvoiceImage(
+     IFormFile file,
+     [FromServices] InvoiceOcrService invoiceOcrService)
+        {
+            try
+            {
+                var result = await invoiceOcrService.ParseInvoiceImageAsync(file);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
 
-        var data = await _importService.GetInventoryImportTicketsAsync(
-            finalBranchId == 0 ? null : finalBranchId
-        );
+        [HttpGet("inventory-tickets")]
+        public async Task<IActionResult> GetInventoryImportTickets([FromQuery] int? branchId)
+        {
+            try
+            {
+                var finalBranchId = ResolveBranchIdForQuery(branchId);
 
-        return Ok(data);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new { message = "Lỗi hệ thống khi lấy phiếu nhập kho: " + ex.Message });
-    }
-}
+                if (finalBranchId == -1)
+                {
+                    return Unauthorized(new
+                    {
+                        message = "Không tìm thấy thông tin chi nhánh trong token."
+                    });
+                }
 
-[HttpGet("inventory-tickets/{id}")]
-public async Task<IActionResult> GetInventoryImportTicketDetail(int id, [FromQuery] int? branchId)
-{
-    try
-    {
-        var finalBranchId = ResolveBranchIdForQuery(branchId);
+                var data = await _importService.GetInventoryImportTicketsAsync(
+                    finalBranchId == 0 ? null : finalBranchId
+                );
 
-        if (finalBranchId == -1)
-            return Unauthorized(new { message = "Không tìm thấy thông tin chi nhánh trong token." });
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Lỗi hệ thống khi lấy phiếu nhập kho: " + ex.Message
+                });
+            }
+        }
 
-        var data = await _importService.GetInventoryImportTicketDetailAsync(
-            id,
-            finalBranchId == 0 ? null : finalBranchId
-        );
+        [HttpGet("inventory-tickets/{id}")]
+        public async Task<IActionResult> GetInventoryImportTicketDetail(int id, [FromQuery] int? branchId)
+        {
+            try
+            {
+                var finalBranchId = ResolveBranchIdForQuery(branchId);
 
-        if (data == null)
-            return NotFound(new { message = "Không tìm thấy phiếu nhập kho." });
+                if (finalBranchId == -1)
+                {
+                    return Unauthorized(new
+                    {
+                        message = "Không tìm thấy thông tin chi nhánh trong token."
+                    });
+                }
 
-        return Ok(data);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new { message = "Lỗi hệ thống khi lấy chi tiết phiếu nhập kho: " + ex.Message });
-    }
-}
+                var data = await _importService.GetInventoryImportTicketDetailAsync(
+                    id,
+                    finalBranchId == 0 ? null : finalBranchId
+                );
 
-private int ResolveBranchIdForQuery(int? requestedBranchId)
-{
-    var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
-    var isAdmin = role == "ADMIN" || role == "QUẢN TRỊ" || role == "QUAN TRI";
+                if (data == null)
+                {
+                    return NotFound(new
+                    {
+                        message = "Không tìm thấy phiếu nhập kho."
+                    });
+                }
 
-    if (isAdmin)
-    {
-        return requestedBranchId.HasValue && requestedBranchId.Value > 0
-            ? requestedBranchId.Value
-            : 0;
-    }
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Lỗi hệ thống khi lấy chi tiết phiếu nhập kho: " + ex.Message
+                });
+            }
+        }
 
-    var tokenBranchIdStr = GetClaimValue("BranchId", "branchId", "branch_id");
+        private int ResolveBranchIdForQuery(int? requestedBranchId)
+        {
+            var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
+            var isAdmin = role == "ADMIN" || role == "QUẢN TRỊ" || role == "QUAN TRI";
 
-    if (!int.TryParse(tokenBranchIdStr, out var tokenBranchId) || tokenBranchId <= 0)
-        return -1;
+            if (isAdmin)
+            {
+                return requestedBranchId.HasValue && requestedBranchId.Value > 0
+                    ? requestedBranchId.Value
+                    : 0;
+            }
 
-    return tokenBranchId;
-}
+            var tokenBranchIdStr = GetClaimValue("BranchId", "branchId", "branch_id");
 
-private string? GetClaimValue(params string[] claimTypes)
-{
-    foreach (var claimType in claimTypes)
-    {
-        var value = User.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+            if (!int.TryParse(tokenBranchIdStr, out var tokenBranchId) || tokenBranchId <= 0)
+            {
+                return -1;
+            }
 
-        if (!string.IsNullOrWhiteSpace(value))
-            return value;
-    }
+            return tokenBranchId;
+        }
 
-    return null;
-}
+        private string? GetClaimValue(params string[] claimTypes)
+        {
+            foreach (var claimType in claimTypes)
+            {
+                var value = User.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
     }
 }

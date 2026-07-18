@@ -286,7 +286,7 @@ export function InventoryTab({ currentUser, branches = [] }) {
         <div className="sd-inventory-hero-main">
           <div className="sd-inventory-icon">📦</div>
           <div>
-            <p className="sd-eyebrow">Báo cáo kho</p>
+           
             <h2>{pageTitle}</h2>
             <p>{pageSubtitle}</p>
           </div>
@@ -380,8 +380,8 @@ export function InventoryTab({ currentUser, branches = [] }) {
               ))}
             </select>
           ) : (
-            <div className="sd-inventory-branch-chip">
-              🏫 {currentBranch?.name || currentUser?.branchName || 'Cơ sở hiện tại'}
+            <div >
+             
             </div>
           )}
 

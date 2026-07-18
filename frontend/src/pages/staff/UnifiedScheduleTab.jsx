@@ -656,143 +656,153 @@ function RegistrationView({ period, user }) {
         </div>
       )}
 
-      <div className="sd-shift-legend" style={{ marginLeft: -20, marginRight: -20, paddingLeft: 20 }}>
-        {shifts.length === 0 && <p style={{ fontSize: 13 }}>Chưa cấu hình ca làm việc.</p>}
-        {shifts.map((s) => (
-          <div key={s.id} className="sd-shift-legend-item">
-            <span>⏱️</span>
-            <div><strong>{s.shiftName}</strong><small>{s.startTime?.slice(0, 5)} – {s.endTime?.slice(0, 5)}</small></div>
-          </div>
-        ))}
-      </div>
 
-      {shifts.length > 0 && dates.length > 0 && (
-        <div className="sd-shift-grid-vertical">
-          <div className="sd-grid-row sd-grid-header-row">
-            <div className="sd-grid-corner-v" />
-            {shifts.map((s) => <div key={s.id} className="sd-grid-shift-col-label">{s.shiftName}</div>)}
-          </div>
 
-          {dates.map((dateObj) => {
-            const dateStr = toDateString(dateObj);
-            const dayOfWeek = DAY_NAMES[dateObj.getDay()];
-            const shortDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+     {shifts.length > 0 && dates.length > 0 && (
+  <div className="sd-board-wrap" style={{ borderRadius: 12 }}>
+    <table className="sd-schedule-board sd-registration-board">
+      <thead>
+        <tr>
+          <th style={{ width: 90 }}>NGÀY</th>
 
-            return (
-              <div key={dateStr} className="sd-grid-row">
-                <div className="sd-grid-day-row-label">
-                  <strong>{dayOfWeek}</strong><small>{shortDate}</small>
-                </div>
+          {shifts.map((s) => (
+            <th key={s.id}>
+              {s.shiftName}
+              <br />
+              <span style={{ fontWeight: 500, fontSize: 11 }}>
+                {s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
 
-                {shifts.map((shift) => {
-                  const isOn = registered[dateStr]?.[shift.id] || false;
-                  const dbItem = dbRegistrations[dateStr]?.[shift.id];
-                  const isCellLocked =
-                    isLocked ||
-                    (
-                      dbItem &&
-                      dbItem.status !== 'REGISTERED' &&
-                      dbItem.status !== 'Chờ Duyệt'
-                    )
+      <tbody>
+        {dates.map((dateObj) => {
+          const dateStr = toDateString(dateObj);
+          const dayOfWeek = DAY_NAMES[dateObj.getDay()];
+          const shortDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
 
-                  const totalMaxStaff = getTotalMaxStaffForShiftDate(shift.id, dateObj)
-                  const staffSlot = getStaffSlotForShiftDate(shift.id, dateObj)
-                  const isFull = !isOn && isShiftFull(dateStr, shift.id, dateObj)
+          return (
+            <tr key={dateStr}>
+              <td className="sd-board-date-col">
+                <strong>{dayOfWeek}</strong>
+                <small>{shortDate}</small>
+              </td>
 
-                  const savedStaffList = allRegistrations.filter((item) => {
-                    return (
-                      item.workDate?.slice(0, 10) === dateStr &&
-                      item.shiftId === shift.id &&
-                      !isRejectedStatus(item.status)
-                    )
-                  })
+              {shifts.map((shift) => {
+                const isOn = registered[dateStr]?.[shift.id] || false;
+                const dbItem = dbRegistrations[dateStr]?.[shift.id];
 
-                  const hasMeInSavedList = savedStaffList.some((item) => item.userId === user.id)
+                const isCellLocked =
+                  isLocked ||
+                  (
+                    dbItem &&
+                    dbItem.status !== 'REGISTERED' &&
+                    dbItem.status !== 'Chờ Duyệt'
+                  );
 
-                  const displayStaffList = savedStaffList.map((item) => ({
-                    id: item.id,
-                    name:
-                      item.userId === user.id
-                        ? user.fullName || 'Bạn'
-                        : item.user?.fullName || item.user?.username || 'Nhân viên',
-                    isMe: item.userId === user.id,
-                    isPending: false
-                  }))
+                const totalMaxStaff = getTotalMaxStaffForShiftDate(shift.id, dateObj);
+                const staffSlot = getStaffSlotForShiftDate(shift.id, dateObj);
+                const isFull = !isOn && isShiftFull(dateStr, shift.id, dateObj);
 
-                  if (isOn && !hasMeInSavedList) {
-                    displayStaffList.push({
-                      id: `new-${dateStr}-${shift.id}`,
-                      name: user.fullName || 'Bạn',
-                      isMe: true,
-                      isPending: true
-                    })
-                  }
-
-                  const emptySlotCount = Math.max(staffSlot - displayStaffList.length, 0)
-
+                const savedStaffList = allRegistrations.filter((item) => {
                   return (
+                    item.workDate?.slice(0, 10) === dateStr &&
+                    item.shiftId === shift.id &&
+                    !isRejectedStatus(item.status)
+                  );
+                });
+
+                const hasMeInSavedList = savedStaffList.some(
+                  (item) => item.userId === user.id
+                );
+
+                const displayStaffList = savedStaffList.map((item) => ({
+                  id: item.id,
+                  name:
+                    item.userId === user.id
+                      ? user.fullName || 'Bạn'
+                      : item.user?.fullName || item.user?.username || 'Nhân viên',
+                  isMe: item.userId === user.id,
+                  isPending: false,
+                }));
+
+                if (isOn && !hasMeInSavedList) {
+                  displayStaffList.push({
+                    id: `new-${dateStr}-${shift.id}`,
+                    name: user.fullName || 'Bạn',
+                    isMe: true,
+                    isPending: true,
+                  });
+                }
+
+                const emptySlotCount = Math.max(staffSlot - displayStaffList.length, 0);
+
+                return (
+                  <td key={shift.id} className="sd-registration-cell">
                     <button
-                     key={shift.id}
-  className={`sd-shift-cell-v sd-shift-cell-slots ${isOn ? 'selected' : ''} ${(isFull || isCellLocked) ? 'disabled' : ''}`}
-  onClick={() => toggle(dateStr, shift.id, dateObj)}
-  type="button"
-  disabled={isCellLocked || isFull}
+                      className={`sd-shift-cell-v sd-shift-cell-slots ${isOn ? 'selected' : ''} ${(isFull || isCellLocked) ? 'disabled' : ''}`}
+                      onClick={() => toggle(dateStr, shift.id, dateObj)}
+                      type="button"
+                      disabled={isCellLocked || isFull}
                     >
                       <div className="sd-slot-list">
-  {totalMaxStaff > 0 && (
-    <div className="sd-slot-person sd-slot-manager">
-      <span className="sd-slot-name">
-        Quản lý
-      </span>
-    </div>
-  )}
+                        {totalMaxStaff > 0 && (
+                          <div className="sd-slot-person sd-slot-manager">
+                            <span className="sd-slot-name">Quản lý</span>
+                          </div>
+                        )}
 
-  {displayStaffList.map((staff) => (
-    <div
-      key={staff.id}
-      className={`sd-slot-person ${staff.isMe ? 'sd-slot-me' : 'sd-slot-staff'}`}
-    >
-      <span className="sd-slot-name">
-        {staff.name}
-      </span>
+                        {displayStaffList.map((staff) => (
+                          <div
+                            key={staff.id}
+                            className={`sd-slot-person ${staff.isMe ? 'sd-slot-me' : 'sd-slot-staff'}`}
+                          >
+                            <span className="sd-slot-name">
+                              {staff.name}
+                            </span>
 
-      {staff.isPending && (
-        <span className="sd-slot-pending">
-          Chưa lưu
-        </span>
-      )}
-    </div>
-  ))}
+                            {staff.isPending && (
+                              <span className="sd-slot-pending">
+                                Chưa lưu
+                              </span>
+                            )}
+                          </div>
+                        ))}
 
-  {Array.from({ length: emptySlotCount }).map((_, index) => (
-    <div
-      key={`empty-${dateStr}-${shift.id}-${index}`}
-      className="sd-slot-empty"
-    >
-      Còn trống
-    </div>
-  ))}
+                        {Array.from({ length: emptySlotCount }).map((_, index) => (
+                          <div
+                            key={`empty-${dateStr}-${shift.id}-${index}`}
+                            className="sd-slot-empty"
+                          >
+                            Còn trống
+                          </div>
+                        ))}
 
-  {staffSlot <= 0 && (
-    <div className="sd-slot-empty">
-      Không có slot nhân viên
-    </div>
-  )}
+                        {staffSlot <= 0 && (
+                          <div className="sd-slot-empty">
+                            Không có slot nhân viên
+                          </div>
+                        )}
 
-  {isFull && (
-    <div className="sd-slot-full-text">
-      Ca đã đủ người
-    </div>
-  )}
-</div>
+                        {isFull && (
+                          <div className="sd-slot-full-text">
+                            Ca đã đủ người
+                          </div>
+                        )}
+                      </div>
                     </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  </td>
+                );
+              })}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+)}
 
       <div className="sd-shift-actions">
         <button className="sd-btn-ghost" onClick={handleReset} type="button" disabled={totalChanges === 0}>Hoàn tác thay đổi</button>

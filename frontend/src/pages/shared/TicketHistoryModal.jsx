@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 
+
+function normalizeSearchText(value = '') {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
 }
@@ -85,6 +94,7 @@ export function TicketHistoryModal({
   const [loadingList, setLoadingList] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   const config = useMemo(() => {
     if (type === 'inventoryImport') {
@@ -151,11 +161,52 @@ export function TicketHistoryModal({
     }
   }
 
+
+  const filteredTickets = useMemo(() => {
+    const keyword = normalizeSearchText(search);
+
+    if (!keyword) {
+      return tickets;
+    }
+
+    return tickets.filter((ticket) => {
+      const searchableText = [
+        ticket.id,
+        `#${ticket.id}`,
+        ticket.branchName,
+        ticket.managerName,
+        ticket.supplierName,
+        ticket.invoiceCode,
+        ticket.invoiceDate,
+        ticket.importDate,
+        ticket.exportDate,
+        ticket.shiftName,
+        ticket.workDate,
+        ticket.shiftTime,
+        ticket.note,
+        ticket.itemCount,
+        ticket.totalQuantity,
+        ticket.totalAmount,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(' ');
+
+      return normalizeSearchText(searchableText).includes(keyword);
+    });
+  }, [tickets, search]);
+
   useEffect(() => {
     if (open) {
       loadTickets();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, type, branchId]);
+
+
+  useEffect(() => {
+    if (open) {
+      setSearch('');
+    }
   }, [open, type, branchId]);
 
   if (!open) return null;
@@ -191,12 +242,45 @@ export function TicketHistoryModal({
               </button>
             </div>
 
+            <div className="sd-ticket-search">
+              <span className="sd-ticket-search-icon">⌕</span>
+
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={
+                  isImport
+                    ? 'Tìm mã phiếu, nhà cung cấp, ngày nhập...'
+                    : 'Tìm mã phiếu, cơ sở, ngày xuất...'
+                }
+              />
+
+              {search && (
+                <button
+                  type="button"
+                  className="sd-ticket-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Xóa nội dung tìm kiếm"
+                  title="Xóa tìm kiếm"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="sd-ticket-result-count">
+              Hiển thị {filteredTickets.length} / {tickets.length} phiếu
+            </div>
+
             {loadingList ? (
               <div className="sd-ticket-empty">Đang tải danh sách phiếu...</div>
-            ) : tickets.length === 0 ? (
-              <div className="sd-ticket-empty">{config.emptyText}</div>
+            ) : filteredTickets.length === 0 ? (
+              <div className="sd-ticket-empty">
+                {search ? 'Không tìm thấy phiếu phù hợp.' : config.emptyText}
+              </div>
             ) : (
-              tickets.map((ticket) => (
+              filteredTickets.map((ticket) => (
                 <button
                   key={ticket.id}
                   type="button"

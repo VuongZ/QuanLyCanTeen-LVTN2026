@@ -82,7 +82,7 @@ namespace LuanVanTotNghiep.Controllers
 
                 return Ok(new
                 {
-                    message = "Gửi báo cáo kết ca thành công.",
+                    message = "Đã gửi báo cáo kết ca và đang chờ Quản lý duyệt.",
                     reportId
                 });
             }
@@ -115,7 +115,7 @@ namespace LuanVanTotNghiep.Controllers
             }
         }
 
-        [HttpGet("my-reports/{id}")]
+        [HttpGet("my-reports/{id:int}")]
         public async Task<IActionResult> GetMyReportDetail(int id)
         {
             try
@@ -138,87 +138,155 @@ namespace LuanVanTotNghiep.Controllers
             }
         }
 
+        [HttpGet("reports")]
+        public async Task<IActionResult> GetReportsForManagement([FromQuery] int? branchId)
+        {
+            try
+            {
+                var finalBranchId = ResolveBranchIdForManagement(branchId);
 
-[HttpGet("reports")]
-public async Task<IActionResult> GetReportsForManagement([FromQuery] int? branchId)
-{
-    try
-    {
-        var finalBranchId = ResolveBranchIdForManagement(branchId);
+                if (finalBranchId == -2)
+                    return Forbid();
 
-        if (finalBranchId == -2)
-            return Forbid();
+                if (finalBranchId == -1)
+                    return Unauthorized(new { message = "Không tìm thấy thông tin cơ sở trong token." });
 
-        if (finalBranchId == -1)
-            return Unauthorized(new { message = "Không tìm thấy thông tin cơ sở trong token." });
+                var data = await _shiftClosingService.GetReportsForManagementAsync(
+                    finalBranchId == 0 ? null : finalBranchId
+                );
 
-        var data = await _shiftClosingService.GetReportsForManagementAsync(
-            finalBranchId == 0 ? null : finalBranchId
-        );
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống khi lấy báo cáo kết ca: " + ex.Message });
+            }
+        }
 
-        return Ok(data);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new { message = "Lỗi hệ thống khi lấy báo cáo kết ca: " + ex.Message });
-    }
-}
+        [HttpGet("reports/{id:int}")]
+        public async Task<IActionResult> GetReportDetailForManagement(int id, [FromQuery] int? branchId)
+        {
+            try
+            {
+                var finalBranchId = ResolveBranchIdForManagement(branchId);
 
-[HttpGet("reports/{id}")]
-public async Task<IActionResult> GetReportDetailForManagement(int id, [FromQuery] int? branchId)
-{
-    try
-    {
-        var finalBranchId = ResolveBranchIdForManagement(branchId);
+                if (finalBranchId == -2)
+                    return Forbid();
 
-        if (finalBranchId == -2)
-            return Forbid();
+                if (finalBranchId == -1)
+                    return Unauthorized(new { message = "Không tìm thấy thông tin cơ sở trong token." });
 
-        if (finalBranchId == -1)
-            return Unauthorized(new { message = "Không tìm thấy thông tin cơ sở trong token." });
+                var data = await _shiftClosingService.GetReportDetailForManagementAsync(
+                    id,
+                    finalBranchId == 0 ? null : finalBranchId
+                );
 
-        var data = await _shiftClosingService.GetReportDetailForManagementAsync(
-            id,
-            finalBranchId == 0 ? null : finalBranchId
-        );
+                if (data == null)
+                    return NotFound(new { message = "Không tìm thấy báo cáo kết ca." });
 
-        if (data == null)
-            return NotFound(new { message = "Không tìm thấy báo cáo kết ca." });
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống khi lấy chi tiết báo cáo kết ca: " + ex.Message });
+            }
+        }
 
-        return Ok(data);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new { message = "Lỗi hệ thống khi lấy chi tiết báo cáo kết ca: " + ex.Message });
-    }
-}
+        [HttpPut("reports/{id:int}/approve")]
+        public async Task<IActionResult> ApproveReport(int id)
+        {
+            try
+            {
+                if (!IsCurrentUserManager())
+                    return Forbid();
 
-private int ResolveBranchIdForManagement(int? requestedBranchId)
-{
-    var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
+                var managerId = GetCurrentUserId();
 
-    var isAdmin = role == "ADMIN" || role == "QUẢN TRỊ" || role == "QUAN TRI";
-    var isManager = role == "MANAGER" || role == "QUẢN LÝ" || role == "QUAN LY";
+                if (managerId <= 0)
+                    return Unauthorized(new { message = "Không tìm thấy thông tin Quản lý trong token." });
 
-    if (isAdmin)
-    {
-        return requestedBranchId.HasValue && requestedBranchId.Value > 0
-            ? requestedBranchId.Value
-            : 0;
-    }
+                await _shiftClosingService.ApproveReportAsync(managerId, id);
 
-    if (isManager)
-    {
-        var branchIdStr = GetClaimValue("BranchId", "branchId", "branch_id");
+                return Ok(new
+                {
+                    message = "Duyệt báo cáo thành công. Tồn quầy đã được cập nhật."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống khi duyệt báo cáo: " + ex.Message });
+            }
+        }
 
-        if (!int.TryParse(branchIdStr, out var branchId) || branchId <= 0)
-            return -1;
+        [HttpPut("reports/{id:int}/reject")]
+        public async Task<IActionResult> RejectReport(int id, [FromBody] RejectShiftClosingDto dto)
+        {
+            try
+            {
+                if (!IsCurrentUserManager())
+                    return Forbid();
 
-        return branchId;
-    }
+                var managerId = GetCurrentUserId();
 
-    return -2;
-}
+                if (managerId <= 0)
+                    return Unauthorized(new { message = "Không tìm thấy thông tin Quản lý trong token." });
+
+                await _shiftClosingService.RejectReportAsync(managerId, id, dto.Reason);
+
+                return Ok(new
+                {
+                    message = "Đã từ chối báo cáo. Tồn quầy được giữ nguyên."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi hệ thống khi từ chối báo cáo: " + ex.Message });
+            }
+        }
+
+        private int ResolveBranchIdForManagement(int? requestedBranchId)
+        {
+            var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
+
+            var isAdmin = role == "ADMIN" || role == "QUẢN TRỊ" || role == "QUAN TRI";
+            var isManager = role == "MANAGER" || role == "QUẢN LÝ" || role == "QUAN LY";
+
+            if (isAdmin)
+            {
+                return requestedBranchId.HasValue && requestedBranchId.Value > 0
+                    ? requestedBranchId.Value
+                    : 0;
+            }
+
+            if (isManager)
+            {
+                var branchIdStr = GetClaimValue("BranchId", "branchId", "branch_id");
+
+                if (!int.TryParse(branchIdStr, out var branchId) || branchId <= 0)
+                    return -1;
+
+                return branchId;
+            }
+
+            return -2;
+        }
+
+        private bool IsCurrentUserManager()
+        {
+            var role = GetClaimValue(ClaimTypes.Role, "role", "Role")?.ToUpperInvariant();
+
+            return role == "MANAGER"
+                || role == "QUẢN LÝ"
+                || role == "QUAN LY";
+        }
 
         private int GetCurrentUserId()
         {

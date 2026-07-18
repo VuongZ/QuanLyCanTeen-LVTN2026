@@ -39,7 +39,11 @@ public partial class NsUser
 
     public virtual ICollection<KhoImportTicket> KhoImportTickets { get; set; } = new List<KhoImportTicket>();
 
-    public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReports { get; set; } = new List<KhoShiftClosingReport>();
+    public virtual ICollection<KhoProduct> KhoProducts { get; set; } = new List<KhoProduct>();
+
+    public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReportReviewedByNavigations { get; set; } = new List<KhoShiftClosingReport>();
+
+    public virtual ICollection<KhoShiftClosingReport> KhoShiftClosingReportUsers { get; set; } = new List<KhoShiftClosingReport>();
 
     public virtual ICollection<LuongMonthlySalary> LuongMonthlySalaries { get; set; } = new List<LuongMonthlySalary>();
 
