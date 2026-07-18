@@ -363,13 +363,16 @@ public class SalaryService
 
         if (salary == null)
         {
+            var hourlyWage = SalaryWagePolicy.GetHourlyWage(
+                user,
+                new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
             salary = new LuongMonthlySalary
             {
                 UserId = dto.UserId,
                 Month = dto.Month,
                 Year = dto.Year,
                 TotalHours = preview.TotalHours,
-                HourlyWageAtTime = user.Role?.HourlyWage ?? 0,
+                HourlyWageAtTime = hourlyWage,
                 Status = "PENDING",
                 CreatedAt = DateTime.UtcNow
             };
@@ -378,7 +381,9 @@ public class SalaryService
 
         salary.TotalBonus = preview.CalculatedBonus;
         salary.TotalPenalty = preview.CalculatedPenalty;
-        salary.HourlyWageAtTime = user.Role?.HourlyWage ?? salary.HourlyWageAtTime;
+        salary.HourlyWageAtTime = SalaryWagePolicy.GetHourlyWage(
+            user,
+            new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
         salary.TotalSalary = (salary.TotalHours * salary.HourlyWageAtTime)
             + (salary.TotalBonus ?? 0)
             - (salary.TotalPenalty ?? 0);
@@ -414,13 +419,16 @@ public class SalaryService
 
         if (salary == null)
         {
+            var hourlyWage = SalaryWagePolicy.GetHourlyWage(
+                user,
+                new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
             salary = new LuongMonthlySalary
             {
                 UserId = dto.UserId,
                 Month = dto.Month,
                 Year = dto.Year,
                 TotalHours = 0,
-                HourlyWageAtTime = user.Role?.HourlyWage ?? 0,
+                HourlyWageAtTime = hourlyWage,
                 TotalBonus = 0,
                 TotalPenalty = 0,
                 TotalSalary = 0,
@@ -432,7 +440,9 @@ public class SalaryService
 
         salary.TotalBonus = (salary.TotalBonus ?? 0) + dto.BonusAmount;
         salary.TotalPenalty = (salary.TotalPenalty ?? 0) + dto.PenaltyAmount;
-        salary.HourlyWageAtTime = user.Role?.HourlyWage ?? salary.HourlyWageAtTime;
+        salary.HourlyWageAtTime = SalaryWagePolicy.GetHourlyWage(
+            user,
+            new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
         salary.TotalSalary = (salary.TotalHours * salary.HourlyWageAtTime)
             + (salary.TotalBonus ?? 0)
             - (salary.TotalPenalty ?? 0);
@@ -550,7 +560,10 @@ public class SalaryService
             CalculatedBonus = calculatedBonus,
             CalculatedPenalty = calculatedPenalty,
             TotalHours = salary?.TotalHours ?? 0,
-            HourlyWageAtTime = salary?.HourlyWageAtTime ?? user.Role?.HourlyWage ?? 0,
+            HourlyWageAtTime = salary?.HourlyWageAtTime
+                ?? SalaryWagePolicy.GetHourlyWage(
+                    user,
+                    new DateOnly(year, month, DateTime.DaysInMonth(year, month))),
             TotalSalary = salary?.TotalSalary ?? 0,
             Status = salary?.Status ?? "PENDING"
         };

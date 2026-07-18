@@ -41,7 +41,8 @@ namespace LuanVanTotNghiep.Services
             if (!branchExists)
                 throw new InvalidOperationException("Không tìm thấy chi nhánh.");
 
-            var supplierExists = await _context.KhoSuppliers.AnyAsync(s => s.Id == dto.SupplierId);
+            var supplierExists = await _context.KhoSuppliers
+                .AnyAsync(s => s.Id == dto.SupplierId && s.IsDeleted != true);
             if (!supplierExists)
                 throw new InvalidOperationException("Không tìm thấy nhà cung cấp.");
 

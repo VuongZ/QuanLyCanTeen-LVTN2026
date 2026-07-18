@@ -7,6 +7,8 @@ namespace LuanVanTotNghiep.DTOs
         public string SupplierName { get; set; } = null!;
         public string? Phone { get; set; }
         public string? Address { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAt { get; set; }
     }
 
     // DTO dùng để nhận dữ liệu từ React khi Thêm/Sửa (không cần ID)

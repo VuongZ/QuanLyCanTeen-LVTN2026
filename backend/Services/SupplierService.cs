@@ -22,7 +22,23 @@ namespace LuanVanTotNghiep.Services
                 Id = s.Id,
                 SupplierName = s.SupplierName,
                 Phone = s.Phone,
-                Address = s.Address
+                Address = s.Address,
+                IsDeleted = s.IsDeleted == true,
+                DeletedAt = s.DeletedAt
+            });
+        }
+
+        public async Task<IEnumerable<SupplierDto>> GetDeletedSuppliersAsync()
+        {
+            var suppliers = await _repo.GetDeletedAsync();
+            return suppliers.Select(s => new SupplierDto
+            {
+                Id = s.Id,
+                SupplierName = s.SupplierName,
+                Phone = s.Phone,
+                Address = s.Address,
+                IsDeleted = true,
+                DeletedAt = s.DeletedAt
             });
         }
 
@@ -60,9 +76,14 @@ namespace LuanVanTotNghiep.Services
             await _repo.UpdateAsync(existingSupplier);
         }
 
-        public async Task DeleteSupplierAsync(int id)
+        public async Task<bool> DeleteSupplierAsync(int id)
         {
-            await _repo.DeleteAsync(id);
+            return await _repo.SoftDeleteAsync(id);
+        }
+
+        public async Task<bool> RestoreSupplierAsync(int id)
+        {
+            return await _repo.RestoreAsync(id);
         }
     }
 }

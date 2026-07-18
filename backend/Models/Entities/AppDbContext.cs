@@ -599,6 +599,12 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
                 .HasColumnName("address");
+            entity.Property(e => e.DeletedAt)
+                .HasColumnType("timestamp")
+                .HasColumnName("deleted_at");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValueSql("'0'")
+                .HasColumnName("is_deleted");
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .HasColumnName("phone");

@@ -1,46 +1,71 @@
+using LuanVanTotNghiep.DTOs;
+using LuanVanTotNghiep.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using LuanVanTotNghiep.backend.Models.Entities;
-using LuanVanTotNghiep.Repositories;
-using Microsoft.AspNetCore.Authorization; // Nhớ import thư viện Authorize
 
 namespace LuanVanTotNghiep.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    // Hoặc [Authorize] nếu bạn chỉ cho phép người dùng đăng nhập nói chung được Xem
     public class SupplierController : ControllerBase
     {
-        private readonly SupplierRepo _repo;
-        public SupplierController(SupplierRepo repo) { _repo = repo; }
+        private readonly SupplierService _service;
 
-        // Mọi user đăng nhập (bao gồm cả Manager) đều có quyền XEM danh sách
+        public SupplierController(SupplierService service)
+        {
+            _service = service;
+        }
+
         [HttpGet]
-        public async Task<IActionResult> GetSuppliers() => Ok(await _repo.GetAllAsync());
+        public async Task<IActionResult> GetSuppliers() => Ok(await _service.GetAllSuppliersAsync());
 
-        // 👉 CHỈ CÓ ADMIN MỚI ĐƯỢC CRUD (Thêm, Sửa, Xóa)
+        [HttpGet("deleted")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> GetDeletedSuppliers() => Ok(await _service.GetDeletedSuppliersAsync());
+
         [HttpPost]
         [Authorize(Roles = "ADMIN")]
-        public async Task<IActionResult> CreateSupplier([FromBody] KhoSupplier supplier)
+        public async Task<IActionResult> CreateSupplier([FromBody] CreateUpdateSupplierDto supplier)
         {
-            await _repo.AddAsync(supplier);
-            return Ok(supplier);
+            var created = await _service.CreateSupplierAsync(supplier);
+            return Ok(created);
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = "ADMIN")]
-        public async Task<IActionResult> UpdateSupplier(int id, [FromBody] KhoSupplier supplier)
+        public async Task<IActionResult> UpdateSupplier(int id, [FromBody] CreateUpdateSupplierDto supplier)
         {
-            if (id != supplier.Id) return BadRequest();
-            await _repo.UpdateAsync(supplier);
-            return Ok(supplier);
+            try
+            {
+                await _service.UpdateSupplierAsync(id, supplier);
+                return NoContent();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Không tìm thấy nhà cung cấp." });
+            }
         }
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> DeleteSupplier(int id)
         {
-            await _repo.DeleteAsync(id);
+            var deleted = await _service.DeleteSupplierAsync(id);
+            if (!deleted)
+                return NotFound(new { message = "Không tìm thấy nhà cung cấp." });
+
             return NoContent();
+        }
+
+        [HttpPatch("{id}/restore")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> RestoreSupplier(int id)
+        {
+            var restored = await _service.RestoreSupplierAsync(id);
+            if (!restored)
+                return NotFound(new { message = "Không tìm thấy nhà cung cấp đã xóa." });
+
+            return Ok(new { message = "Khôi phục nhà cung cấp thành công." });
         }
     }
 }

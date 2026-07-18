@@ -13,6 +13,10 @@ public partial class KhoSupplier
 
     public string? Address { get; set; }
 
+    public bool? IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual ICollection<KhoImportTicket> KhoImportTickets { get; set; } = new List<KhoImportTicket>();
 
     public virtual ICollection<KhoProduct> KhoProducts { get; set; } = new List<KhoProduct>();
