@@ -5,9 +5,56 @@ import { getAllShifts } from '../../api/ShiftApi'
 
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
 
+function getApiErrorMessage(error, fallbackMessage) {
+  const responseData = error?.response?.data
+
+  if (typeof responseData === 'string' && responseData.trim()) {
+    return responseData
+  }
+
+  return responseData?.message || fallbackMessage
+}
+
+function getVietnamDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+function addDaysToDateString(dateString, days) {
+  const [year, month, day] = dateString.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  date.setUTCDate(date.getUTCDate() + days)
+
+  return date.toISOString().slice(0, 10)
+}
+
+function hasPeriodStarted(startDate) {
+  const normalizedStartDate = String(startDate || '').slice(0, 10)
+
+  return Boolean(normalizedStartDate) &&
+    normalizedStartDate <= getVietnamDateString()
+}
+
 function formatDate(value) {
   if (!value) return '—'
-  return new Intl.DateTimeFormat('vi-VN').format(new Date(value))
+
+  const normalizedDate = String(value).slice(0, 10)
+  const [year, month, day] = normalizedDate.split('-').map(Number)
+
+  if (!year || !month || !day) return '—'
+
+  return new Intl.DateTimeFormat('vi-VN').format(
+    new Date(year, month - 1, day)
+  )
 }
 
 export function ManagerPeriodTab({ user, isManager, branches }) {
@@ -21,25 +68,52 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   const [reviewingPeriodId, setReviewingPeriodId] = useState(null)
   const [form, setForm] = useState({ startDate: '', endDate: '', status: 'OPEN' })
 
-  useEffect(() => { loadPeriods() }, [])
+  useEffect(() => {
+    loadPeriods()
+
+    const intervalId = window.setInterval(loadPeriods, 10000)
+
+    return () => window.clearInterval(intervalId)
+  }, [user.branchId])
 
   async function loadPeriods() {
-    try { const data = await getAllPeriods(); setPeriods(Array.isArray(data) ? data : []) } catch (err) { console.error(err) }
+    try {
+      const data = await getAllPeriods()
+      setPeriods(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('Lỗi tải danh sách đợt đăng ký:', err)
+    }
   }
 
   function handleStartDateChange(e) {
-    const selectedDateStr = e.target.value;
-    if (!selectedDateStr) { setForm({ ...form, startDate: '', endDate: '' }); return; }
-    const startDateObj = new Date(selectedDateStr);
-    const endDateObj = new Date(startDateObj);
-    endDateObj.setDate(startDateObj.getDate() + 6);
-    const endDateStr = endDateObj.toISOString().slice(0, 10);
-    setForm({ ...form, startDate: selectedDateStr, endDate: endDateStr });
+    const selectedDateStr = e.target.value
+
+    if (!selectedDateStr) {
+      setForm((previous) => ({
+        ...previous,
+        startDate: '',
+        endDate: ''
+      }))
+      return
+    }
+
+    const endDateStr = addDaysToDateString(selectedDateStr, 6)
+
+    setForm((previous) => ({
+      ...previous,
+      startDate: selectedDateStr,
+      endDate: endDateStr
+    }))
   }
+
+  const minimumStartDate = addDaysToDateString(
+    getVietnamDateString(),
+    1
+  )
 
   const filteredPeriods = periods
     .filter((p) => {
-      const matchBranch = p.branchId === user.branchId
+      const matchBranch = String(p.branchId) === String(user.branchId)
       const dateRangeStr = `${formatDate(p.startDate)} ${formatDate(p.endDate)}`.toLowerCase()
       return matchBranch && dateRangeStr.includes(search.toLowerCase())
     })
@@ -50,32 +124,104 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
     setError('')
     setModal('add')
   }
-  function openEdit(p) {
+  function openEdit(period) {
+    const status = String(period.status || '').toUpperCase()
+
+    if (status === 'PUBLISHED') {
+      setError('Không thể chỉnh sửa đợt đăng ký đã được công bố.')
+      return
+    }
+
+    if (hasPeriodStarted(period.startDate)) {
+      setError('Không thể chỉnh sửa đợt đăng ký đã đến ngày bắt đầu.')
+      return
+    }
+
     setForm({
-      id: p.id,
-      startDate: p.startDate?.slice(0, 10) || '',
-      endDate: p.endDate?.slice(0, 10) || '',
-      status: p.status || 'OPEN'
+      id: period.id,
+      startDate: period.startDate?.slice(0, 10) || '',
+      endDate: period.endDate?.slice(0, 10) || '',
+      status: period.status || 'OPEN'
     })
     setError('')
     setModal('edit')
   }
-  function openDelete(p) { setSelectedPeriod(p); setError(''); setModal('delete') }
+
+  function openDelete(period) {
+    const status = String(period.status || '').toUpperCase()
+
+    if (status === 'PUBLISHED') {
+      setError('Không thể xóa đợt đăng ký đã được công bố.')
+      return
+    }
+
+    setSelectedPeriod(period)
+    setError('')
+    setModal('delete')
+  }
 
   async function handleSave() {
-    if (!form.startDate || !form.endDate) return setError('Vui lòng điền ngày bắt đầu và kết thúc')
-    setSaving(true); setError('')
+    if (!form.startDate || !form.endDate) {
+      setError('Vui lòng chọn ngày bắt đầu đợt đăng ký.')
+      return
+    }
+
+    if (form.startDate < minimumStartDate) {
+      setError('Ngày bắt đầu phải lớn hơn ngày hiện tại.')
+      return
+    }
+
+    const startDate = new Date(`${form.startDate}T00:00:00`)
+
+    if (startDate.getDay() !== 1) {
+      setError('Ngày bắt đầu đợt đăng ký bắt buộc phải là Thứ Hai.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
     try {
-      const payload = { ...form, branchId: user.branchId }
-      if (modal === 'add') await createPeriod(payload); else await updatePeriod(form.id, payload)
-      await loadPeriods(); setModal(null)
-    } catch (err) { setError('Lỗi khi lưu đợt.') } finally { setSaving(false) }
+      const payload = {
+        ...form,
+        branchId: user.branchId
+      }
+
+      if (modal === 'add') {
+        await createPeriod(payload)
+      } else {
+        await updatePeriod(form.id, payload)
+      }
+
+      await loadPeriods()
+      setModal(null)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể lưu đợt đăng ký.'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete() {
-    setSaving(true); setError('')
-    try { await deletePeriod(selectedPeriod.id); await loadPeriods(); setModal(null) }
-    catch (err) { setError('Không thể xóa đợt đăng ký này!') } finally { setSaving(false) }
+    if (!selectedPeriod) return
+
+    setSaving(true)
+    setError('')
+
+    try {
+      await deletePeriod(selectedPeriod.id)
+      await loadPeriods()
+      setModal(null)
+    } catch (err) {
+      setError(
+        getApiErrorMessage(
+          err,
+          'Không thể xóa đợt đăng ký này.'
+        )
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ✅ FIX: Tìm period object từ periods state (luôn mới nhất sau loadPeriods)
@@ -110,6 +256,12 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
         </div>
       </div>
 
+      {error && !modal && (
+        <p className="sd-status sd-status-error">
+          {error}
+        </p>
+      )}
+
       <div className="sd-table-wrap">
         <table className="sd-table">
           <thead>
@@ -125,34 +277,39 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
                 <div className="sd-empty-state"><span className="sd-empty-icon">📅</span><p>Chưa có đợt đăng ký lịch làm nào</p></div>
               </td></tr>
             )}
-            {filteredPeriods.map((p) => {
-              const st = String(p.status || '').toUpperCase()
+            {filteredPeriods.map((period) => {
+              const status = String(period.status || '').toUpperCase()
+              const isOpen = status === 'OPEN'
+              const isPublished = status === 'PUBLISHED'
+              const isOverdue =
+                !isPublished &&
+                hasPeriodStarted(period.startDate)
 
-              const isOpen = st === 'OPEN'
+              const cannotEdit =
+                isPublished ||
+                hasPeriodStarted(period.startDate)
 
-              const isClosed =
-                st === 'CLOSED' ||
-                st === 'REVIEWING' ||
-                st === 'DRAFT'
-
-              const isPublished = st === 'PUBLISHED'
               return (
-                // ✅ FIX: setReviewingPeriodId(p.id) thay vì setReviewingPeriod(p)
-                <tr key={p.id} className="sd-tr" style={{ cursor: 'pointer' }} onClick={() => setReviewingPeriodId(p.id)}>
+                <tr
+                  key={period.id}
+                  className="sd-tr"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setReviewingPeriodId(period.id)}
+                >
                   <td className="sd-td sd-td-name-col">
-                    <strong style={{ color: '#1e293b' }}>Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)}</strong>
+                    <strong style={{ color: '#1e293b' }}>
+                      Từ {formatDate(period.startDate)} đến {formatDate(period.endDate)}
+                    </strong>
                   </td>
+
                   <td className="sd-td sd-text-center sd-td-info-col">
                     {isPublished ? (
-                      <span
-                        className="sd-status-pill"
-                        style={{
-                          background: '#e0e7ff',
-                          color: '#1d4ed8',
-                          borderColor: '#bfdbfe'
-                        }}
-                      >
+                      <span className="sd-status-pill sd-status-pill--published">
                         Đã công bố
+                      </span>
+                    ) : isOverdue ? (
+                      <span className="sd-status-pill sd-status-pill--overdue">
+                        Quá hạn - Chưa công bố
                       </span>
                     ) : isOpen ? (
                       <span className="sd-status-pill sd-status-pill--open">
@@ -160,14 +317,46 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
                       </span>
                     ) : (
                       <span className="sd-status-pill sd-status-pill--closed">
-                        Đã đóng
+                        Đã khóa
                       </span>
                     )}
-
                   </td>
-                  <td className="sd-td sd-text-right" style={{ whiteSpace: 'nowrap' }}>
-                    <button className="sd-action-btn sd-action-edit" onClick={(e) => { e.stopPropagation(); openEdit(p) }}>✎</button>
-                    <button className="sd-action-btn sd-action-delete" onClick={(e) => { e.stopPropagation(); openDelete(p) }}>✕</button>
+
+                  <td
+                    className="sd-td sd-text-right"
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    <button
+                      className="sd-action-btn sd-action-edit"
+                      title={
+                        cannotEdit
+                          ? 'Đợt đã bắt đầu hoặc đã công bố nên không thể chỉnh sửa'
+                          : 'Chỉnh sửa đợt đăng ký'
+                      }
+                      disabled={cannotEdit}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openEdit(period)
+                      }}
+                    >
+                      ✎
+                    </button>
+
+                    <button
+                      className="sd-action-btn sd-action-delete"
+                      title={
+                        isPublished
+                          ? 'Không thể xóa đợt đã công bố'
+                          : 'Xóa đợt đăng ký'
+                      }
+                      disabled={isPublished}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openDelete(period)
+                      }}
+                    >
+                      ✕
+                    </button>
                   </td>
                 </tr>
               )
@@ -184,7 +373,7 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
               <div className="sd-modal-grid">
                 <div className="sd-field">
                   <label>Ngày bắt đầu đợt (Bắt buộc Thứ 2) *</label>
-                  <input type="date" value={form.startDate} onChange={handleStartDateChange} />
+                  <input type="date" min={minimumStartDate} value={form.startDate} onChange={handleStartDateChange} />
                 </div>
               </div>
               <div className="sd-field">
@@ -198,7 +387,7 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
                   </option>
 
                   <option value="CLOSED">
-                    Đóng đăng ký
+                    Khóa đăng ký
                   </option>
                 </select>
               </div>
@@ -236,11 +425,18 @@ function PeriodReviewScreen({ period, onBack, user }) {
   const [shifts, setShifts] = useState([])
   const [dates, setDates] = useState([])
   const [loading, setLoading] = useState(true)
-  const [currentStatus, setCurrentStatus] = useState((period?.status || 'OPEN').toUpperCase())
+  const [reviewError, setReviewError] = useState('')
+  const [currentStatus, setCurrentStatus] = useState(
+    (period?.status || 'OPEN').toUpperCase()
+  )
 
   useEffect(() => {
-    setCurrentStatus((period?.status || 'OPEN').toUpperCase())
+    setCurrentStatus(
+      String(period?.status || 'OPEN').toUpperCase()
+    )
+  }, [period?.status])
 
+  useEffect(() => {
     async function loadBoardData() {
       setLoading(true)
 
@@ -251,7 +447,7 @@ function PeriodReviewScreen({ period, onBack, user }) {
         ])
 
         const allRegs = regRes.data || []
-        const branchShifts = shiftRes.filter((s) => s.branchId === period.branchId)
+        const branchShifts = shiftRes.filter((s) => String(s.branchId) === String(period.branchId))
 
         setRegistrations(allRegs)
         setShifts(branchShifts)
@@ -268,13 +464,24 @@ function PeriodReviewScreen({ period, onBack, user }) {
         setDates(dArray)
       } catch (error) {
         console.error(error)
+        setReviewError(
+          getApiErrorMessage(
+            error,
+            'Không thể tải dữ liệu đăng ký ca.'
+          )
+        )
       } finally {
         setLoading(false)
       }
     }
 
     loadBoardData()
-  }, [period])
+  }, [
+    period.id,
+    period.branchId,
+    period.startDate,
+    period.endDate
+  ])
 
   function toDateString(dateObj) {
     const offset = dateObj.getTimezoneOffset()
@@ -290,7 +497,6 @@ function PeriodReviewScreen({ period, onBack, user }) {
       'CANCELLED',
       'Từ Chối',
       'REJECTED',
-      'Tá»« Chá»‘i'
     ].includes(status)
   }
 
@@ -341,11 +547,21 @@ function PeriodReviewScreen({ period, onBack, user }) {
       alert('Đã khóa đăng ký thành công!')
       setCurrentStatus('CLOSED')
     } catch (error) {
-      alert(error?.response?.data?.message || 'Lỗi khi khóa đăng ký')
+      alert(
+        getApiErrorMessage(
+          error,
+          'Không thể khóa đợt đăng ký.'
+        )
+      )
     }
   }
 
   const handleReopenPeriod = async () => {
+    if (hasPeriodStarted(period.startDate)) {
+      alert('Không thể mở lại đợt đăng ký khi đã đến ngày bắt đầu lịch làm.')
+      return
+    }
+
     if (!window.confirm('Bạn muốn mở lại đợt đăng ký này?')) return
 
     try {
@@ -356,7 +572,12 @@ function PeriodReviewScreen({ period, onBack, user }) {
       alert('Đã mở lại đợt đăng ký!')
       setCurrentStatus('OPEN')
     } catch (error) {
-      alert(error?.response?.data?.message || 'Lỗi khi mở lại đợt')
+      alert(
+        getApiErrorMessage(
+          error,
+          'Không thể mở lại đợt đăng ký.'
+        )
+      )
     }
   }
 
@@ -375,13 +596,26 @@ function PeriodReviewScreen({ period, onBack, user }) {
       setCurrentStatus('PUBLISHED')
       onBack()
     } catch (error) {
-      alert(error?.response?.data?.message || 'Lỗi công bố lịch')
+      alert(
+        getApiErrorMessage(
+          error,
+          'Không thể công bố lịch.'
+        )
+      )
     }
   }
 
   const isOpen = currentStatus === 'OPEN'
-  const isClosed = currentStatus === 'CLOSED'
+  const isClosed = [
+    'CLOSED',
+    'REVIEWING',
+    'DRAFT'
+  ].includes(currentStatus)
   const isPublished = currentStatus === 'PUBLISHED'
+  const isOverdue =
+    !isPublished &&
+    hasPeriodStarted(period.startDate)
+  const canReopen = isClosed && !isOverdue
 
   return (
     <div className="sd-users-page">
@@ -422,13 +656,15 @@ function PeriodReviewScreen({ period, onBack, user }) {
             Trạng thái hiện tại:{' '}
 
             <strong style={{ color: '#ea580c' }}>
-              {isOpen
-                ? 'Đang mở'
-                : isClosed
-                  ? 'Đã đóng'
-                  : isPublished
-                    ? 'Đã công bố'
-                    : currentStatus}
+              {isPublished
+                ? 'Đã công bố'
+                : isOverdue
+                  ? 'Quá hạn - Chưa công bố'
+                  : isOpen
+                    ? 'Đang mở'
+                    : isClosed
+                      ? 'Đã khóa'
+                      : currentStatus}
             </strong>
           </p>
         </div>
@@ -456,7 +692,7 @@ function PeriodReviewScreen({ period, onBack, user }) {
             </button>
           )}
 
-          {isClosed && (
+          {canReopen && (
             <button
               style={{
                 padding: '8px 16px',
@@ -504,6 +740,19 @@ function PeriodReviewScreen({ period, onBack, user }) {
 )}
         </div>
       </div>
+
+      {isOverdue && !isPublished && (
+        <div className="sd-period-message sd-period-message--overdue">
+          <strong>Lịch làm đã đến ngày bắt đầu nhưng chưa được công bố.</strong>
+          {' '}Đợt đăng ký không thể mở lại; Quản lý cần kiểm tra và công bố lịch.
+        </div>
+      )}
+
+      {reviewError && (
+        <p className="sd-status sd-status-error">
+          {reviewError}
+        </p>
+      )}
 
       {loading ? (
         <p>Đang tải...</p>

@@ -5,9 +5,56 @@ import { getAllShifts } from '../../api/ShiftApi';
 
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
+function getApiErrorMessage(error, fallbackMessage) {
+  const responseData = error?.response?.data;
+
+  if (typeof responseData === 'string' && responseData.trim()) {
+    return responseData;
+  }
+
+  return responseData?.message || fallbackMessage;
+}
+
+function getVietnamDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function hasPeriodStarted(startDate) {
+  const normalizedStartDate = String(startDate || '').slice(0, 10);
+
+  return Boolean(normalizedStartDate) &&
+    normalizedStartDate <= getVietnamDateString();
+}
+
+function isPeriodOpenForRegistration(period) {
+  return (
+    String(period?.status || '').toUpperCase() === 'OPEN' &&
+    !hasPeriodStarted(period?.startDate)
+  );
+}
+
 function formatDate(value) {
   if (!value) return 'Chưa có';
-  return new Intl.DateTimeFormat('vi-VN').format(new Date(value));
+
+  const normalizedDate = String(value).slice(0, 10);
+  const [year, month, day] = normalizedDate.split('-').map(Number);
+
+  if (!year || !month || !day) return 'Chưa có';
+
+  return new Intl.DateTimeFormat('vi-VN').format(
+    new Date(year, month - 1, day)
+  );
 }
 
 // ==========================================
@@ -17,76 +64,137 @@ export function UnifiedScheduleTab({ user }) {
   const [periods, setPeriods] = useState([])
   const [selectedPeriodId, setSelectedPeriodId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [periodError, setPeriodError] = useState('')
 
   useEffect(() => {
-    async function init() {
+    let isMounted = true
+
+    async function loadPeriods() {
       try {
         const allPeriods = await getAllPeriods()
 
-        const branchPeriods = allPeriods
-          .filter((p) => String(p.branchId) === String(user.branchId))
-          .filter((p) => {
-            const st = String(p.status || '').toUpperCase()
-
-            return (
-              st === 'OPEN' ||
-              st === 'CLOSED' ||
-              st === 'PUBLISHED' ||
-              st === 'REVIEWING' ||
-              st === 'DRAFT'
-            )
+        const branchPeriods = (allPeriods || [])
+          .filter((period) => {
+            return String(period.branchId) === String(user.branchId)
           })
-          .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
+          .filter((period) => {
+            const status = String(
+              period.status || ''
+            ).toUpperCase()
+
+            return [
+              'OPEN',
+              'CLOSED',
+              'PUBLISHED',
+              'REVIEWING',
+              'DRAFT',
+            ].includes(status)
+          })
+          .sort((first, second) => {
+            return new Date(second.startDate) - new Date(first.startDate)
+          })
+
+        if (!isMounted) return
 
         setPeriods(branchPeriods)
+        setPeriodError('')
 
-        if (branchPeriods.length > 0) {
-          const firstOpenPeriod = branchPeriods.find((p) => {
-            return String(p.status || '').toUpperCase() === 'OPEN'
+        setSelectedPeriodId((currentId) => {
+          const currentStillExists = branchPeriods.some(
+            (period) => String(period.id) === String(currentId)
+          )
+
+          if (currentId && currentStillExists) {
+            return currentId
+          }
+
+          const openPeriod = branchPeriods.find(
+            isPeriodOpenForRegistration
+          )
+
+          const publishedPeriod = branchPeriods.find((period) => {
+            return String(period.status || '').toUpperCase() === 'PUBLISHED'
           })
 
-          const firstPeriod = firstOpenPeriod || branchPeriods[0]
+          const firstPeriod =
+            openPeriod ||
+            publishedPeriod ||
+            branchPeriods[0]
 
-          setSelectedPeriodId(firstPeriod.id.toString())
+          return firstPeriod ? String(firstPeriod.id) : ''
+        })
+      } catch (error) {
+        console.error('Lỗi lấy danh sách đợt:', error)
+
+        if (isMounted) {
+          setPeriodError(
+            getApiErrorMessage(
+              error,
+              'Không thể tải danh sách đợt đăng ký.'
+            )
+          )
         }
-      } catch (e) {
-        console.error('Lỗi lấy danh sách đợt:', e)
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    init()
+    loadPeriods()
+
+    const intervalId = window.setInterval(loadPeriods, 10000)
+
+    return () => {
+      isMounted = false
+      window.clearInterval(intervalId)
+    }
   }, [user.branchId])
 
   const selectedPeriod = periods.find((p) => {
     return p.id.toString() === selectedPeriodId
   })
 
-  const selectedStatus = String(selectedPeriod?.status || '').toUpperCase()
+  const selectedStatus = String(
+    selectedPeriod?.status || ''
+  ).toUpperCase()
 
   const isPublished = selectedStatus === 'PUBLISHED'
+  const registrationIsOpen =
+    isPeriodOpenForRegistration(selectedPeriod)
+  const isWaitingForPublication =
+    Boolean(selectedPeriod) &&
+    !isPublished &&
+    !registrationIsOpen
 
   function handleChangePeriod(e) {
     setSelectedPeriodId(e.target.value)
   }
 
-  function getPeriodStatusText(status) {
-    const st = String(status || '').toUpperCase()
+  function getPeriodStatusText(period) {
+    const status = String(period?.status || '').toUpperCase()
 
-    if (st === 'OPEN') return 'Đang mở đăng ký'
-
-    if (
-      st === 'CLOSED' ||
-      st === 'REVIEWING' ||
-      st === 'DRAFT'
-    ) {
-      return 'Đã đóng đăng ký'
+    if (status === 'PUBLISHED') {
+      return 'Đã công bố lịch'
     }
 
-    if (st === 'PUBLISHED') return 'Đã công bố lịch'
+    if (hasPeriodStarted(period?.startDate)) {
+      return 'Quá hạn - Chưa công bố'
+    }
 
-    return status || 'Không rõ trạng thái'
+    if (status === 'OPEN') {
+      return 'Đang mở đăng ký'
+    }
+
+    if (
+      status === 'CLOSED' ||
+      status === 'REVIEWING' ||
+      status === 'DRAFT'
+    ) {
+      return 'Đã khóa đăng ký'
+    }
+
+    return period?.status || 'Không rõ trạng thái'
   }
 
   if (loading) {
@@ -118,7 +226,9 @@ export function UnifiedScheduleTab({ user }) {
           </h3>
 
           <p>
-            Hiện tại chi nhánh của bạn chưa có lịch làm chính thức hoặc đợt đăng ký ca nào được mở.
+            {periodError
+              ? periodError
+              : 'Hiện tại cơ sở của bạn chưa có lịch làm chính thức hoặc đợt đăng ký ca nào được mở.'}
           </p>
         </div>
       </div>
@@ -178,7 +288,7 @@ export function UnifiedScheduleTab({ user }) {
                   key={p.id}
                   value={p.id}
                 >
-                  Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)} - {getPeriodStatusText(p.status)}
+                  Từ {formatDate(p.startDate)} đến {formatDate(p.endDate)} - {getPeriodStatusText(p)}
                 </option>
               ))}
             </select>
@@ -194,10 +304,10 @@ export function UnifiedScheduleTab({ user }) {
 
             <strong
               style={{
-                color: isPublished ? '#1d4ed8' : '#ea580c'
+                color: isPublished ? '#1d4ed8' : isWaitingForPublication ? '#b45309' : '#ea580c'
               }}
             >
-              {getPeriodStatusText(selectedPeriod?.status)}
+              {getPeriodStatusText(selectedPeriod)}
             </strong>
           </div>
 
@@ -209,10 +319,21 @@ export function UnifiedScheduleTab({ user }) {
           >
             {isPublished
               ? 'Tuần này đã công bố lịch. Hệ thống đang hiển thị lịch làm chính thức.'
-              : 'Tuần này chưa công bố lịch. Hệ thống đang hiển thị màn hình đăng ký ca làm.'}
+              : registrationIsOpen
+                ? 'Đợt đăng ký đang mở. Bạn có thể chọn hoặc hủy các ca trước ngày bắt đầu.'
+                : 'Đợt đăng ký đã khóa hoặc đã đến hạn. Bạn chỉ có thể xem các ca đã đăng ký và chờ Quản lý công bố lịch.'}
           </div>
         </div>
       </div>
+
+      {periodError && (
+        <div
+          className="sd-period-message sd-period-message--error"
+          style={{ margin: '0 20px 16px' }}
+        >
+          {periodError}
+        </div>
+      )}
 
       <div
         style={{
@@ -241,6 +362,7 @@ export function UnifiedScheduleTab({ user }) {
 function PublishedScheduleView({ period, user }) {
   const [registrations, setRegistrations] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [shiftConfigs, setShiftConfigs] = useState([]);
   const [dates, setDates] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -248,9 +370,10 @@ function PublishedScheduleView({ period, user }) {
     async function loadBoard() {
       setLoading(true);
       try {
-        const [regRes, shiftRes] = await Promise.all([
+        const [regRes, shiftRes, configRes] = await Promise.all([
           axios.get(`/api/StaffRegistration/period/${period.id}`),
-          getAllShifts()
+          getAllShifts(),
+          axios.get('/api/BranchShiftConfig'),
         ]);
 
         const approvedRegs = (regRes.data || []).filter((r) => {
@@ -261,7 +384,21 @@ function PublishedScheduleView({ period, user }) {
           )
         })
         setRegistrations(approvedRegs);
-        setShifts(shiftRes.filter(s => String(s.branchId) === String(user.branchId)));
+
+        const branchShifts = (shiftRes || []).filter((shift) => {
+          return String(shift.branchId) === String(user.branchId);
+        });
+
+        const branchShiftIds = new Set(
+          branchShifts.map((shift) => shift.id)
+        );
+
+        setShifts(branchShifts);
+        setShiftConfigs(
+          (configRes.data || []).filter((config) => {
+            return branchShiftIds.has(config.shiftId);
+          })
+        );
 
         const dArray = [];
         let curr = new Date(period.startDate);
@@ -280,6 +417,23 @@ function PublishedScheduleView({ period, user }) {
     const offset = dateObj.getTimezoneOffset();
     const d = new Date(dateObj.getTime() - (offset * 60 * 1000));
     return d.toISOString().split('T')[0];
+  }
+
+  function isShiftOpenOnDate(shiftId, dateObj) {
+    const dayName = dateObj.toLocaleDateString(
+      'en-US',
+      { weekday: 'long' }
+    );
+
+    const config = shiftConfigs.find((item) => {
+      return (
+        item.shiftId === shiftId &&
+        String(item.dayOfWeek).toLowerCase() ===
+          dayName.toLowerCase()
+      );
+    });
+
+    return Number(config?.maxStaff ?? 0) > 0;
   }
 
   const boardMatrix = {};
@@ -327,12 +481,14 @@ function PublishedScheduleView({ period, user }) {
 
                   {shifts.map(shift => {
                     const cellRegs = boardMatrix[dStr][shift.id] || [];
-                    const isWeekend = dayOfWeek === 'Thứ 7' || dayOfWeek === 'Chủ nhật';
-                    const isShiftClosed = isWeekend && cellRegs.length === 0;
+                    const isShiftOpen = isShiftOpenOnDate(
+                      shift.id,
+                      dateObj
+                    );
 
                     return (
                       <td key={shift.id}>
-                        {!isShiftClosed ? (
+                        {isShiftOpen ? (
                           <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
                             <span className="sd-reg-name"> Quản lý ca</span>
                           </div>
@@ -387,16 +543,24 @@ function RegistrationView({ period, user }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [registrationError, setRegistrationError] = useState('');
   const periodStatus = String(period.status || '').toUpperCase()
 
-  const isClosed =
-    periodStatus === 'CLOSED' ||
-    periodStatus === 'REVIEWING' ||
-    periodStatus === 'DRAFT'
+  const isClosed = [
+    'CLOSED',
+    'REVIEWING',
+    'DRAFT',
+  ].includes(periodStatus)
 
   const isPublished = periodStatus === 'PUBLISHED'
-
-  const isLocked = isClosed || isPublished
+  const isDeadlineReached = hasPeriodStarted(period.startDate)
+  const isLocked =
+    isClosed ||
+    isPublished ||
+    isDeadlineReached
+  const isOverdue =
+    !isPublished &&
+    isDeadlineReached
 
   useEffect(() => {
     async function loadData() {
@@ -423,7 +587,9 @@ function RegistrationView({ period, user }) {
         setDates(dArray);
 
         const regRes = await axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`);
-        const myRegs = regRes.data || [];
+        const myRegs = (regRes.data || []).filter(
+          (registration) => !isRejectedStatus(registration.status)
+        );
 
         const dbMap = {};
         const initRegs = {};
@@ -437,10 +603,40 @@ function RegistrationView({ period, user }) {
 
         setDbRegistrations(dbMap);
         setRegistered(initRegs);
-      } catch (err) { console.error('Lỗi:', err); } finally { setLoading(false); }
+      } catch (err) {
+        console.error('Lỗi tải dữ liệu đăng ký:', err);
+        setRegistrationError(
+          getApiErrorMessage(
+            err,
+            'Không thể tải dữ liệu đăng ký ca.'
+          )
+        );
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, [period.id, user.id, user.branchId]);
+
+  useEffect(() => {
+    if (!isLocked) return;
+
+    const savedRegistrations = {};
+
+    Object.entries(dbRegistrations).forEach(
+      ([dateString, shiftsInfo]) => {
+        savedRegistrations[dateString] = {};
+
+        Object.keys(shiftsInfo).forEach((shiftId) => {
+          savedRegistrations[dateString][shiftId] = true;
+        });
+      }
+    );
+
+    setRegistered(savedRegistrations);
+    setSaved(false);
+    setCapacityMessage('');
+  }, [isLocked, dbRegistrations]);
 
   function toDateString(dateObj) {
     const offset = dateObj.getTimezoneOffset();
@@ -475,8 +671,7 @@ function RegistrationView({ period, user }) {
     return (
       normalized === 'cancelled' ||
       normalized === 'rejected' ||
-      normalized.includes('từ chối') ||
-      normalized.includes('tá»« chá»‘i')
+      normalized.includes('từ chối')
     )
   }
 
@@ -552,6 +747,15 @@ function RegistrationView({ period, user }) {
   }
 
   async function handleSave() {
+    if (isLocked) {
+      alert(
+        isOverdue
+          ? 'Đợt đăng ký đã đến hạn nên không thể thay đổi ca.'
+          : 'Đợt đăng ký đã khóa nên không thể thay đổi ca.'
+      )
+      return
+    }
+
     const { adds, deletes } = getChanges()
 
     if (adds.length === 0 && deletes.length === 0) {
@@ -559,6 +763,7 @@ function RegistrationView({ period, user }) {
     }
 
     setSaving(true)
+    setRegistrationError('')
 
     try {
       // Xóa/hủy ca trước nếu có
@@ -582,7 +787,11 @@ function RegistrationView({ period, user }) {
       const dbMap = {}
       const initRegs = {}
 
-        ; (regRes.data || []).forEach((r) => {
+      ;(regRes.data || [])
+        .filter((registration) => {
+          return !isRejectedStatus(registration.status)
+        })
+        .forEach((r) => {
           const dStr = r.workDate.slice(0, 10)
 
           if (!dbMap[dStr]) {
@@ -606,14 +815,13 @@ function RegistrationView({ period, user }) {
     } catch (err) {
       console.error(err)
 
-      alert(
-        '❌ Lỗi: ' +
-        (
-          err.response?.data?.message ||
-          err.response?.data ||
-          'Có lỗi xảy ra khi lưu đăng ký!'
-        )
+      const message = getApiErrorMessage(
+        err,
+        'Có lỗi xảy ra khi lưu đăng ký.'
       )
+
+      setRegistrationError(message)
+      alert(`❌ Lỗi: ${message}`)
     } finally {
       setSaving(false)
     }
@@ -639,16 +847,34 @@ function RegistrationView({ period, user }) {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ color: '#ea580c', margin: '0 0 4px' }}>Đăng ký ca làm việc</h2>
         {isLocked && (
-          <div style={{ background: '#fef9c3', color: '#854d0e', padding: '12px 16px', borderRadius: 8, marginBottom: 16, border: '1px solid #fde047' }}>
-            <strong>Đợt đăng ký đã đóng!</strong> Bạn chỉ có thể xem các ca đã đăng ký, không thể thêm hoặc hủy ca trong tuần này.
+          <div
+            className={`sd-period-message ${
+              isOverdue
+                ? 'sd-period-message--overdue'
+                : 'sd-period-message--locked'
+            }`}
+          >
+            <strong>
+              {isOverdue
+                ? 'Đợt đăng ký đã đến hạn nhưng lịch chưa được công bố.'
+                : 'Đợt đăng ký đã được khóa.'}
+            </strong>
+            {' '}Bạn chỉ có thể xem các ca đã đăng ký, không thể thêm hoặc hủy ca.
           </div>
         )}
+
         <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
           {isLocked
-            ? 'Đợt đăng ký này đã đóng. Bạn chỉ có thể xem lại các ca đã đăng ký.'
+            ? 'Bạn đang xem lại các ca đã đăng ký và chờ Quản lý công bố lịch làm chính thức.'
             : 'Quản lý đang mở đăng ký cho tuần này. Hãy chọn các ca bạn có thể làm.'}
         </p>
       </div>
+
+      {registrationError && (
+        <div className="sd-period-message sd-period-message--error">
+          {registrationError}
+        </div>
+      )}
 
       {capacityMessage && (
         <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, margin: '-4px 0 16px', border: '1px solid #fecaca', fontWeight: 700 }}>
@@ -818,7 +1044,7 @@ function RegistrationView({ period, user }) {
 
       {saved && totalChanges === 0 && (
         <p className="sd-save-notice" style={{ color: '#15803d', fontSize: 13, marginTop: 12, textAlign: 'center' }}>
-          ✅ Dữ liệu đã được đồng bộ. Các ca đăng ký sẽ có biểu tượng (🔒) nếu đợt đăng ký đã đóng hoặc đã công bố lịch.
+          ✅ Dữ liệu đã được đồng bộ. Khi đợt được khóa hoặc đến hạn, các ca sẽ chuyển sang chế độ chỉ xem.
         </p>
       )}
     </>
