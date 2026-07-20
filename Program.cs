@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer; // 👉 Thư viện JWT
 using Microsoft.IdentityModel.Tokens;               // 👉 Thư viện Token
 using Microsoft.EntityFrameworkCore;
 using System.Text;
+using LuanVanTotNghiep.Services.BackgroundJobs;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -83,6 +84,8 @@ builder.Services.AddScoped<ShiftClosingService>();
 builder.Services.AddScoped<CheckoutRequestService>();
 builder.Services.AddHostedService<MissingCheckoutWorker>();
 builder.Services.AddScoped<InvoiceOcrService>();    
+builder.Services.AddHostedService<SchedulePeriodDeadlineWorker>();
+
 
 // Cho phép React/Vite frontend gọi API backend khi chạy local
 builder.Services.AddCors(options =>

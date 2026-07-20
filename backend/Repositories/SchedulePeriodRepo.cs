@@ -21,4 +21,19 @@ public class SchedulePeriodRepo : Repository<CaSchedulePeriod>
             .Where(sp => sp.Status == "OPEN")
             .ToListAsync();
     }
+
+    public async Task<int> CloseExpiredOpenPeriodsAsync(
+        DateOnly today,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(period =>
+                period.Status == "OPEN" &&
+                period.StartDate <= today)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    period => period.Status,
+                    "CLOSED"),
+                cancellationToken);
+    }
 }
