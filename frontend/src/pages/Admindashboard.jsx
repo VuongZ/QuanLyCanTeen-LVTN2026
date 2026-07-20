@@ -19,6 +19,7 @@ import { InventoryTab } from './shared/InventoryTab';
 import { ManagerExportTab } from './manager/ManagerExportTab';
 import { FrontStockTab } from './shared/FrontStockTab';
 import { ShiftClosingManagementTab } from './shared/ShiftClosingManagementTab';
+import { CheckoutRequestTab } from './shared/CheckoutRequestTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -207,6 +208,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'branches': return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
+      case 'forgotCheckout': return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' }
       case 'salaryRules': return isAdmin
         ? { eyebrow: 'Lương', title: 'Salary rule theo cơ sở' }
         : { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
@@ -247,6 +249,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca toàn cục' });
+    NAV_ITEMS.push({ id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' })
   }
   if (isManager) {
     NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
@@ -259,6 +262,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'exportStock', icon: '📤', label: 'Xuất hàng ra quầy' })
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy cơ sở' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca' });
+    NAV_ITEMS.push({ id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' })
   }
   NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
 
@@ -475,6 +479,9 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'shiftClosingReports' && (isAdmin || isManager) && (
   <ShiftClosingManagementTab currentUser={user} branches={branches} />
 )}
+            {activeTab === 'forgotCheckout' && (isAdmin || isManager) && (
+              <CheckoutRequestTab canReview />
+            )}
 
             {/* TÀI KHOẢN VÀ BẢO MẬT */}
             {activeTab === 'account' && (

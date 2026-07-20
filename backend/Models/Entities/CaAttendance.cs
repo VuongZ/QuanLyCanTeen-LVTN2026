@@ -20,4 +20,6 @@ public partial class CaAttendance
     public virtual LuongMonthlySalary? Salary { get; set; }
 
     public virtual CaFinalSchedule Schedule { get; set; } = null!;
+
+    public virtual ICollection<CaCheckoutRequest> CheckoutRequests { get; set; } = new List<CaCheckoutRequest>();
 }

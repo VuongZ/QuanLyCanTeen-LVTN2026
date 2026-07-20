@@ -80,6 +80,8 @@ builder.Services.AddScoped<SalaryService>();
 builder.Services.AddScoped<KhoExportService>();
 builder.Services.AddScoped<FrontStockRepo>();
 builder.Services.AddScoped<ShiftClosingService>();
+builder.Services.AddScoped<CheckoutRequestService>();
+builder.Services.AddHostedService<MissingCheckoutWorker>();
 builder.Services.AddScoped<InvoiceOcrService>();    
 
 // Cho phép React/Vite frontend gọi API backend khi chạy local

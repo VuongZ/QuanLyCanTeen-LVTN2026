@@ -135,6 +135,8 @@ namespace LuanVanTotNghiep.Services
 
             var hasCheckedIn = attendance?.CheckInTime != null;
             var hasCheckedOut = attendance?.CheckOutTime != null;
+            var hasConfirmedCheckout = hasCheckedOut &&
+                !string.Equals(attendance?.Status, CheckoutRequestService.AutoCheckoutPending, StringComparison.OrdinalIgnoreCase);
 
             var startTime = ToTimeSpan(selectedSchedule.Shift!.StartTime);
             var endTime = ToTimeSpan(selectedSchedule.Shift.EndTime);
@@ -157,11 +159,12 @@ namespace LuanVanTotNghiep.Services
                 StringComparison.OrdinalIgnoreCase
             );
 
-            // Chỉ cần đã check-in, không bắt buộc check-out.
+            // Chỉ báo cáo kết ca sau khi checkout thật hoặc checkout bổ sung đã được duyệt.
             // Một báo cáo PENDING/APPROVED của bất kỳ nhân viên nào trong ca sẽ khóa gửi mới.
             var canSubmit =
                 isPublished &&
                 hasCheckedIn &&
+                hasConfirmedCheckout &&
                 activeShiftReport == null;
 
             string? submitBlockReason = null;
@@ -190,6 +193,12 @@ namespace LuanVanTotNghiep.Services
                 submitBlockReason =
                     "Bạn chưa được điểm danh vào ca này.";
             }
+            else if (!hasConfirmedCheckout)
+            {
+                submitBlockReason = attendance?.Status == CheckoutRequestService.AutoCheckoutPending
+                    ? "Checkout tạm đang chờ xác nhận và phê duyệt."
+                    : "Bạn chưa checkout ca làm này.";
+            }
 
             return new ClosingShiftInfoDto
             {
@@ -205,7 +214,7 @@ namespace LuanVanTotNghiep.Services
                 RejectReason = rejectReason,
                 AlreadyReported = alreadyReported,
                 HasCheckedIn = hasCheckedIn,
-                HasCheckedOut = hasCheckedOut,
+                HasCheckedOut = hasConfirmedCheckout,
                 IsShiftEnded = isShiftEnded,
                 CanSubmit = canSubmit,
                 SubmitBlockReason = submitBlockReason
@@ -291,6 +300,14 @@ namespace LuanVanTotNghiep.Services
             {
                 throw new InvalidOperationException(
                     "Bạn chưa được điểm danh vào ca này nên không thể báo cáo kết ca."
+                );
+            }
+
+            if (attendance.CheckOutTime == null ||
+                string.Equals(attendance.Status, CheckoutRequestService.AutoCheckoutPending, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "Bạn cần checkout hoặc hoàn tất duyệt yêu cầu quên checkout trước khi báo cáo kết ca."
                 );
             }
 

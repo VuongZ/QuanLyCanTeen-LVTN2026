@@ -516,11 +516,13 @@ public class SalaryService
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
         var workedDays = schedules
-            .Where(s => s.CaAttendances.Any(a => a.CheckOutTime != null))
+            .Where(s => s.CaAttendances.Any(a =>
+                a.CheckOutTime != null && a.Status != CheckoutRequestService.AutoCheckoutPending))
             .Select(s => s.WorkDate)
             .Distinct()
             .Count();
-        var absentCount = schedules.Count(s => s.WorkDate <= today && !s.CaAttendances.Any(a => a.CheckOutTime != null));
+        var absentCount = schedules.Count(s => s.WorkDate <= today && !s.CaAttendances.Any(a =>
+            a.CheckOutTime != null && a.Status != CheckoutRequestService.AutoCheckoutPending));
         var lateCount = schedules.Count(s =>
         {
             var checkIn = s.CaAttendances

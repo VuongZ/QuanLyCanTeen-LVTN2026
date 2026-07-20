@@ -434,6 +434,9 @@ if (registeredCount >= staffSlot)
             if (attendance.CheckInTime == null)
                 throw new Exception("Nhân viên chưa check-in ca này.");
 
+            if (attendance.Status == CheckoutRequestService.AutoCheckoutPending)
+                throw new Exception("Ca này đã được checkout tạm. Vui lòng xử lý tại mục Quên checkout.");
+
             if (attendance.CheckOutTime == null)
             {
                 attendance.CheckOutTime = scanTime;

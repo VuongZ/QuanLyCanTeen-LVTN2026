@@ -5,6 +5,7 @@ import { UnifiedScheduleTab } from './staff/UnifiedScheduleTab';
 import { ProfileTab } from './staff/ProfileTab';
 import { SalaryTab } from './staff/SalaryTab';
 import { ShiftClosingReportTab } from './shared/ShiftClosingReportTab';
+import { CheckoutRequestTab } from './shared/CheckoutRequestTab';
 
 function getInitials(name = '') {
   return name
@@ -34,6 +35,8 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
         return { eyebrow: 'Kho hàng', title: 'Tra cứu tồn kho' };
       case 'shiftClosing':
         return { eyebrow: 'Báo cáo cuối ca', title: 'Báo cáo kết ca' };
+      case 'forgotCheckout':
+        return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' };
       default:
         return { eyebrow: '', title: '' };
     }
@@ -46,6 +49,7 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
     { id: 'inventory', icon: '📦', label: 'Tra cứu tồn kho' },
     { id: 'salary', icon: '💰', label: 'Giờ làm & lương' },
     { id: 'shiftClosing', icon: '📋', label: 'Báo cáo kết ca' },
+    { id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' },
     { id: 'profile', icon: '👤', label: 'Tài khoản' },
   ];
 
@@ -143,6 +147,8 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
             {activeTab === 'salary' && <SalaryTab user={user} />}
 
             {activeTab === 'shiftClosing' && <ShiftClosingReportTab />}
+
+            {activeTab === 'forgotCheckout' && <CheckoutRequestTab />}
           </div>
         </main>
       </div>

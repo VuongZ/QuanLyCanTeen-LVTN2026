@@ -18,6 +18,10 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<CaAttendance> CaAttendances { get; set; }
 
+    public virtual DbSet<CaCheckoutRequest> CaCheckoutRequests { get; set; }
+
+    public virtual DbSet<CaCheckoutRequestHistory> CaCheckoutRequestHistories { get; set; }
+
     public virtual DbSet<CaBranchShiftConfig> CaBranchShiftConfigs { get; set; }
 
     public virtual DbSet<CaFinalSchedule> CaFinalSchedules { get; set; }
@@ -106,6 +110,58 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.Schedule).WithMany(p => p.CaAttendances)
                 .HasForeignKey(d => d.ScheduleId)
                 .HasConstraintName("fk_att_schedule");
+        });
+
+        modelBuilder.Entity<CaCheckoutRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("ca_checkout_request").UseCollation("utf8mb4_unicode_ci");
+
+            entity.HasIndex(e => e.AttendanceId, "idx_checkout_request_attendance").IsUnique();
+            entity.HasIndex(e => new { e.Status, e.UpdatedAt }, "idx_checkout_request_status");
+            entity.HasIndex(e => e.RequestedByUserId, "idx_checkout_request_user");
+            entity.HasIndex(e => e.ReviewedByUserId, "idx_checkout_request_reviewer");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AttendanceId).HasColumnName("attendance_id");
+            entity.Property(e => e.RequestedByUserId).HasColumnName("requested_by_user_id");
+            entity.Property(e => e.ProposedCheckOutTime).HasColumnType("datetime").HasColumnName("proposed_check_out_time");
+            entity.Property(e => e.RequestedCheckOutTime).HasColumnType("datetime").HasColumnName("requested_check_out_time");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.Status).HasMaxLength(30).HasColumnName("status");
+            entity.Property(e => e.ReviewedByUserId).HasColumnName("reviewed_by_user_id");
+            entity.Property(e => e.RejectReason).HasMaxLength(500).HasColumnName("reject_reason");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime").HasColumnName("updated_at");
+            entity.Property(e => e.ReviewedAt).HasColumnType("datetime").HasColumnName("reviewed_at");
+
+            entity.HasOne(e => e.Attendance).WithMany(a => a.CheckoutRequests)
+                .HasForeignKey(e => e.AttendanceId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_checkout_request_attendance");
+            entity.HasOne(e => e.RequestedByUser).WithMany()
+                .HasForeignKey(e => e.RequestedByUserId).OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_checkout_request_user");
+            entity.HasOne(e => e.ReviewedByUser).WithMany()
+                .HasForeignKey(e => e.ReviewedByUserId).OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_checkout_request_reviewer");
+        });
+
+        modelBuilder.Entity<CaCheckoutRequestHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("ca_checkout_request_history").UseCollation("utf8mb4_unicode_ci");
+            entity.HasIndex(e => e.RequestId, "idx_checkout_history_request");
+            entity.HasIndex(e => e.ActorUserId, "idx_checkout_history_actor");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.RequestId).HasColumnName("request_id");
+            entity.Property(e => e.ActorUserId).HasColumnName("actor_user_id");
+            entity.Property(e => e.Action).HasMaxLength(30).HasColumnName("action");
+            entity.Property(e => e.Detail).HasMaxLength(1000).HasColumnName("detail");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("created_at");
+            entity.HasOne(e => e.Request).WithMany(r => r.History).HasForeignKey(e => e.RequestId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_checkout_history_request");
+            entity.HasOne(e => e.ActorUser).WithMany().HasForeignKey(e => e.ActorUserId)
+                .OnDelete(DeleteBehavior.SetNull).HasConstraintName("fk_checkout_history_actor");
         });
 
         modelBuilder.Entity<CaBranchShiftConfig>(entity =>
