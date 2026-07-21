@@ -34,6 +34,17 @@ export async function getSalaryRuleAdjustments(month, year, branchId) {
   return response.data;
 }
 
+export async function getSalaryWorkDetails(userId, month, year) {
+  const response = await axios.get(
+    `${BASE_URL}/user/${userId}/work-details`,
+    {
+      params: { month, year },
+    },
+  );
+
+  return response.data;
+}
+
 export async function updateSalaryRule(payload) {
   const response = await axios.put(`${BASE_URL}/rule`, payload);
   return response.data;

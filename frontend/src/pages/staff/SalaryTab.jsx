@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getSalaryByUser } from '../../api/SalaryApi';
+import {
+  getSalaryByUser,
+  getSalaryWorkDetails,
+} from '../../api/SalaryApi';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -15,24 +18,51 @@ function formatNumber(value) {
   }).format(Number(value || 0));
 }
 
+function formatDate(value) {
+  if (!value) return '—';
+
+  const [year, month, day] = String(value).split('-');
+
+  if (!year || !month || !day) return value;
+
+  return `${day}/${month}/${year}`;
+}
+
+function formatTime(value) {
+  if (!value) return '—';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 function getMonthKey(item) {
   return `${item.year}-${String(item.month).padStart(2, '0')}`;
 }
 
-function formatStatus(status) {
-  const map = {
-    PENDING: 'Chưa thanh toán',
-    PAID: 'Đã thanh toán',
-    CANCELLED: 'Đã huỷ',
+function formatWorkStatus(status) {
+  const statusMap = {
+    COMPLETED: 'Đã hoàn thành',
+    WORKING: 'Đang trong ca',
+    NOT_STARTED: 'Chưa bắt đầu',
   };
-  return map[(status || 'PENDING').toUpperCase()] || status;
+
+  return statusMap[(status || '').toUpperCase()] || status || '—';
 }
 
-function getStatusClass(status) {
-  const normalized = (status || 'PENDING').toUpperCase();
-  if (normalized === 'PAID') return 'paid';
-  if (normalized === 'CANCELLED') return 'cancelled';
-  return 'pending';
+function getWorkStatusClass(status) {
+  const normalized = (status || '').toUpperCase();
+
+  if (normalized === 'COMPLETED') return 'completed';
+  if (normalized === 'WORKING') return 'working';
+
+  return 'not-started';
 }
 
 function SalaryMetric({ label, value }) {
@@ -47,24 +77,40 @@ function SalaryMetric({ label, value }) {
 export function SalaryTab({ user }) {
   const [salaries, setSalaries] = useState([]);
   const [selectedMonthKey, setSelectedMonthKey] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+
+  const [workDetails, setWorkDetails] = useState([]);
+
+  const [salaryLoading, setSalaryLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const [salaryError, setSalaryError] = useState('');
+  const [detailError, setDetailError] = useState('');
 
   useEffect(() => {
     async function loadSalary() {
       if (!user?.id) return;
 
-      setLoading(true);
-      setError('');
+      setSalaryLoading(true);
+      setSalaryError('');
+
       try {
         const data = await getSalaryByUser(user.id);
         const nextSalaries = Array.isArray(data) ? data : [];
+
         setSalaries(nextSalaries);
-        setSelectedMonthKey(nextSalaries[0] ? getMonthKey(nextSalaries[0]) : '');
-      } catch (err) {
-        setError(err.response?.data?.message || 'Không tải được dữ liệu lương.');
+
+        setSelectedMonthKey(
+          nextSalaries[0]
+            ? getMonthKey(nextSalaries[0])
+            : '',
+        );
+      } catch (error) {
+        setSalaryError(
+          error.response?.data?.message ||
+          'Không tải được dữ liệu lương.',
+        );
       } finally {
-        setLoading(false);
+        setSalaryLoading(false);
       }
     }
 
@@ -79,8 +125,47 @@ export function SalaryTab({ user }) {
   }, [salaries]);
 
   const selectedSalary = useMemo(() => {
-    return salaries.find((item) => getMonthKey(item) === selectedMonthKey) || null;
+    return salaries.find(
+      (item) => getMonthKey(item) === selectedMonthKey,
+    ) || null;
   }, [salaries, selectedMonthKey]);
+
+  useEffect(() => {
+    async function loadWorkDetails() {
+      if (!user?.id || !selectedSalary) {
+        setWorkDetails([]);
+        return;
+      }
+
+      setDetailLoading(true);
+      setDetailError('');
+
+      try {
+        const data = await getSalaryWorkDetails(
+          user.id,
+          selectedSalary.month,
+          selectedSalary.year,
+        );
+
+        setWorkDetails(Array.isArray(data) ? data : []);
+      } catch (error) {
+        setWorkDetails([]);
+
+        setDetailError(
+          error.response?.data?.message ||
+          'Không tải được chi tiết ngày làm.',
+        );
+      } finally {
+        setDetailLoading(false);
+      }
+    }
+
+    loadWorkDetails();
+  }, [
+    user?.id,
+    selectedSalary?.month,
+    selectedSalary?.year,
+  ]);
 
   const summary = useMemo(() => ({
     hours: Number(selectedSalary?.totalHours || 0),
@@ -90,72 +175,140 @@ export function SalaryTab({ user }) {
   }), [selectedSalary]);
 
   return (
-    <div className="sd-profile-layout">
+    <div className="sd-profile-layout sd-salary-layout">
       <div className="sd-salary-summary">
-        <SalaryMetric label="Tổng giờ làm" value={`${formatNumber(summary.hours)} giờ`} />
-        <SalaryMetric label="Tổng lương" value={formatMoney(summary.salary)} />
-        <SalaryMetric label="Thưởng" value={formatMoney(summary.bonus)} />
-        <SalaryMetric label="Phạt" value={formatMoney(summary.penalty)} />
+        <SalaryMetric
+          label="Tổng giờ làm"
+          value={`${formatNumber(summary.hours)} giờ`}
+        />
+
+        <SalaryMetric
+          label="Tổng lương"
+          value={formatMoney(summary.salary)}
+        />
+
+        <SalaryMetric
+          label="Thưởng"
+          value={formatMoney(summary.bonus)}
+        />
+
+        <SalaryMetric
+          label="Phạt"
+          value={formatMoney(summary.penalty)}
+        />
       </div>
 
-      <div className="sd-card">
+      <div className="sd-card sd-work-detail-card">
         <div className="sd-card-header sd-salary-header">
           <div>
-            <p className="sd-eyebrow">Lương nhân viên</p>
-            <h2>{selectedSalary ? `Tháng ${selectedSalary.month}/${selectedSalary.year}` : 'Bảng lương của tôi'}</h2>
+            <p className="sd-eyebrow">Chi tiết chấm công</p>
+
+            <h2>
+              {selectedSalary
+                ? `Ngày làm trong tháng ${selectedSalary.month}/${selectedSalary.year}`
+                : 'Chi tiết ngày làm'}
+            </h2>
           </div>
+
           {monthOptions.length > 0 && (
             <div className="sd-field sd-salary-filter">
               <label>Chọn kỳ lương</label>
-              <select value={selectedMonthKey} onChange={(event) => setSelectedMonthKey(event.target.value)}>
+
+              <select
+                value={selectedMonthKey}
+                onChange={(event) =>
+                  setSelectedMonthKey(event.target.value)
+                }
+              >
                 {monthOptions.map((month) => (
-                  <option key={month.key} value={month.key}>{month.label}</option>
+                  <option key={month.key} value={month.key}>
+                    {month.label}
+                  </option>
                 ))}
               </select>
             </div>
           )}
         </div>
 
-        {error && <p className="sd-status sd-status-error">{error}</p>}
+        {salaryError && (
+          <p className="sd-status sd-status-error">
+            {salaryError}
+          </p>
+        )}
 
-        {loading ? (
-          <p className="sd-salary-empty">Đang tải dữ liệu lương...</p>
+        {detailError && (
+          <p className="sd-status sd-status-error">
+            {detailError}
+          </p>
+        )}
+
+        {salaryLoading || detailLoading ? (
+          <p className="sd-salary-empty">
+            Đang tải dữ liệu ngày làm...
+          </p>
         ) : !selectedSalary ? (
-          <p className="sd-salary-empty">Chưa có dữ liệu lương. Bảng lương sẽ được tạo sau khi ca làm được check-out.</p>
+          <p className="sd-salary-empty">
+            Chưa có dữ liệu lương. Bảng lương sẽ được tạo
+            sau khi Nhân viên hoàn tất điểm danh ra ca.
+          </p>
+        ) : workDetails.length === 0 ? (
+          <p className="sd-salary-empty">
+            Chưa có dữ liệu điểm danh trong kỳ lương này.
+          </p>
         ) : (
           <div className="sd-salary-table-wrap">
-            <table className="sd-salary-table">
+            <table className="sd-salary-table sd-work-detail-table">
               <thead>
                 <tr>
-                  <th>Tháng</th>
-                  <th>Giờ làm</th>
-                  <th>Lương/giờ</th>
-                  <th>Thưởng</th>
-                  <th>Phạt</th>
-                  <th>Thực nhận</th>
+                  <th>Ngày làm</th>
+                  <th>Ca làm</th>
+                  <th>Giờ ca</th>
+                  <th>Vào ca</th>
+                  <th>Ra ca</th>
+                  <th>Số giờ làm</th>
                   <th>Trạng thái</th>
                 </tr>
               </thead>
+
               <tbody>
-                <tr>
-                  <td><strong>{selectedSalary.month}/{selectedSalary.year}</strong></td>
-                  <td>{formatNumber(selectedSalary.totalHours)} giờ</td>
-                  <td>{formatMoney(selectedSalary.hourlyWageAtTime)}</td>
-                  <td>{formatMoney(selectedSalary.totalBonus)}</td>
-                  <td>{formatMoney(selectedSalary.totalPenalty)}</td>
-                  <td className="sd-salary-total">{formatMoney(selectedSalary.totalSalary)}</td>
-                  <td>
-                    <span className={`sd-salary-status ${getStatusClass(selectedSalary.status)}`}>
-                      {formatStatus(selectedSalary.status)}
-                    </span>
-                  </td>
-                </tr>
+                {workDetails.map((item) => (
+                  <tr key={item.attendanceId}>
+                    <td>
+                      <strong>{formatDate(item.workDate)}</strong>
+                    </td>
+
+                    <td>{item.shiftName}</td>
+
+                    <td>
+                      {item.startTime} – {item.endTime}
+                    </td>
+
+                    <td>{formatTime(item.checkInTime)}</td>
+
+                    <td>{formatTime(item.checkOutTime)}</td>
+
+                    <td className="sd-worked-hours">
+                      {formatNumber(item.workedHours)} giờ
+                    </td>
+
+                    <td>
+                      <span
+                        className={
+                          `sd-work-status ${
+                            getWorkStatusClass(item.status)
+                          }`
+                        }
+                      >
+                        {formatWorkStatus(item.status)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
-
     </div>
   );
 }

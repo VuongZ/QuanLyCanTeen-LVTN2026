@@ -52,10 +52,19 @@ public class SalaryController : ControllerBase
     [HttpGet("user/{userId}")]
     public async Task<IActionResult> GetByUser(int userId)
     {
-        var role = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value?.ToUpperInvariant();
-        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        var role = User.Claims
+            .FirstOrDefault(c => c.Type == ClaimTypes.Role)?
+            .Value?
+            .ToUpperInvariant();
+
+        var userIdClaim = User.Claims
+            .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?
+            .Value;
+
         var currentUser = int.TryParse(userIdClaim, out var currentUserId)
-            ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
+            ? await _context.NsUsers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == currentUserId)
             : null;
 
         if (currentUser == null)
@@ -83,6 +92,129 @@ public class SalaryController : ControllerBase
         return Ok(salaries);
     }
 
+    [HttpGet("user/{userId}/work-details")]
+    public async Task<IActionResult> GetUserWorkDetails(
+        int userId,
+        [FromQuery] int month,
+        [FromQuery] int year)
+    {
+        if (month < 1 || month > 12)
+            return BadRequest(new { message = "Tháng không hợp lệ." });
+
+        if (year < 2000 || year > 2100)
+            return BadRequest(new { message = "Năm không hợp lệ." });
+
+        var role = User.Claims
+            .FirstOrDefault(c => c.Type == ClaimTypes.Role)?
+            .Value?
+            .ToUpperInvariant();
+
+        var userIdClaim = User.Claims
+            .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?
+            .Value;
+
+        var currentUser = int.TryParse(userIdClaim, out var currentUserId)
+            ? await _context.NsUsers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == currentUserId)
+            : null;
+
+        if (currentUser == null)
+        {
+            return Unauthorized(new
+            {
+                message = "Không xác định được người dùng."
+            });
+        }
+
+        // Nhân viên chỉ được xem dữ liệu của chính mình.
+        // Quản lý chỉ được xem dữ liệu của người thuộc cùng cơ sở.
+        if (currentUser.Id != userId && role != "MANAGER")
+            return Forbid();
+
+        if (role == "MANAGER")
+        {
+            if (currentUser.BranchId == null)
+            {
+                return BadRequest(new
+                {
+                    message = "Tài khoản Quản lý chưa được gắn cơ sở."
+                });
+            }
+
+            var targetBranchId = await _context.NsUsers
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.BranchId)
+                .FirstOrDefaultAsync();
+
+            if (targetBranchId != currentUser.BranchId)
+                return Forbid();
+        }
+
+        var startDate = new DateOnly(year, month, 1);
+        var endDate = startDate.AddMonths(1);
+
+        var attendances = await _context.CaAttendances
+            .AsNoTracking()
+            .Include(a => a.Schedule)
+                .ThenInclude(s => s.Shift)
+            .Where(a =>
+                a.Schedule.UserId == userId &&
+                a.Schedule.WorkDate >= startDate &&
+                a.Schedule.WorkDate < endDate)
+            .OrderBy(a => a.Schedule.WorkDate)
+            .ThenBy(a => a.Schedule.Shift.StartTime)
+            .ToListAsync();
+
+        var result = attendances.Select(attendance =>
+        {
+            decimal workedHours = 0;
+
+            if (attendance.CheckInTime.HasValue &&
+                attendance.CheckOutTime.HasValue)
+            {
+                workedHours = Math.Round(
+                    (decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime.Value)
+                        .TotalHours,
+                    2);
+            }
+
+            string displayStatus;
+
+            if (attendance.CheckInTime.HasValue &&
+                attendance.CheckOutTime.HasValue)
+            {
+                displayStatus = "COMPLETED";
+            }
+            else if (attendance.CheckInTime.HasValue)
+            {
+                displayStatus = "WORKING";
+            }
+            else
+            {
+                displayStatus = "NOT_STARTED";
+            }
+
+            return new SalaryWorkDetailDto
+            {
+                AttendanceId = attendance.Id,
+                ScheduleId = attendance.ScheduleId,
+                WorkDate = attendance.Schedule.WorkDate,
+                ShiftId = attendance.Schedule.ShiftId,
+                ShiftName = attendance.Schedule.Shift.ShiftName,
+                StartTime = attendance.Schedule.Shift.StartTime.ToString("HH:mm"),
+                EndTime = attendance.Schedule.Shift.EndTime.ToString("HH:mm"),
+                CheckInTime = attendance.CheckInTime,
+                CheckOutTime = attendance.CheckOutTime,
+                WorkedHours = workedHours,
+                Status = displayStatus
+            };
+        }).ToList();
+
+        return Ok(result);
+    }
+
     [HttpPut("branch/{branchId}/period/{year}/{month}/transfer")]
     public async Task<IActionResult> MarkBranchTransferred(int branchId, int year, int month)
     {
@@ -95,7 +227,12 @@ public class SalaryController : ControllerBase
 
         try
         {
-            var result = await _salaryService.MarkBranchTransferredAsync(branchId, month, year, currentUser.Id);
+            var result = await _salaryService.MarkBranchTransferredAsync(
+                branchId,
+                month,
+                year,
+                currentUser.Id);
+
             if (result == null)
                 return NotFound(new { message = "Không tìm thấy bảng lương của cơ sở trong kỳ này." });
 
@@ -108,7 +245,10 @@ public class SalaryController : ControllerBase
     }
 
     [HttpGet("rule-adjustments")]
-    public async Task<IActionResult> GetRuleAdjustments([FromQuery] int month, [FromQuery] int year, [FromQuery] int? branchId)
+    public async Task<IActionResult> GetRuleAdjustments(
+        [FromQuery] int month,
+        [FromQuery] int year,
+        [FromQuery] int? branchId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
@@ -121,28 +261,32 @@ public class SalaryController : ControllerBase
         if (resolvedBranch == null)
             return BadRequest(new { message = "Vui lòng chọn cơ sở." });
 
-        var result = await _salaryService.GetRuleAdjustmentsAsync(resolvedBranch.Value, month, year);
+        var result = await _salaryService.GetRuleAdjustmentsAsync(
+            resolvedBranch.Value,
+            month,
+            year);
+
         return Ok(result);
     }
 
     [HttpPost("parse-invoice-image")]
-public async Task<IActionResult> ParseInvoiceImage(
-    IFormFile file,
-    [FromServices] InvoiceOcrService invoiceOcrService)
-{
-    try
+    public async Task<IActionResult> ParseInvoiceImage(
+        IFormFile file,
+        [FromServices] InvoiceOcrService invoiceOcrService)
     {
-        var result = await invoiceOcrService.ParseInvoiceImageAsync(file);
-        return Ok(result);
-    }
-    catch (Exception ex)
-    {
-        return BadRequest(new
+        try
         {
-            message = ex.Message
-        });
+            var result = await invoiceOcrService.ParseInvoiceImageAsync(file);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                message = ex.Message
+            });
+        }
     }
-}
 
     [HttpPut("rule")]
     public async Task<IActionResult> UpdateSalaryRule([FromBody] UpdateSalaryRuleDto dto)
@@ -166,7 +310,9 @@ public async Task<IActionResult> ParseInvoiceImage(
     }
 
     [HttpPut("rule-adjustments/apply")]
-    public async Task<IActionResult> ApplyRuleAdjustment([FromBody] ApplySalaryRuleDto dto, [FromQuery] int? branchId)
+    public async Task<IActionResult> ApplyRuleAdjustment(
+        [FromBody] ApplySalaryRuleDto dto,
+        [FromQuery] int? branchId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
@@ -181,7 +327,10 @@ public async Task<IActionResult> ParseInvoiceImage(
 
         try
         {
-            var result = await _salaryService.ApplyRuleAdjustmentAsync(resolvedBranch.Value, dto);
+            var result = await _salaryService.ApplyRuleAdjustmentAsync(
+                resolvedBranch.Value,
+                dto);
+
             if (result == null)
                 return NotFound(new { message = "Không Tìm Thấy Nhân Viên Trong Cơ Sở Của Bạn." });
 
@@ -194,7 +343,9 @@ public async Task<IActionResult> ParseInvoiceImage(
     }
 
     [HttpPut("rule-adjustments/manual")]
-    public async Task<IActionResult> AddManualAdjustment([FromBody] ManualSalaryAdjustmentDto dto, [FromQuery] int? branchId)
+    public async Task<IActionResult> AddManualAdjustment(
+        [FromBody] ManualSalaryAdjustmentDto dto,
+        [FromQuery] int? branchId)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
@@ -209,7 +360,10 @@ public async Task<IActionResult> ParseInvoiceImage(
 
         try
         {
-            var result = await _salaryService.AddManualAdjustmentAsync(resolvedBranch.Value, dto);
+            var result = await _salaryService.AddManualAdjustmentAsync(
+                resolvedBranch.Value,
+                dto);
+
             if (result == null)
                 return NotFound(new { message = "Không Tìm Thấy Nhân Viên Trong Cơ Sở Của Bạn." });
 
@@ -234,7 +388,10 @@ public async Task<IActionResult> ParseInvoiceImage(
         if (currentUser.BranchId == null)
             return BadRequest(new { message = "Tài Khoản Quản Lý Chưa Được Gắn cơ sở." });
 
-        var salary = await _salaryService.MarkPaidAsync(salaryId, currentUser.BranchId.Value);
+        var salary = await _salaryService.MarkPaidAsync(
+            salaryId,
+            currentUser.BranchId.Value);
+
         if (salary == null)
             return NotFound(new { message = "Không Tìm Thấy Bảng Lương Trong Cơ Sở Của Bạn." });
 
@@ -266,17 +423,25 @@ public async Task<IActionResult> ParseInvoiceImage(
         if (currentUser.BranchId == null)
             return null;
 
-        if (requestedBranchId != null && requestedBranchId.Value != currentUser.BranchId.Value)
+        if (requestedBranchId != null &&
+            requestedBranchId.Value != currentUser.BranchId.Value)
+        {
             return null;
+        }
 
         return currentUser.BranchId.Value;
     }
 
     private async Task<NsUser?> GetCurrentUserAsync()
     {
-        var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+        var userIdClaim = User.Claims
+            .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?
+            .Value;
+
         return int.TryParse(userIdClaim, out var currentUserId)
-            ? await _context.NsUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId)
+            ? await _context.NsUsers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == currentUserId)
             : null;
     }
 }

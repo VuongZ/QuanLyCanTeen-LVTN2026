@@ -7,6 +7,7 @@ namespace LuanVanTotNghiep.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class SupplierController : ControllerBase
     {
         private readonly SupplierService _service;
@@ -17,55 +18,144 @@ namespace LuanVanTotNghiep.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetSuppliers() => Ok(await _service.GetAllSuppliersAsync());
+        public async Task<IActionResult> GetSuppliers()
+        {
+            var suppliers =
+                await _service.GetAllSuppliersAsync();
+
+            return Ok(suppliers);
+        }
 
         [HttpGet("deleted")]
         [Authorize(Roles = "ADMIN")]
-        public async Task<IActionResult> GetDeletedSuppliers() => Ok(await _service.GetDeletedSuppliersAsync());
+        public async Task<IActionResult> GetDeletedSuppliers()
+        {
+            var suppliers =
+                await _service.GetDeletedSuppliersAsync();
+
+            return Ok(suppliers);
+        }
 
         [HttpPost]
         [Authorize(Roles = "ADMIN")]
-        public async Task<IActionResult> CreateSupplier([FromBody] CreateUpdateSupplierDto supplier)
-        {
-            var created = await _service.CreateSupplierAsync(supplier);
-            return Ok(created);
-        }
-
-        [HttpPut("{id}")]
-        [Authorize(Roles = "ADMIN")]
-        public async Task<IActionResult> UpdateSupplier(int id, [FromBody] CreateUpdateSupplierDto supplier)
+        public async Task<IActionResult> CreateSupplier(
+            [FromBody] CreateUpdateSupplierDto dto
+        )
         {
             try
             {
-                await _service.UpdateSupplierAsync(id, supplier);
-                return NoContent();
+                var created =
+                    await _service.CreateSupplierAsync(dto);
+
+                return Ok(created);
             }
-            catch (KeyNotFoundException)
+            catch (ArgumentException ex)
             {
-                return NotFound(new { message = "Không tìm thấy nhà cung cấp." });
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new
+                {
+                    message = ex.Message
+                });
             }
         }
 
-        [HttpDelete("{id}")]
+        [HttpPut("{id:int}")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> UpdateSupplier(
+            int id,
+            [FromBody] CreateUpdateSupplierDto dto
+        )
+        {
+            try
+            {
+                var updated =
+                    await _service.UpdateSupplierAsync(id, dto);
+
+                return Ok(updated);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
+        [HttpDelete("{id:int}")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> DeleteSupplier(int id)
         {
-            var deleted = await _service.DeleteSupplierAsync(id);
-            if (!deleted)
-                return NotFound(new { message = "Không tìm thấy nhà cung cấp." });
+            var deleted =
+                await _service.DeleteSupplierAsync(id);
 
-            return NoContent();
+            if (!deleted)
+            {
+                return NotFound(new
+                {
+                    message =
+                        "Không tìm thấy nhà phân phối đang hoạt động."
+                });
+            }
+
+            return Ok(new
+            {
+                message =
+                    "Đã ngừng hoạt động nhà phân phối."
+            });
         }
 
-        [HttpPatch("{id}/restore")]
+        [HttpPatch("{id:int}/restore")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> RestoreSupplier(int id)
         {
-            var restored = await _service.RestoreSupplierAsync(id);
-            if (!restored)
-                return NotFound(new { message = "Không tìm thấy nhà cung cấp đã xóa." });
+            try
+            {
+                var restored =
+                    await _service.RestoreSupplierAsync(id);
 
-            return Ok(new { message = "Khôi phục nhà cung cấp thành công." });
+                if (!restored)
+                {
+                    return NotFound(new
+                    {
+                        message =
+                            "Không tìm thấy nhà phân phối đã ngừng hoạt động."
+                    });
+                }
+
+                return Ok(new
+                {
+                    message =
+                        "Khôi phục nhà phân phối thành công."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new
+                {
+                    message = ex.Message
+                });
+            }
         }
     }
 }

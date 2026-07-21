@@ -2320,3 +2320,148 @@
   background: #f8fafc !important;
   transform: none;
 }
+
+/* ===== Bố cục trang giờ làm và lương ===== */
+
+.sd-profile-layout.sd-salary-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Bốn thẻ tổng hợp nằm ngang phía trên */
+.sd-salary-layout .sd-salary-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.sd-salary-layout .sd-salary-metric {
+  min-width: 0;
+  padding: 16px 18px;
+}
+
+/* Bảng chi tiết chiếm toàn bộ chiều rộng */
+.sd-salary-layout > .sd-card,
+.sd-work-detail-card {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.sd-work-detail-card .sd-salary-table-wrap {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.sd-work-detail-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+/* Chia chiều rộng hợp lý cho bảy cột */
+.sd-work-detail-table th:nth-child(1),
+.sd-work-detail-table td:nth-child(1) {
+  width: 13%;
+}
+
+.sd-work-detail-table th:nth-child(2),
+.sd-work-detail-table td:nth-child(2) {
+  width: 14%;
+}
+
+.sd-work-detail-table th:nth-child(3),
+.sd-work-detail-table td:nth-child(3) {
+  width: 17%;
+}
+
+.sd-work-detail-table th:nth-child(4),
+.sd-work-detail-table td:nth-child(4),
+.sd-work-detail-table th:nth-child(5),
+.sd-work-detail-table td:nth-child(5) {
+  width: 11%;
+}
+
+.sd-work-detail-table th:nth-child(6),
+.sd-work-detail-table td:nth-child(6) {
+  width: 15%;
+}
+
+.sd-work-detail-table th:nth-child(7),
+.sd-work-detail-table td:nth-child(7) {
+  width: 19%;
+}
+
+.sd-work-detail-table th,
+.sd-work-detail-table td {
+  padding: 11px 9px;
+  white-space: nowrap;
+}
+
+.sd-work-detail-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sd-worked-hours {
+  color: #ea580c !important;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-work-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-work-status.completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sd-work-status.working {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.sd-work-status.not-started {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Máy tính bảng */
+@media (max-width: 900px) {
+  .sd-salary-layout .sd-salary-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sd-work-detail-card .sd-salary-table-wrap {
+    overflow-x: auto;
+  }
+
+  .sd-work-detail-table {
+    min-width: 760px;
+    table-layout: auto;
+  }
+}
+
+/* Điện thoại */
+@media (max-width: 520px) {
+  .sd-salary-layout .sd-salary-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-salary-header {
+    align-items: stretch;
+  }
+}
