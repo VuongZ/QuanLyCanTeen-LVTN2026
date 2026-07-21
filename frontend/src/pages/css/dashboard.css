@@ -2465,3 +2465,31 @@
     align-items: stretch;
   }
 }
+.sd-salary-period-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.sd-salary-period-filter .sd-field {
+  margin-bottom: 0;
+}
+
+.sd-salary-period-filter select {
+  min-width: 120px;
+}
+
+@media (max-width: 520px) {
+  .sd-salary-period-filter {
+    width: 100%;
+  }
+
+  .sd-salary-period-filter .sd-field {
+    flex: 1;
+  }
+
+  .sd-salary-period-filter select {
+    width: 100%;
+    min-width: 0;
+  }
+}

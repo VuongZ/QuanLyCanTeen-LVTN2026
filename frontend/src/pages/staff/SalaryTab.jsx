@@ -76,7 +76,8 @@ function SalaryMetric({ label, value }) {
 
 export function SalaryTab({ user }) {
   const [salaries, setSalaries] = useState([]);
-  const [selectedMonthKey, setSelectedMonthKey] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
+const [selectedMonth, setSelectedMonth] = useState('');
 
   const [workDetails, setWorkDetails] = useState([]);
 
@@ -99,11 +100,13 @@ export function SalaryTab({ user }) {
 
         setSalaries(nextSalaries);
 
-        setSelectedMonthKey(
-          nextSalaries[0]
-            ? getMonthKey(nextSalaries[0])
-            : '',
-        );
+       if (nextSalaries[0]) {
+  setSelectedYear(String(nextSalaries[0].year));
+  setSelectedMonth(String(nextSalaries[0].month));
+} else {
+  setSelectedYear('');
+  setSelectedMonth('');
+}
       } catch (error) {
         setSalaryError(
           error.response?.data?.message ||
@@ -117,18 +120,43 @@ export function SalaryTab({ user }) {
     loadSalary();
   }, [user?.id]);
 
-  const monthOptions = useMemo(() => {
-    return salaries.map((item) => ({
-      key: getMonthKey(item),
-      label: `Tháng ${item.month}/${item.year}`,
-    }));
-  }, [salaries]);
+const yearOptions = useMemo(() => {
+  return [...new Set(salaries.map((item) => item.year))]
+    .sort((a, b) => b - a);
+}, [salaries]);
 
-  const selectedSalary = useMemo(() => {
-    return salaries.find(
-      (item) => getMonthKey(item) === selectedMonthKey,
-    ) || null;
-  }, [salaries, selectedMonthKey]);
+const monthOptions = useMemo(() => {
+  if (!selectedYear) return [];
+
+  return salaries
+    .filter((item) => item.year === Number(selectedYear))
+    .map((item) => item.month)
+    .filter((month, index, array) => array.indexOf(month) === index)
+    .sort((a, b) => b - a);
+}, [salaries, selectedYear]);
+
+useEffect(() => {
+  if (monthOptions.length === 0) {
+    setSelectedMonth('');
+    return;
+  }
+
+  const currentMonthExists = monthOptions.includes(
+    Number(selectedMonth),
+  );
+
+  if (!currentMonthExists) {
+    setSelectedMonth(String(monthOptions[0]));
+  }
+}, [monthOptions, selectedMonth]);
+
+const selectedSalary = useMemo(() => {
+  return salaries.find(
+    (item) =>
+      item.year === Number(selectedYear) &&
+      item.month === Number(selectedMonth),
+  ) || null;
+}, [salaries, selectedYear, selectedMonth]);
 
   useEffect(() => {
     async function loadWorkDetails() {
@@ -210,24 +238,45 @@ export function SalaryTab({ user }) {
             </h2>
           </div>
 
-          {monthOptions.length > 0 && (
-            <div className="sd-field sd-salary-filter">
-              <label>Chọn kỳ lương</label>
+         {yearOptions.length > 0 && (
+  <div className="sd-salary-period-filter">
+    
 
-              <select
-                value={selectedMonthKey}
-                onChange={(event) =>
-                  setSelectedMonthKey(event.target.value)
-                }
-              >
-                {monthOptions.map((month) => (
-                  <option key={month.key} value={month.key}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+    <div className="sd-field sd-salary-filter">
+      <label>Tháng</label>
+
+      <select
+        value={selectedMonth}
+        onChange={(event) =>
+          setSelectedMonth(event.target.value)
+        }
+      >
+        {monthOptions.map((month) => (
+          <option key={month} value={month}>
+            Tháng {month}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div className="sd-field sd-salary-filter">
+      <label>Năm</label>
+
+      <select
+        value={selectedYear}
+        onChange={(event) =>
+          setSelectedYear(event.target.value)
+        }
+      >
+        {yearOptions.map((year) => (
+          <option key={year} value={year}>
+            {year}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+)}
         </div>
 
         {salaryError && (
