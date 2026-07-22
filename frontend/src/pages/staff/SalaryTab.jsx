@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  getSalaryAdjustmentHistory,
   getSalaryByUser,
   getSalaryWorkDetails,
 } from '../../api/SalaryApi';
@@ -42,10 +43,6 @@ function formatTime(value) {
   });
 }
 
-function getMonthKey(item) {
-  return `${item.year}-${String(item.month).padStart(2, '0')}`;
-}
-
 function formatWorkStatus(status) {
   const statusMap = {
     COMPLETED: 'Đã hoàn thành',
@@ -80,12 +77,15 @@ export function SalaryTab({ user }) {
 const [selectedMonth, setSelectedMonth] = useState('');
 
   const [workDetails, setWorkDetails] = useState([]);
+  const [adjustmentHistory, setAdjustmentHistory] = useState([]);
 
   const [salaryLoading, setSalaryLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const [salaryError, setSalaryError] = useState('');
   const [detailError, setDetailError] = useState('');
+  const [historyError, setHistoryError] = useState('');
 
   useEffect(() => {
     async function loadSalary() {
@@ -189,11 +189,34 @@ const selectedSalary = useMemo(() => {
     }
 
     loadWorkDetails();
-  }, [
-    user?.id,
-    selectedSalary?.month,
-    selectedSalary?.year,
-  ]);
+  }, [user?.id, selectedSalary]);
+
+  useEffect(() => {
+    async function loadAdjustmentHistory() {
+      if (!user?.id || !selectedSalary) {
+        setAdjustmentHistory([]);
+        return;
+      }
+
+      setHistoryLoading(true);
+      setHistoryError('');
+      try {
+        const data = await getSalaryAdjustmentHistory(
+          user.id,
+          selectedSalary.month,
+          selectedSalary.year,
+        );
+        setAdjustmentHistory(Array.isArray(data) ? data : []);
+      } catch (error) {
+        setAdjustmentHistory([]);
+        setHistoryError(error.response?.data?.message || 'Không tải được lịch sử thưởng/phạt.');
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+
+    loadAdjustmentHistory();
+  }, [user?.id, selectedSalary]);
 
   const summary = useMemo(() => ({
     hours: Number(selectedSalary?.totalHours || 0),
@@ -351,6 +374,41 @@ const selectedSalary = useMemo(() => {
                         {formatWorkStatus(item.status)}
                       </span>
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="sd-card sd-work-detail-card">
+        <div className="sd-card-header">
+          <div>
+            <p className="sd-eyebrow">Minh bạch thu nhập</p>
+            <h2>Lịch sử thưởng/phạt</h2>
+          </div>
+        </div>
+
+        {historyError && <p className="sd-status sd-status-error">{historyError}</p>}
+        {historyLoading ? (
+          <p className="sd-salary-empty">Đang tải lịch sử thưởng/phạt...</p>
+        ) : adjustmentHistory.length === 0 ? (
+          <p className="sd-salary-empty">Chưa có lần thưởng/phạt thủ công nào trong kỳ lương này.</p>
+        ) : (
+          <div className="sd-salary-table-wrap">
+            <table className="sd-salary-table sd-adjustment-history-table">
+              <thead>
+                <tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người tạo</th></tr>
+              </thead>
+              <tbody>
+                {adjustmentHistory.map((item) => (
+                  <tr key={item.id}>
+                    <td>{new Date(item.createdAt).toLocaleString('vi-VN')}</td>
+                    <td>{formatMoney(item.bonusAmount)}</td>
+                    <td>{formatMoney(item.penaltyAmount)}</td>
+                    <td>{item.reason}</td>
+                    <td>{item.createdByName || 'Quản lý'}</td>
                   </tr>
                 ))}
               </tbody>

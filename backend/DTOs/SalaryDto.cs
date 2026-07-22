@@ -19,6 +19,12 @@ public class SalaryDto
     public decimal TotalPenalty { get; set; }
     public string? Status { get; set; }
     public DateTime? PaidAt { get; set; }
+    public DateTime? FinalizedAt { get; set; }
+    public int? FinalizedByUserId { get; set; }
+    public string? FinalizedByName { get; set; }
+    public DateTime? AdminFinalizedAt { get; set; }
+    public int? AdminFinalizedByUserId { get; set; }
+    public string? AdminFinalizedByName { get; set; }
     public DateTime? CreatedAt { get; set; }
 }
 

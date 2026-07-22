@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addManualSalaryAdjustment, getSalaryRuleAdjustments, updateSalaryRule } from '../../api/SalaryApi';
+import {
+  addManualSalaryAdjustment,
+  getSalaryAdjustmentHistory,
+  getSalaryRuleAdjustments,
+  updateSalaryRule,
+} from '../../api/SalaryApi';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -50,7 +55,10 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
   const [savingRule, setSavingRule] = useState(false);
   const [savingUserId, setSavingUserId] = useState(null);
   const [manualTarget, setManualTarget] = useState(null);
-  const [manualForm, setManualForm] = useState({ bonusAmount: '', penaltyAmount: '' });
+  const [manualForm, setManualForm] = useState({ bonusAmount: '', penaltyAmount: '', reason: '' });
+  const [historyTarget, setHistoryTarget] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -176,8 +184,23 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
 
   function openManualAdjustment(employee) {
     setManualTarget(employee);
-    setManualForm({ bonusAmount: '', penaltyAmount: '' });
+    setManualForm({ bonusAmount: '', penaltyAmount: '', reason: '' });
     setMessage(null);
+  }
+
+  async function openHistory(employee) {
+    setHistoryTarget(employee);
+    setHistory([]);
+    setHistoryLoading(true);
+    try {
+      const data = await getSalaryAdjustmentHistory(employee.userId, period.month, period.year);
+      setHistory(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được lịch sử thưởng/phạt.' });
+      setHistoryTarget(null);
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   async function handleManualSubmit(event) {
@@ -194,6 +217,10 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
       setMessage({ type: 'error', text: 'Vui lòng nhập số tiền thưởng hoặc phạt.' });
       return;
     }
+    if (!manualForm.reason.trim()) {
+      setMessage({ type: 'error', text: 'Vui lòng nhập lý do thưởng/phạt.' });
+      return;
+    }
 
     setSavingUserId(manualTarget.userId);
     setMessage(null);
@@ -204,6 +231,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
         year: period.year,
         bonusAmount,
         penaltyAmount,
+        reason: manualForm.reason.trim(),
       }, selectedBranchId);
       setEmployees((items) => items.map((item) => (item.userId === updated.userId ? updated : item)));
       setManualTarget(null);
@@ -328,7 +356,8 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
             ) : filteredEmployees.length === 0 ? (
               <tr><td colSpan={isAdmin ? 7 : 8} className="sd-td-empty">Không có nhân viên phù hợp.</td></tr>
             ) : filteredEmployees.map((employee) => {
-              const isPaid = (employee.status || '').toUpperCase() === 'PAID';
+              const salaryStatus = (employee.status || '').toUpperCase();
+              const isLocked = salaryStatus === 'FINALIZED' || salaryStatus === 'ADMIN_FINALIZED' || salaryStatus === 'PAID';
               const isSaving = savingUserId === employee.userId;
 
               return (
@@ -354,14 +383,19 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                   </td>
                   {!isAdmin && (
                     <td>
-                      <button
-                        className="sd-btn-primary"
-                        disabled={isPaid || isSaving}
-                        onClick={() => openManualAdjustment(employee)}
-                        type="button"
-                      >
-                        {isPaid ? 'Đã trả' : isSaving ? 'Đang lưu...' : 'Thưởng phạt'}
-                      </button>
+                      <div className="sd-salary-actions">
+                        <button className="sd-btn-ghost" onClick={() => openHistory(employee)} type="button">
+                          Lịch sử
+                        </button>
+                        <button
+                          className="sd-btn-primary"
+                          disabled={isLocked || isSaving}
+                          onClick={() => openManualAdjustment(employee)}
+                          type="button"
+                        >
+                          {isLocked ? (salaryStatus === 'PAID' ? 'Đã trả' : 'Đã chốt') : isSaving ? 'Đang lưu...' : 'Thưởng phạt'}
+                        </button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -411,6 +445,17 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                     />
                   </div>
                 </div>
+                <div className="sd-field">
+                  <label>Lý do thưởng/phạt</label>
+                  <textarea
+                    maxLength="500"
+                    onChange={(event) => setManualForm((form) => ({ ...form, reason: event.target.value }))}
+                    placeholder="Nhập lý do cụ thể để nhân viên có thể tra cứu"
+                    required
+                    rows="3"
+                    value={manualForm.reason}
+                  />
+                </div>
                 <dl className="sd-dl">
                   <div className="sd-info-row"><dt>Thưởng hiện tại</dt><dd>{formatMoney(manualTarget.currentBonus)}</dd></div>
                   <div className="sd-info-row"><dt>Phạt hiện tại</dt><dd>{formatMoney(manualTarget.currentPenalty)}</dd></div>
@@ -424,6 +469,44 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {historyTarget && (
+        <div className="sd-overlay" onClick={() => setHistoryTarget(null)}>
+          <div className="sd-modal sd-modal--wide" onClick={(event) => event.stopPropagation()}>
+            <div className="sd-modal-header">
+              <div>
+                <p className="sd-eyebrow">Tháng {period.month}/{period.year}</p>
+                <h2>Lịch sử thưởng/phạt - {historyTarget.fullName || historyTarget.email}</h2>
+              </div>
+              <button onClick={() => setHistoryTarget(null)} type="button">✕</button>
+            </div>
+            <div className="sd-modal-body">
+              {historyLoading ? (
+                <p className="sd-salary-empty">Đang tải lịch sử...</p>
+              ) : history.length === 0 ? (
+                <p className="sd-salary-empty">Chưa có lần thưởng/phạt thủ công nào trong kỳ này.</p>
+              ) : (
+                <div className="sd-table-wrap">
+                  <table className="sd-table sd-adjustment-history-table">
+                    <thead><tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người tạo</th></tr></thead>
+                    <tbody>
+                      {history.map((item) => (
+                        <tr key={item.id}>
+                          <td>{new Date(item.createdAt).toLocaleString('vi-VN')}</td>
+                          <td>{formatMoney(item.bonusAmount)}</td>
+                          <td>{formatMoney(item.penaltyAmount)}</td>
+                          <td>{item.reason}</td>
+                          <td>{item.createdByName || 'Quản lý'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

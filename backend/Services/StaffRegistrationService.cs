@@ -593,11 +593,13 @@ public class StaffRegistrationService
                     employee,
                     schedule.WorkDate);
 
-                if (salary != null &&
-                    string.Equals(salary.Status, "PAID", StringComparison.OrdinalIgnoreCase))
+                if (salary != null && (
+                    string.Equals(salary.Status, "FINALIZED", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(salary.Status, "ADMIN_FINALIZED", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(salary.Status, "PAID", StringComparison.OrdinalIgnoreCase)))
                 {
                     throw new InvalidOperationException(
-                        "Bảng lương của tháng này đã thanh toán, không thể cộng thêm giờ làm.");
+                        "Bảng lương của tháng này đã chốt hoặc thanh toán, không thể cộng thêm giờ làm.");
                 }
 
                 if (salary == null)

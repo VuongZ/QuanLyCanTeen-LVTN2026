@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getAllSalaries, getBranchSalaries, markBranchSalaryTransferred, markSalaryPaid } from '../../api/SalaryApi';
+import {
+  adminFinalizeSalary,
+  finalizeSalary,
+  getAllSalaries,
+  getBranchSalaries,
+  getSalaryAdjustmentHistory,
+  getSalaryWorkDetails,
+  markSalaryPaid,
+} from '../../api/SalaryApi';
 
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0));
 const number = (value) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -8,8 +16,18 @@ const periodKey = (item) => `${item.year}-${String(item.month).padStart(2, '0')}
 
 function statusLabel(status) {
   if ((status || '').toUpperCase() === 'PAID') return 'Đã thanh toán';
+  if ((status || '').toUpperCase() === 'ADMIN_FINALIZED') return 'Admin đã chốt - chờ trả';
+  if ((status || '').toUpperCase() === 'FINALIZED') return 'Manager đã chốt - chờ admin';
   if ((status || '').toUpperCase() === 'CANCELLED') return 'Đã huỷ';
   return 'Chưa thanh toán';
+}
+
+function statusClass(status) {
+  const normalized = (status || '').toUpperCase();
+  if (normalized === 'PAID') return 'paid';
+  if (normalized === 'ADMIN_FINALIZED') return 'approved';
+  if (normalized === 'FINALIZED') return 'finalized';
+  return 'pending';
 }
 
 function InfoRow({ label, value }) {
@@ -24,6 +42,9 @@ export function AdminSalaryTab({ isAdmin = true }) {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [workDetails, setWorkDetails] = useState([]);
+  const [adjustmentHistory, setAdjustmentHistory] = useState([]);
   const [message, setMessage] = useState(null);
 
   async function fetchItems() {
@@ -76,11 +97,12 @@ export function AdminSalaryTab({ isAdmin = true }) {
     const keyword = query.trim().toLowerCase();
     return items.filter((item) => {
       if (selectedPeriod !== 'ALL' && periodKey(item) !== selectedPeriod) return false;
-      const history = isAdmin ? Boolean(item.isTransferred) : (item.status || '').toUpperCase() === 'PAID';
+      const normalizedStatus = (item.status || '').toUpperCase();
+      const history = isAdmin
+        ? normalizedStatus === 'ADMIN_FINALIZED' || normalizedStatus === 'PAID'
+        : normalizedStatus === 'PAID';
       if ((viewMode === 'HISTORY') !== history) return false;
-      const values = isAdmin
-        ? [item.branchName, item.managerName, item.managerEmail, item.managerBankName, item.managerBankAccountNumber, `${item.month}/${item.year}`]
-        : [item.fullName, item.username, item.bankName, item.bankAccountNumber, `${item.month}/${item.year}`];
+      const values = [item.fullName, item.username, item.branchName, item.bankName, item.bankAccountNumber, `${item.month}/${item.year}`];
       return !keyword || values.some((value) => String(value || '').toLowerCase().includes(keyword));
     });
   }, [items, query, viewMode, isAdmin, selectedPeriod]);
@@ -88,15 +110,12 @@ export function AdminSalaryTab({ isAdmin = true }) {
   const summary = useMemo(() => items
     .filter((item) => selectedPeriod === 'ALL' || periodKey(item) === selectedPeriod)
     .reduce((total, item) => {
-    if (isAdmin) {
-      total.count += Number(item.salaryCount || 0);
-      if (item.isTransferred) total.paid += Number(item.transferredAmount || item.totalSalary || 0);
-      else total.pending += Number(item.totalSalary || 0);
-    } else {
-      const paid = (item.status || '').toUpperCase() === 'PAID';
-      total.count += 1;
-      total[paid ? 'paid' : 'pending'] += Number(item.totalSalary || 0);
-    }
+    const normalizedStatus = (item.status || '').toUpperCase();
+    const completed = isAdmin
+      ? normalizedStatus === 'ADMIN_FINALIZED' || normalizedStatus === 'PAID'
+      : normalizedStatus === 'PAID';
+    total.count += 1;
+    total[completed ? 'paid' : 'pending'] += Number(item.totalSalary || 0);
     return total;
   }, { count: 0, pending: 0, paid: 0 }), [items, isAdmin, selectedPeriod]);
 
@@ -105,15 +124,9 @@ export function AdminSalaryTab({ isAdmin = true }) {
     setSaving(true);
     setMessage(null);
     try {
-      if (isAdmin) {
-        const updated = await markBranchSalaryTransferred(selected.branchId, selected.month, selected.year);
-        setItems((current) => current.map((item) => item.branchId === updated.branchId && item.month === updated.month && item.year === updated.year ? updated : item));
-        setMessage({ type: 'success', text: 'Đã xác nhận chuyển lương cho quản lý.' });
-      } else {
-        const updated = await markSalaryPaid(selected.id);
-        setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
-        setMessage({ type: 'success', text: 'Đã xác nhận trả lương cho nhân viên.' });
-      }
+      const updated = await markSalaryPaid(selected.id);
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setMessage({ type: 'success', text: 'Đã xác nhận trả lương cho nhân viên.' });
       setSelected(null);
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể cập nhật thanh toán.' });
@@ -122,24 +135,75 @@ export function AdminSalaryTab({ isAdmin = true }) {
     }
   }
 
+  async function confirmAdminFinalization() {
+    if (!selected || !isAdmin) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const updated = await adminFinalizeSalary(selected.id);
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setSelected(null);
+      setMessage({ type: 'success', text: 'Admin đã chốt bảng lương của nhân viên.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể chốt bảng lương.' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmFinalization() {
+    if (!selected || isAdmin) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const updated = await finalizeSalary(selected.id);
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setSelected(updated);
+      setMessage({ type: 'success', text: 'Đã chốt bảng lương. Các số liệu của kỳ này đã được khóa.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể chốt bảng lương.' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openSalaryDetail(item) {
+    setSelected(item);
+    setDetailLoading(true);
+    setWorkDetails([]);
+    setAdjustmentHistory([]);
+    try {
+      const [details, history] = await Promise.all([
+        getSalaryWorkDetails(item.userId, item.month, item.year),
+        getSalaryAdjustmentHistory(item.userId, item.month, item.year),
+      ]);
+      setWorkDetails(Array.isArray(details) ? details : []);
+      setAdjustmentHistory(Array.isArray(history) ? history : []);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được chi tiết bảng lương.' });
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
   return (
     <div className={`sd-salary-admin-page ${isAdmin ? 'sd-salary-admin-page--admin' : ''}`}>
       <div className="sd-stat-grid sd-salary-admin-stats">
-        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>{isAdmin ? 'Bảng lương toàn hệ thống' : 'Bảng lương cơ sở'}</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{money(summary.pending)}</h3><p>{isAdmin ? 'Chờ chuyển cho quản lý' : 'Chưa thanh toán'}</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">✓</span><h3>{money(summary.paid)}</h3><p>{isAdmin ? 'Đã chuyển cho quản lý' : 'Đã thanh toán'}</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>{isAdmin ? 'Bảng lương manager đã gửi' : 'Bảng lương cơ sở'}</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{money(summary.pending)}</h3><p>{isAdmin ? 'Chờ admin chốt' : 'Chưa thanh toán'}</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">✓</span><h3>{money(summary.paid)}</h3><p>{isAdmin ? 'Admin đã chốt' : 'Đã thanh toán'}</p></div>
       </div>
 
       <div className="sd-users-toolbar">
         <div className="sd-users-toolbar-left">
           <div className="sd-search-wrap">
             <span className="sd-search-icon">⌕</span>
-            <input className="sd-input-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={isAdmin ? 'Tìm cơ sở, quản lý hoặc kỳ lương...' : 'Tìm nhân viên, ngân hàng hoặc kỳ lương...'} />
+            <input className="sd-input-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm nhân viên, cơ sở, ngân hàng hoặc kỳ lương..." />
             {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
           </div>
           <div className="sd-filter-chips">
-            <button className={`sd-filter-chip ${viewMode === 'CURRENT' ? 'active' : ''}`} onClick={() => setViewMode('CURRENT')} type="button">{isAdmin ? 'Chờ chuyển' : 'Chờ trả'}</button>
-            <button className={`sd-filter-chip ${viewMode === 'HISTORY' ? 'active' : ''}`} onClick={() => setViewMode('HISTORY')} type="button">{isAdmin ? 'Lịch sử chuyển lương' : 'Lịch sử trả lương'}</button>
+            <button className={`sd-filter-chip ${viewMode === 'CURRENT' ? 'active' : ''}`} onClick={() => setViewMode('CURRENT')} type="button">{isAdmin ? 'Chờ admin chốt' : 'Chờ trả'}</button>
+            <button className={`sd-filter-chip ${viewMode === 'HISTORY' ? 'active' : ''}`} onClick={() => setViewMode('HISTORY')} type="button">{isAdmin ? 'Admin đã chốt' : 'Lịch sử trả lương'}</button>
           </div>
           {periodOptions.length > 0 && (
             <div className="sd-salary-period-filter">
@@ -155,23 +219,64 @@ export function AdminSalaryTab({ isAdmin = true }) {
       </div>
 
       {message && <p className={`sd-status sd-status-${message.type}`}>{message.text}</p>}
-      {isAdmin ? <AdminTable history={viewMode === 'HISTORY'} items={filtered} loading={loading} onSelect={setSelected} /> : <ManagerTable history={viewMode === 'HISTORY'} items={filtered} loading={loading} onSelect={setSelected} />}
+      <SalaryEmployeeTable history={viewMode === 'HISTORY'} isAdmin={isAdmin} items={filtered} loading={loading} onSelect={openSalaryDetail} />
 
       {selected && (
         <div className="sd-overlay" onClick={() => setSelected(null)}>
-          <div className="sd-modal sd-salary-pay-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="sd-modal-header"><h2>{isAdmin ? 'Xác nhận chuyển lương cho quản lý' : 'Xác nhận trả lương'}</h2><button onClick={() => setSelected(null)} type="button">✕</button></div>
-            <div className="sd-modal-body"><dl className="sd-dl">
-              <InfoRow label={isAdmin ? 'Quản lý nhận' : 'Nhân viên'} value={isAdmin ? selected.managerName || selected.managerEmail : selected.fullName || selected.username} />
-              <InfoRow label="Kỳ lương" value={`Tháng ${selected.month}/${selected.year}`} />
-              <InfoRow label="Số tiền" value={money(selected.totalSalary)} />
-              <InfoRow label="Ngân hàng" value={isAdmin ? selected.managerBankName : selected.bankName} />
-              <InfoRow label="Số tài khoản" value={isAdmin ? selected.managerBankAccountNumber : selected.bankAccountNumber} />
-              <InfoRow label="Tên tài khoản" value={isAdmin ? selected.managerBankAccountName : selected.bankAccountName} />
-            </dl></div>
+          <div className="sd-modal sd-salary-pay-modal sd-modal--wide" onClick={(event) => event.stopPropagation()}>
+            <div className="sd-modal-header"><h2>{isAdmin ? 'Chi tiết và chốt lương nhân viên' : 'Chi tiết và chốt lương'}</h2><button onClick={() => setSelected(null)} type="button">✕</button></div>
+            <div className="sd-modal-body">
+              <dl className="sd-dl">
+                <InfoRow label="Nhân viên" value={selected.fullName || selected.username} />
+                <InfoRow label="Kỳ lương" value={`Tháng ${selected.month}/${selected.year}`} />
+                <InfoRow label="Cơ sở" value={selected.branchName} />
+                <InfoRow label="Trạng thái" value={statusLabel(selected.status)} />
+                <InfoRow label="Ngân hàng" value={selected.bankName} />
+                <InfoRow label="Số tài khoản" value={selected.bankAccountNumber} />
+                <InfoRow label="Tên tài khoản" value={selected.bankAccountName} />
+              </dl>
+
+              <>
+                  <div className="sd-salary-detail-summary">
+                    <div><span>Tổng giờ</span><strong>{number(selected.totalHours)} giờ</strong></div>
+                    <div><span>Lương/giờ</span><strong>{money(selected.hourlyWageAtTime)}</strong></div>
+                    <div><span>Lương cơ bản</span><strong>{money(Number(selected.totalHours) * Number(selected.hourlyWageAtTime))}</strong></div>
+                    <div><span>Thưởng</span><strong>{money(selected.totalBonus)}</strong></div>
+                    <div><span>Phạt</span><strong>{money(selected.totalPenalty)}</strong></div>
+                    <div className="total"><span>Thực nhận</span><strong>{money(selected.totalSalary)}</strong></div>
+                  </div>
+
+                  {selected.finalizedAt && <p className="sd-salary-finalized-note">Chốt lúc {date(selected.finalizedAt)} bởi {selected.finalizedByName || 'Manager'}</p>}
+                  {selected.adminFinalizedAt && <p className="sd-salary-finalized-note sd-salary-finalized-note--admin">Admin chốt lúc {date(selected.adminFinalizedAt)} bởi {selected.adminFinalizedByName || 'Admin'}</p>}
+
+                  {detailLoading ? <p className="sd-salary-empty">Đang tải chi tiết lương...</p> : (
+                    <>
+                      <h3 className="sd-salary-detail-title">Chi tiết giờ làm</h3>
+                      <div className="sd-table-wrap sd-salary-detail-table-wrap">
+                        <table className="sd-table sd-salary-detail-table"><thead><tr><th>Ngày</th><th>Ca</th><th>Vào</th><th>Ra</th><th>Số giờ</th></tr></thead><tbody>
+                          {workDetails.length === 0 ? <tr><td colSpan={5} className="sd-td-empty">Chưa có dữ liệu chấm công.</td></tr> : workDetails.map((item) => <tr key={item.attendanceId}>
+                            <td>{new Intl.DateTimeFormat('vi-VN').format(new Date(`${item.workDate}T00:00:00`))}</td><td>{item.shiftName}</td><td>{date(item.checkInTime)}</td><td>{date(item.checkOutTime)}</td><td>{number(item.workedHours)} giờ</td>
+                          </tr>)}
+                        </tbody></table>
+                      </div>
+
+                      <h3 className="sd-salary-detail-title">Chi tiết thưởng/phạt</h3>
+                      <div className="sd-table-wrap sd-salary-detail-table-wrap">
+                        <table className="sd-table sd-salary-detail-table"><thead><tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th></tr></thead><tbody>
+                          {adjustmentHistory.length === 0 ? <tr><td colSpan={4} className="sd-td-empty">Chưa có thưởng/phạt thủ công.</td></tr> : adjustmentHistory.map((item) => <tr key={item.id}>
+                            <td>{date(item.createdAt)}</td><td>{money(item.bonusAmount)}</td><td>{money(item.penaltyAmount)}</td><td>{item.reason}</td>
+                          </tr>)}
+                        </tbody></table>
+                      </div>
+                    </>
+                  )}
+              </>
+            </div>
             <div className="sd-modal-footer">
-              <button className="sd-btn-ghost" onClick={() => setSelected(null)} type="button">Hủy</button>
-              <button className="sd-btn-primary" disabled={saving} onClick={confirmPayment} type="button">{saving ? 'Đang cập nhật...' : isAdmin ? 'Xác nhận đã chuyển' : 'Xác nhận đã trả'}</button>
+              <button className="sd-btn-ghost" onClick={() => setSelected(null)} type="button">Đóng</button>
+              {!isAdmin && (selected.status || '').toUpperCase() === 'ADMIN_FINALIZED' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmPayment} type="button">{saving ? 'Đang cập nhật...' : 'Xác nhận đã trả'}</button>}
+              {!isAdmin && (selected.status || 'PENDING').toUpperCase() === 'PENDING' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmFinalization} type="button">{saving ? 'Đang chốt...' : 'Chốt lương'}</button>}
+              {isAdmin && (selected.status || '').toUpperCase() === 'FINALIZED' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmAdminFinalization} type="button">{saving ? 'Đang chốt...' : 'Admin chốt lương'}</button>}
             </div>
           </div>
         </div>
@@ -180,34 +285,17 @@ export function AdminSalaryTab({ isAdmin = true }) {
   );
 }
 
-function AdminTable({ history, items, loading, onSelect }) {
-  return <div className="sd-table-wrap"><table className="sd-table"><thead><tr>
-    <th>Cơ sở</th><th>Kỳ lương</th><th>Quản lý nhận tiền</th><th>Nhân viên</th><th>Bảng lương</th><th>Tổng cần chuyển</th><th>Đã trả nhân viên</th><th>Trạng thái</th><th>Thao tác</th>
+function SalaryEmployeeTable({ history, isAdmin, items, loading, onSelect }) {
+  return <div className="sd-table-wrap"><table className="sd-table sd-salary-employee-table"><thead><tr>
+    <th>Nhân viên</th><th>Cơ sở</th><th>Tháng</th><th>Giờ làm</th><th>Thực nhận</th><th>Ngân hàng</th><th>Trạng thái</th><th>Thao tác</th>
   </tr></thead><tbody>
-    {loading ? <tr><td colSpan={9} className="sd-td-empty">Đang tải dữ liệu lương...</td></tr> : items.length === 0 ? <tr><td colSpan={9} className="sd-td-empty">{history ? 'Chưa có lịch sử chuyển lương.' : 'Không có kỳ lương đang chờ chuyển.'}</td></tr> : items.map((item) => <tr key={`${item.branchId}-${item.year}-${item.month}`}>
-      <td><strong>{item.branchName || 'Chưa gán cơ sở'}</strong></td>
-      <td><strong>{item.month}/{item.year}</strong></td>
-      <td><strong>{item.managerName || item.managerEmail || 'Chưa có quản lý'}</strong><span className="sd-subline">{item.managerBankName || 'Chưa có ngân hàng'}</span><span className="sd-subline">{item.managerBankAccountNumber || 'Chưa có STK'}</span></td>
-      <td>{number(item.employeeCount)}</td>
-      <td><strong>{number(item.salaryCount)}</strong><span className="sd-subline">{number(item.pendingCount)} chưa trả / {number(item.paidCount)} đã trả</span></td>
-      <td className="sd-salary-admin-total">{money(item.isTransferred ? item.transferredAmount : item.totalSalary)}</td>
-      <td>{money(item.paidTotal)}</td>
-      <td>{item.isTransferred ? <><span className="sd-status-pill paid">Đã chuyển</span><span className="sd-subline">{date(item.transferredAt)}</span><span className="sd-subline">Bởi {item.transferredByName || 'Admin'}</span></> : <span className="sd-status-pill pending">Chờ chuyển</span>}</td>
-      <td>{history ? <span className="sd-status-pill paid">Hoàn tất</span> : <button className="sd-btn-primary sd-salary-transfer-btn" disabled={!item.managerId} onClick={() => onSelect(item)} type="button">Đã chuyển lương cho quản lý</button>}</td>
-    </tr>)}
-  </tbody></table></div>;
-}
-
-function ManagerTable({ history, items, loading, onSelect }) {
-  return <div className="sd-table-wrap"><table className="sd-table"><thead><tr>
-    <th>Nhân viên</th><th>Tháng</th><th>Giờ làm</th><th>Thực nhận</th><th>Ngân hàng</th><th>Trạng thái</th><th>{history ? 'Thời gian trả' : 'Thao tác'}</th>
-  </tr></thead><tbody>
-    {loading ? <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="sd-td-empty">{history ? 'Chưa có lịch sử trả lương.' : 'Không có bảng lương đang chờ trả.'}</td></tr> : items.map((item) => <tr key={item.id}>
-      <td><strong>{item.fullName || item.username}</strong><span className="sd-subline">{item.branchName || 'Chưa gán cơ sở'}</span></td>
+    {loading ? <tr><td colSpan={8} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={8} className="sd-td-empty">{isAdmin ? (history ? 'Chưa có bảng lương admin đã chốt.' : 'Chưa có bảng lương nào được manager chốt gửi lên.') : (history ? 'Chưa có lịch sử trả lương.' : 'Không có bảng lương đang chờ xử lý.')}</td></tr> : items.map((item) => <tr key={item.id}>
+      <td><strong>{item.fullName || item.username}</strong></td>
+      <td>{item.branchName || 'Chưa gán cơ sở'}</td>
       <td>{item.month}/{item.year}</td><td>{number(item.totalHours)} giờ</td><td className="sd-salary-admin-total">{money(item.totalSalary)}</td>
       <td><strong>{item.bankName || 'Chưa có'}</strong><span className="sd-subline">{item.bankAccountNumber || 'Chưa có STK'}</span></td>
-      <td><span className={`sd-status-pill ${history ? 'paid' : 'pending'}`}>{statusLabel(item.status)}</span></td>
-      <td>{history ? <strong>{date(item.paidAt)}</strong> : <button className="sd-btn-primary" onClick={() => onSelect(item)} type="button">Trả lương</button>}</td>
+      <td><span className={`sd-status-pill ${statusClass(item.status)}`}>{statusLabel(item.status)}</span></td>
+      <td><button className={history ? 'sd-btn-ghost' : 'sd-btn-primary'} onClick={() => onSelect(item)} type="button">{history ? 'Xem chi tiết' : 'Chi tiết lương'}</button></td>
     </tr>)}
   </tbody></table></div>;
 }

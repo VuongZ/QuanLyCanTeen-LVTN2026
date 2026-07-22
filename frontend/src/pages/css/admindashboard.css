@@ -1074,6 +1074,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.sd-modal > form {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .sd-modal-header h2 {
@@ -1092,6 +1101,8 @@
 
 .sd-modal-body {
   padding: 20px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1100,6 +1111,8 @@
   border-top: 1px solid #f1f5f9;
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
+  background: #fff;
   padding-bottom: env(safe-area-inset-bottom, 20px);
 }
 
@@ -1646,6 +1659,81 @@
   white-space: nowrap;
 }
 
+/* Bảng lương từng nhân viên có 8 cột; tách riêng độ rộng để trạng thái
+   và nút thao tác không chồng lên nhau. */
+.sd-salary-admin-page .sd-table.sd-salary-employee-table,
+.sd-salary-admin-page--admin .sd-table.sd-salary-employee-table {
+  min-width: 1450px;
+  table-layout: fixed;
+}
+
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(1),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(1) { width: 240px; }
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(2),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(2) { width: 180px; }
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(3),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(3) { width: 110px; }
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(4),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(4) { width: 130px; }
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(5),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(5) { width: 180px; }
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(6),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(6) {
+  width: 220px;
+  text-align: left;
+}
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(7),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(7) {
+  width: 230px;
+  padding-right: 20px;
+  text-align: center;
+}
+.sd-salary-admin-page .sd-salary-employee-table th:nth-child(8),
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(8) {
+  width: 180px;
+  padding-right: 28px;
+  text-align: center;
+}
+
+.sd-salary-employee-table .sd-status-pill {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(8) .sd-btn-primary,
+.sd-salary-admin-page .sd-salary-employee-table td:nth-child(8) .sd-btn-ghost {
+  width: 150px;
+  max-width: 100%;
+}
+
+.sd-salary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.sd-salary-admin-page .sd-salary-actions .sd-btn-primary,
+.sd-salary-admin-page .sd-salary-actions .sd-btn-ghost {
+  width: 120px;
+  padding: 9px 10px;
+}
+
+@media (min-width: 768px) {
+  .sd-modal.sd-modal--wide {
+    width: min(900px, calc(100vw - 40px));
+  }
+}
+
+.sd-adjustment-history-table td:nth-child(4) {
+  min-width: 220px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* Dòng phụ bên dưới tên chính trong ô bảng (vd: tên chi nhánh dưới tên nhân viên,
    số tài khoản dưới tên ngân hàng) — luôn xuống dòng riêng, cách dòng trên 4px */
 .sd-subline {
@@ -1689,8 +1777,122 @@
   color: #9a3412;
 }
 
+.sd-status-pill.finalized {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.sd-status-pill.approved {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
 .sd-salary-pay-modal {
   max-width: 560px;
+}
+
+.sd-salary-pay-modal.sd-modal--wide {
+  max-width: 900px;
+}
+
+.sd-salary-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.sd-salary-detail-summary > div,
+.sd-salary-transfer-total {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.sd-salary-detail-summary span,
+.sd-salary-detail-summary strong,
+.sd-salary-transfer-total span,
+.sd-salary-transfer-total strong {
+  display: block;
+}
+
+.sd-salary-detail-summary span,
+.sd-salary-transfer-total span {
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.sd-salary-detail-summary strong,
+.sd-salary-transfer-total strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.sd-salary-detail-summary .total {
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.sd-salary-detail-summary .total strong {
+  color: #c2410c;
+}
+
+.sd-salary-finalized-note {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sd-salary-finalized-note--admin {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.sd-salary-detail-title {
+  margin: 20px 0 10px;
+  color: #1e293b;
+  font-size: 15px;
+}
+
+.sd-salary-detail-table-wrap {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.sd-salary-admin-page .sd-salary-detail-table {
+  min-width: 620px;
+}
+
+.sd-salary-admin-page .sd-salary-detail-table th,
+.sd-salary-admin-page .sd-salary-detail-table td {
+  width: auto;
+  min-width: 100px;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sd-salary-admin-page .sd-salary-detail-table th:last-child,
+.sd-salary-admin-page .sd-salary-detail-table td:last-child {
+  white-space: normal;
+}
+
+.sd-salary-transfer-total {
+  margin-top: 16px;
+}
+
+@media (max-width: 767px) {
+  .sd-salary-detail-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .sd-salary-admin-page .sd-salary-transfer-btn {

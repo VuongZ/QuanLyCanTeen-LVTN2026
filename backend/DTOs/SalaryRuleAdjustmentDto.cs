@@ -64,4 +64,21 @@ public class ManualSalaryAdjustmentDto
     public int Year { get; set; }
     public decimal BonusAmount { get; set; }
     public decimal PenaltyAmount { get; set; }
+    public string? Reason { get; set; }
+}
+
+public class SalaryAdjustmentHistoryDto
+{
+    public int Id { get; set; }
+    public int SalaryId { get; set; }
+    public int UserId { get; set; }
+    public string? EmployeeName { get; set; }
+    public int Month { get; set; }
+    public int Year { get; set; }
+    public decimal BonusAmount { get; set; }
+    public decimal PenaltyAmount { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public int CreatedByUserId { get; set; }
+    public string? CreatedByName { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

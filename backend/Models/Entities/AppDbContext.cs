@@ -56,6 +56,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<LuongMonthlySalary> LuongMonthlySalaries { get; set; }
 
+    public virtual DbSet<LuongSalaryAdjustmentHistory> LuongSalaryAdjustmentHistories { get; set; }
+
     public virtual DbSet<LuongSalaryRule> LuongSalaryRules { get; set; }
 
     public virtual DbSet<LuongSalaryTransfer> LuongSalaryTransfers { get; set; }
@@ -723,6 +725,10 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => new { e.UserId, e.Month, e.Year }, "unique_user_month_year").IsUnique();
 
+            entity.HasIndex(e => e.FinalizedByUserId, "idx_monthly_salary_finalized_by");
+
+            entity.HasIndex(e => e.AdminFinalizedByUserId, "idx_monthly_salary_admin_finalized_by");
+
             entity.HasIndex(e => e.UserId, "user_id");
 
             entity.Property(e => e.Id).HasColumnName("id");
@@ -737,6 +743,14 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.PaidAt)
                 .HasColumnType("datetime")
                 .HasColumnName("paid_at");
+            entity.Property(e => e.FinalizedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("finalized_at");
+            entity.Property(e => e.FinalizedByUserId).HasColumnName("finalized_by_user_id");
+            entity.Property(e => e.AdminFinalizedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("admin_finalized_at");
+            entity.Property(e => e.AdminFinalizedByUserId).HasColumnName("admin_finalized_by_user_id");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
                 .HasDefaultValueSql("'PENDING'")
@@ -762,6 +776,47 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("luong_monthly_salary_ibfk_1");
+
+            entity.HasOne(d => d.FinalizedByUser).WithMany(p => p.FinalizedMonthlySalaries)
+                .HasForeignKey(d => d.FinalizedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_monthly_salary_finalized_by");
+
+            entity.HasOne(d => d.AdminFinalizedByUser).WithMany(p => p.AdminFinalizedMonthlySalaries)
+                .HasForeignKey(d => d.AdminFinalizedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_monthly_salary_admin_finalized_by");
+        });
+
+        modelBuilder.Entity<LuongSalaryAdjustmentHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("luong_salary_adjustment_history").UseCollation("utf8mb4_unicode_ci");
+
+            entity.HasIndex(e => e.SalaryId, "idx_salary_adjustment_salary");
+            entity.HasIndex(e => new { e.UserId, e.Year, e.Month }, "idx_salary_adjustment_user_period");
+            entity.HasIndex(e => e.CreatedByUserId, "idx_salary_adjustment_creator");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SalaryId).HasColumnName("salary_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
+            entity.Property(e => e.Month).HasColumnName("month");
+            entity.Property(e => e.Year).HasColumnName("year");
+            entity.Property(e => e.BonusAmount).HasPrecision(15, 2).HasColumnName("bonus_amount");
+            entity.Property(e => e.PenaltyAmount).HasPrecision(15, 2).HasColumnName("penalty_amount");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("created_at");
+
+            entity.HasOne(e => e.Salary).WithMany(s => s.AdjustmentHistories)
+                .HasForeignKey(e => e.SalaryId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_salary_adjustment_salary");
+            entity.HasOne(e => e.User).WithMany(u => u.SalaryAdjustmentHistories)
+                .HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_salary_adjustment_user");
+            entity.HasOne(e => e.CreatedByUser).WithMany(u => u.CreatedSalaryAdjustmentHistories)
+                .HasForeignKey(e => e.CreatedByUserId).OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_salary_adjustment_creator");
         });
 
         modelBuilder.Entity<LuongSalaryRule>(entity =>

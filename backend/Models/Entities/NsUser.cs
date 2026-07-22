@@ -47,6 +47,14 @@ public partial class NsUser
 
     public virtual ICollection<LuongMonthlySalary> LuongMonthlySalaries { get; set; } = new List<LuongMonthlySalary>();
 
+    public virtual ICollection<LuongMonthlySalary> FinalizedMonthlySalaries { get; set; } = new List<LuongMonthlySalary>();
+
+    public virtual ICollection<LuongMonthlySalary> AdminFinalizedMonthlySalaries { get; set; } = new List<LuongMonthlySalary>();
+
+    public virtual ICollection<LuongSalaryAdjustmentHistory> SalaryAdjustmentHistories { get; set; } = new List<LuongSalaryAdjustmentHistory>();
+
+    public virtual ICollection<LuongSalaryAdjustmentHistory> CreatedSalaryAdjustmentHistories { get; set; } = new List<LuongSalaryAdjustmentHistory>();
+
     public virtual ICollection<NsUserBankAccount> NsUserBankAccounts { get; set; } = new List<NsUserBankAccount>();
 
     public virtual NsRole? Role { get; set; }

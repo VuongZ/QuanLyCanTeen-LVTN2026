@@ -45,6 +45,23 @@ export async function getSalaryWorkDetails(userId, month, year) {
   return response.data;
 }
 
+export async function finalizeSalary(salaryId) {
+  const response = await axios.put(`${BASE_URL}/${salaryId}/finalize`);
+  return response.data;
+}
+
+export async function adminFinalizeSalary(salaryId) {
+  const response = await axios.put(`${BASE_URL}/${salaryId}/admin-finalize`);
+  return response.data;
+}
+
+export async function getSalaryAdjustmentHistory(userId, month, year) {
+  const response = await axios.get(`${BASE_URL}/user/${userId}/adjustment-history`, {
+    params: { month: month || undefined, year: year || undefined },
+  });
+  return response.data;
+}
+
 export async function updateSalaryRule(payload) {
   const response = await axios.put(`${BASE_URL}/rule`, payload);
   return response.data;
