@@ -254,7 +254,7 @@ namespace LuanVanTotNghiep.Controllers
                     .Include(u => u.Branch)
                     .Include(u => u.Role)
                     .Include(u => u.NsUserBankAccounts)
-                    .FirstOrDefaultAsync(u => u.Id == foundUser.Id);
+                    .FirstOrDefaultAsync(u => u.Id == foundUser.Id && u.IsDeleted != true);
 
             if (user != null && UserService.VerifyPassword(model.Password, user.Password))
             {

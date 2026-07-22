@@ -167,7 +167,7 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         var normalizedEmail = normalized.ToLowerInvariant();
         var normalizedPhone = NormalizePhone(normalized);
         var users = await context.NsUsers
-            .Where(u => u.Email != null || u.PhoneNumber != null)
+            .Where(u => u.IsDeleted != true && (u.Email != null || u.PhoneNumber != null))
             .ToListAsync();
 
         return users.FirstOrDefault(u =>
