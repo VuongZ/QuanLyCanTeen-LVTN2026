@@ -428,8 +428,7 @@ export function ShiftClosingManagementTab({
               : 'Duyệt báo cáo kết ca cơ sở'}
           </h2>
           <span>
-            Staff gửi báo cáo, Manager duyệt hoặc từ chối trước khi
-            tồn quầy được cập nhật.
+            
           </span>
         </div>
 

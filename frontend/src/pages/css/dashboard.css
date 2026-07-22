@@ -2493,3 +2493,92 @@
     min-width: 0;
   }
 }
+/* =========================================================
+   FIX CĂN CỘT BẢNG CHI TIẾT BÁO CÁO KẾT CA
+   Áp dụng cho cả màn hình Nhân viên và Quản lý/Admin
+   ========================================================= */
+.staff-closing-table,
+.sd-closing-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+/* Mặt hàng */
+.staff-closing-table th:nth-child(1),
+.staff-closing-table td:nth-child(1),
+.sd-closing-table th:nth-child(1),
+.sd-closing-table td:nth-child(1) {
+  width: 26%;
+  text-align: left;
+}
+
+/* Mã sản phẩm */
+.staff-closing-table th:nth-child(2),
+.staff-closing-table td:nth-child(2),
+.sd-closing-table th:nth-child(2),
+.sd-closing-table td:nth-child(2) {
+  width: 12%;
+  text-align: left;
+}
+
+/* Đơn vị */
+.staff-closing-table th:nth-child(3),
+.staff-closing-table td:nth-child(3),
+.sd-closing-table th:nth-child(3),
+.sd-closing-table td:nth-child(3) {
+  width: 12%;
+  text-align: left;
+}
+
+/* Hệ thống */
+.staff-closing-table th:nth-child(4),
+.staff-closing-table td:nth-child(4),
+.sd-closing-table th:nth-child(4),
+.sd-closing-table td:nth-child(4) {
+  width: 16%;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+/* Thực tế */
+.staff-closing-table th:nth-child(5),
+.staff-closing-table td:nth-child(5),
+.sd-closing-table th:nth-child(5),
+.sd-closing-table td:nth-child(5) {
+  width: 16%;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+/* Chênh lệch */
+.staff-closing-table th:nth-child(6),
+.staff-closing-table td:nth-child(6),
+.sd-closing-table th:nth-child(6),
+.sd-closing-table td:nth-child(6) {
+  width: 18%;
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.staff-closing-table th,
+.staff-closing-table td,
+.sd-closing-table th,
+.sd-closing-table td {
+  vertical-align: middle;
+}
+
+/* Ghi đè quy tắc tiêu đề căn trái cũ */
+.staff-closing-table th.text-right,
+.staff-closing-table td.text-right,
+.sd-closing-table th.text-right,
+.sd-closing-table td.text-right {
+  text-align: right !important;
+}
+
+@media (max-width: 767px) {
+  .staff-closing-table,
+  .sd-closing-table {
+    min-width: 720px;
+  }
+}
