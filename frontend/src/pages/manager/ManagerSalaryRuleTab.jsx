@@ -26,6 +26,17 @@ function getCurrentPeriod() {
   };
 }
 
+function formatWorkDate(value) {
+  if (!value) return '—';
+  const [year, month, day] = String(value).slice(0, 10).split('-').map(Number);
+  return new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day));
+}
+
 function SalaryRuleMetric({ label, value }) {
   return (
     <div className="sd-salary-metric">
@@ -59,6 +70,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
   const [historyTarget, setHistoryTarget] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [attendanceTarget, setAttendanceTarget] = useState(null);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -109,10 +121,16 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
   }, [period.month, period.year, selectedBranchId]);
 
   const filteredEmployees = useMemo(() => {
+    const employeesWithAdjustments = employees.filter((employee) =>
+      Number(employee.calculatedBonus || 0) !== 0
+      || Number(employee.calculatedPenalty || 0) !== 0
+      || Number(employee.currentBonus || 0) !== 0
+      || Number(employee.currentPenalty || 0) !== 0
+    );
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return employees;
+    if (!normalizedQuery) return employeesWithAdjustments;
 
-    return employees.filter((employee) => [
+    return employeesWithAdjustments.filter((employee) => [
       employee.fullName,
       employee.email,
       employee.phoneNumber,
@@ -132,7 +150,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
     );
   }, [filteredEmployees]);
 
-  function handlePeriodChange(event) {
+  function handleMonthChange(event) {
     const [year, month] = event.target.value.split('-').map(Number);
     setPeriod({ month, year });
   }
@@ -243,6 +261,15 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
     }
   }
 
+  const monthOptions = [
+    ...(currentPeriod.month === 1
+      ? [{ month: 12, year: currentPeriod.year - 1 }]
+      : []),
+    ...Array.from({ length: 12 }, (_, index) => ({
+      month: index + 1,
+      year: currentPeriod.year,
+    })),
+  ];
   const periodValue = `${period.year}-${String(period.month).padStart(2, '0')}`;
 
   return (
@@ -317,8 +344,19 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
       <div className="sd-users-toolbar">
         <div className="sd-users-toolbar-left">
           <div className="sd-field sd-salary-filter">
-            <label>Tháng</label>
-            <input type="month" value={periodValue} onChange={handlePeriodChange} />
+            <label>Xem tháng</label>
+            <div className="sd-period-selects">
+              <select aria-label="Chọn tháng" onChange={handleMonthChange} value={periodValue}>
+                {monthOptions.map((option) => (
+                  <option
+                    key={`${option.year}-${option.month}`}
+                    value={`${option.year}-${String(option.month).padStart(2, '0')}`}
+                  >
+                    Tháng {option.month}/{option.year}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="sd-search-wrap">
             <span className="sd-search-icon">⌕</span>
@@ -354,7 +392,13 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
             {loading ? (
               <tr><td colSpan={isAdmin ? 7 : 8} className="sd-td-empty">Đang tải danh sách thưởng phạt...</td></tr>
             ) : filteredEmployees.length === 0 ? (
-              <tr><td colSpan={isAdmin ? 7 : 8} className="sd-td-empty">Không có nhân viên phù hợp.</td></tr>
+              <tr>
+                <td colSpan={isAdmin ? 7 : 8} className="sd-td-empty">
+                  {query.trim()
+                    ? 'Không có nhân viên phù hợp.'
+                    : 'Không có nhân viên phát sinh thưởng/phạt trong tháng này.'}
+                </td>
+              </tr>
             ) : filteredEmployees.map((employee) => {
               const salaryStatus = (employee.status || '').toUpperCase();
               const isLocked = salaryStatus === 'FINALIZED' || salaryStatus === 'ADMIN_FINALIZED' || salaryStatus === 'PAID';
@@ -367,8 +411,28 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                     <span className="sd-subline">{employee.roleName || 'Nhân viên'}</span>
                   </td>
                   <td>{employee.workedDays}</td>
-                  <td>{employee.lateCount}</td>
-                  <td>{employee.absentCount}</td>
+                  <td>
+                    {employee.lateCount > 0 ? (
+                      <button
+                        className="sd-attendance-detail-button"
+                        onClick={() => setAttendanceTarget({ employee, type: 'late' })}
+                        type="button"
+                      >
+                        {employee.lateCount} · Xem ngày
+                      </button>
+                    ) : 0}
+                  </td>
+                  <td>
+                    {employee.absentCount > 0 ? (
+                      <button
+                        className="sd-attendance-detail-button sd-attendance-detail-button--absent"
+                        onClick={() => setAttendanceTarget({ employee, type: 'absent' })}
+                        type="button"
+                      >
+                        {employee.absentCount} · Xem ngày
+                      </button>
+                    ) : 0}
+                  </td>
                   <td>
                     <strong>{formatMoney(employee.calculatedBonus)}</strong>
                     <span className="sd-subline">Đang ghi: {formatMoney(employee.currentBonus)}</span>
@@ -404,6 +468,64 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
           </tbody>
         </table>
       </div>
+
+      {attendanceTarget && (() => {
+        const isLate = attendanceTarget.type === 'late';
+        const details = isLate
+          ? (attendanceTarget.employee.lateDetails || [])
+          : (attendanceTarget.employee.absentDetails || []);
+
+        return (
+          <div className="sd-overlay" onClick={() => setAttendanceTarget(null)}>
+            <div className="sd-modal sd-modal--wide" onClick={(event) => event.stopPropagation()}>
+              <div className="sd-modal-header">
+                <div>
+                  <p className="sd-eyebrow">Tháng {period.month}/{period.year}</p>
+                  <h2>
+                    {isLate ? 'Chi tiết đi trễ' : 'Chi tiết vắng ca'} - {' '}
+                    {attendanceTarget.employee.fullName || attendanceTarget.employee.email}
+                  </h2>
+                </div>
+                <button onClick={() => setAttendanceTarget(null)} type="button">✕</button>
+              </div>
+              <div className="sd-modal-body">
+                {details.length === 0 ? (
+                  <p className="sd-salary-empty">Không có dữ liệu chi tiết trong kỳ này.</p>
+                ) : (
+                  <div className="sd-table-wrap">
+                    <table className="sd-table">
+                      <thead>
+                        <tr>
+                          <th>Ngày</th>
+                          <th>Ca làm</th>
+                          <th>Giờ ca</th>
+                          <th>{isLate ? 'Giờ vào thực tế' : 'Trạng thái chấm công'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {details.map((detail, index) => (
+                          <tr key={`${detail.workDate}-${detail.scheduledTime}-${index}`}>
+                            <td><strong>{formatWorkDate(detail.workDate)}</strong></td>
+                            <td>{detail.shiftName || '—'}</td>
+                            <td>{detail.scheduledTime || '—'}</td>
+                            <td>
+                              {isLate
+                                ? (detail.actualCheckInTime || 'Chưa ghi nhận')
+                                : (detail.actualCheckInTime
+                                  ? `Đã vào lúc ${detail.actualCheckInTime}, chưa hoàn tất ca`
+                                  : 'Không có chấm công hoàn tất')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {manualTarget && (
         <div className="sd-overlay" onClick={() => setManualTarget(null)}>

@@ -13,6 +13,8 @@ public class SalaryRuleAdjustmentDto
     public int WorkedDays { get; set; }
     public int LateCount { get; set; }
     public int AbsentCount { get; set; }
+    public IEnumerable<AttendanceIssueDetailDto> LateDetails { get; set; } = [];
+    public IEnumerable<AttendanceIssueDetailDto> AbsentDetails { get; set; } = [];
     public decimal CurrentBonus { get; set; }
     public decimal CurrentPenalty { get; set; }
     public decimal CalculatedBonus { get; set; }
@@ -21,6 +23,14 @@ public class SalaryRuleAdjustmentDto
     public decimal HourlyWageAtTime { get; set; }
     public decimal TotalSalary { get; set; }
     public string? Status { get; set; }
+}
+
+public class AttendanceIssueDetailDto
+{
+    public DateOnly WorkDate { get; set; }
+    public string? ShiftName { get; set; }
+    public string ScheduledTime { get; set; } = string.Empty;
+    public string? ActualCheckInTime { get; set; }
 }
 
 public class SalaryRuleDto

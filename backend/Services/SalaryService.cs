@@ -711,21 +711,52 @@ public class SalaryService
             .Select(s => s.WorkDate)
             .Distinct()
             .Count();
-        var absentCount = schedules.Count(s => s.WorkDate <= today && !s.CaAttendances.Any(a =>
-            a.CheckOutTime != null && a.Status != CheckoutRequestService.AutoCheckoutPending));
-        var lateCount = schedules.Count(s =>
+        bool IsAbsent(CaFinalSchedule schedule) =>
+            schedule.WorkDate <= today && !schedule.CaAttendances.Any(a =>
+                a.CheckOutTime != null && a.Status != CheckoutRequestService.AutoCheckoutPending);
+
+        DateTime? FirstCheckIn(CaFinalSchedule schedule) => schedule.CaAttendances
+            .Where(a => a.CheckInTime != null)
+            .OrderBy(a => a.CheckInTime)
+            .Select(a => a.CheckInTime)
+            .FirstOrDefault();
+
+        bool IsLate(CaFinalSchedule schedule)
         {
-            var checkIn = s.CaAttendances
-                .Where(a => a.CheckInTime != null)
-                .OrderBy(a => a.CheckInTime)
-                .Select(a => a.CheckInTime)
-                .FirstOrDefault();
+            var checkIn = FirstCheckIn(schedule);
             if (checkIn == null)
                 return false;
 
             var vietnamCheckIn = checkIn.Value.AddHours(7);
-            return TimeOnly.FromDateTime(vietnamCheckIn) > s.Shift.StartTime;
-        });
+            return TimeOnly.FromDateTime(vietnamCheckIn) > schedule.Shift.StartTime;
+        }
+
+        AttendanceIssueDetailDto ToIssueDetail(CaFinalSchedule schedule)
+        {
+            var checkIn = FirstCheckIn(schedule);
+            return new AttendanceIssueDetailDto
+            {
+                WorkDate = schedule.WorkDate,
+                ShiftName = schedule.Shift.ShiftName,
+                ScheduledTime = $"{schedule.Shift.StartTime:HH\\:mm} - {schedule.Shift.EndTime:HH\\:mm}",
+                ActualCheckInTime = checkIn?.AddHours(7).ToString("HH:mm")
+            };
+        }
+
+        var absentDetails = schedules
+            .Where(IsAbsent)
+            .OrderBy(s => s.WorkDate)
+            .ThenBy(s => s.Shift.StartTime)
+            .Select(ToIssueDetail)
+            .ToList();
+        var lateDetails = schedules
+            .Where(IsLate)
+            .OrderBy(s => s.WorkDate)
+            .ThenBy(s => s.Shift.StartTime)
+            .Select(ToIssueDetail)
+            .ToList();
+        var absentCount = absentDetails.Count;
+        var lateCount = lateDetails.Count;
 
         var calculatedBonus = rule != null && workedDays >= (rule.BonusThresholdDays ?? 0)
             ? rule.BonusAmount ?? 0
@@ -747,6 +778,8 @@ public class SalaryService
             WorkedDays = workedDays,
             LateCount = lateCount,
             AbsentCount = absentCount,
+            LateDetails = lateDetails,
+            AbsentDetails = absentDetails,
             CurrentBonus = salary?.TotalBonus ?? 0,
             CurrentPenalty = salary?.TotalPenalty ?? 0,
             CalculatedBonus = calculatedBonus,

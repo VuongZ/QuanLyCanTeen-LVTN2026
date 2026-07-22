@@ -1716,6 +1716,45 @@
   align-items: center;
 }
 
+.sd-period-selects {
+  display: flex;
+  gap: 8px;
+}
+
+.sd-period-selects select {
+  min-width: 150px;
+}
+
+.sd-attendance-detail-button {
+  border: 0;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.sd-attendance-detail-button:hover,
+.sd-attendance-detail-button:focus-visible {
+  background: #ffedd5;
+  outline: 2px solid #fdba74;
+  outline-offset: 2px;
+}
+
+.sd-attendance-detail-button--absent {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sd-attendance-detail-button--absent:hover,
+.sd-attendance-detail-button--absent:focus-visible {
+  background: #fee2e2;
+  outline-color: #fca5a5;
+}
+
 .sd-salary-admin-page .sd-salary-actions .sd-btn-primary,
 .sd-salary-admin-page .sd-salary-actions .sd-btn-ghost {
   width: 120px;
