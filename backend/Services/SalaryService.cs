@@ -318,9 +318,32 @@ public class SalaryService
             .ToListAsync();
 
         var employees = new List<SalaryRuleAdjustmentDto>();
+        var synchronizedSalaries = new List<(SalaryRuleAdjustmentDto Adjustment, LuongMonthlySalary Salary)>();
         foreach (var user in users)
         {
-            employees.Add(await BuildAdjustmentDtoAsync(user, month, year, rule));
+            var adjustment = await BuildAdjustmentDtoAsync(user, month, year, rule);
+            employees.Add(adjustment);
+
+            var salary = rule == null
+                ? null
+                : await SynchronizeRuleAdjustmentAsync(user, adjustment);
+            if (salary != null)
+                synchronizedSalaries.Add((adjustment, salary));
+        }
+
+        if (synchronizedSalaries.Count > 0)
+        {
+            await _context.SaveChangesAsync();
+            foreach (var (adjustment, salary) in synchronizedSalaries)
+            {
+                adjustment.SalaryId = salary.Id;
+                adjustment.CurrentBonus = salary.TotalBonus ?? 0;
+                adjustment.CurrentPenalty = salary.TotalPenalty ?? 0;
+                adjustment.TotalHours = salary.TotalHours;
+                adjustment.HourlyWageAtTime = salary.HourlyWageAtTime;
+                adjustment.TotalSalary = salary.TotalSalary;
+                adjustment.Status = salary.Status;
+            }
         }
 
         return new SalaryRuleAdjustmentPageDto
@@ -391,37 +414,13 @@ public class SalaryService
 
         var preview = await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
         var salary = await _context.LuongMonthlySalaries
+            .AsNoTracking()
             .FirstOrDefaultAsync(s => s.UserId == dto.UserId && s.Month == dto.Month && s.Year == dto.Year);
 
         if (salary != null && IsSalaryLocked(salary.Status))
             throw new InvalidOperationException("Bảng lương đã chốt hoặc thanh toán, không thể cập nhật thưởng phạt.");
 
-        if (salary == null)
-        {
-            var hourlyWage = SalaryWagePolicy.GetHourlyWage(
-                user,
-                new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
-            salary = new LuongMonthlySalary
-            {
-                UserId = dto.UserId,
-                Month = dto.Month,
-                Year = dto.Year,
-                TotalHours = preview.TotalHours,
-                HourlyWageAtTime = hourlyWage,
-                Status = "PENDING",
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.LuongMonthlySalaries.Add(salary);
-        }
-
-        salary.TotalBonus = preview.CalculatedBonus;
-        salary.TotalPenalty = preview.CalculatedPenalty;
-        salary.HourlyWageAtTime = SalaryWagePolicy.GetHourlyWage(
-            user,
-            new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
-        salary.TotalSalary = (salary.TotalHours * salary.HourlyWageAtTime)
-            + (salary.TotalBonus ?? 0)
-            - (salary.TotalPenalty ?? 0);
+        await SynchronizeRuleAdjustmentAsync(user, preview, createWhenNoAdjustment: true);
 
         await _context.SaveChangesAsync();
 
@@ -483,8 +482,23 @@ public class SalaryService
             _context.LuongMonthlySalaries.Add(salary);
         }
 
-        salary.TotalBonus = (salary.TotalBonus ?? 0) + dto.BonusAmount;
-        salary.TotalPenalty = (salary.TotalPenalty ?? 0) + dto.PenaltyAmount;
+        var rule = await _context.LuongSalaryRules
+            .AsNoTracking()
+            .Where(r => r.BranchId == branchId)
+            .OrderByDescending(r => r.Id)
+            .FirstOrDefaultAsync();
+        if (rule == null)
+        {
+            salary.TotalBonus = (salary.TotalBonus ?? 0) + dto.BonusAmount;
+            salary.TotalPenalty = (salary.TotalPenalty ?? 0) + dto.PenaltyAmount;
+        }
+        else
+        {
+            var ruleAdjustment = await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
+            var manualTotals = await GetManualAdjustmentTotalsAsync(user.Id, dto.Month, dto.Year);
+            salary.TotalBonus = ruleAdjustment.CalculatedBonus + manualTotals.Bonus + dto.BonusAmount;
+            salary.TotalPenalty = ruleAdjustment.CalculatedPenalty + manualTotals.Penalty + dto.PenaltyAmount;
+        }
         salary.HourlyWageAtTime = SalaryWagePolicy.GetHourlyWage(
             user,
             new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
@@ -507,11 +521,6 @@ public class SalaryService
 
         await _context.SaveChangesAsync();
 
-        var rule = await _context.LuongSalaryRules
-            .AsNoTracking()
-            .Where(r => r.BranchId == branchId)
-            .OrderByDescending(r => r.Id)
-            .FirstOrDefaultAsync();
         return await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
     }
 
@@ -575,6 +584,17 @@ public class SalaryService
 
         if (status != "FINALIZED")
         {
+            var rule = await _context.LuongSalaryRules
+                .AsNoTracking()
+                .Where(r => r.BranchId == salary.User.BranchId)
+                .OrderByDescending(r => r.Id)
+                .FirstOrDefaultAsync();
+            if (rule != null)
+            {
+                var adjustment = await BuildAdjustmentDtoAsync(salary.User, salary.Month, salary.Year, rule);
+                await SetSalaryAdjustmentTotalsAsync(salary, adjustment);
+            }
+
             salary.Status = "FINALIZED";
             salary.FinalizedAt = DateTime.Now;
             salary.FinalizedByUserId = managerUserId;
@@ -689,6 +709,84 @@ public class SalaryService
         return string.Equals(status, "FINALIZED", StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, "ADMIN_FINALIZED", StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<LuongMonthlySalary?> SynchronizeRuleAdjustmentAsync(
+        NsUser user,
+        SalaryRuleAdjustmentDto adjustment,
+        bool createWhenNoAdjustment = false)
+    {
+        var salary = await _context.LuongMonthlySalaries
+            .FirstOrDefaultAsync(s =>
+                s.UserId == user.Id
+                && s.Month == adjustment.Month
+                && s.Year == adjustment.Year);
+
+        if (salary != null && IsSalaryLocked(salary.Status))
+            return null;
+
+        if (salary == null)
+        {
+            if (!createWhenNoAdjustment
+                && adjustment.CalculatedBonus == 0
+                && adjustment.CalculatedPenalty == 0)
+            {
+                return null;
+            }
+
+            salary = new LuongMonthlySalary
+            {
+                UserId = user.Id,
+                Month = adjustment.Month,
+                Year = adjustment.Year,
+                TotalHours = adjustment.TotalHours,
+                HourlyWageAtTime = adjustment.HourlyWageAtTime,
+                Status = "PENDING",
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.LuongMonthlySalaries.Add(salary);
+        }
+
+        await SetSalaryAdjustmentTotalsAsync(salary, adjustment);
+        return salary;
+    }
+
+    private async Task SetSalaryAdjustmentTotalsAsync(
+        LuongMonthlySalary salary,
+        SalaryRuleAdjustmentDto adjustment)
+    {
+        var manualTotals = await GetManualAdjustmentTotalsAsync(
+            salary.UserId,
+            salary.Month,
+            salary.Year);
+
+        salary.TotalBonus = adjustment.CalculatedBonus + manualTotals.Bonus;
+        salary.TotalPenalty = adjustment.CalculatedPenalty + manualTotals.Penalty;
+        salary.HourlyWageAtTime = adjustment.HourlyWageAtTime;
+        salary.TotalSalary = (salary.TotalHours * salary.HourlyWageAtTime)
+            + (salary.TotalBonus ?? 0)
+            - (salary.TotalPenalty ?? 0);
+    }
+
+    private async Task<(decimal Bonus, decimal Penalty)> GetManualAdjustmentTotalsAsync(
+        int userId,
+        int month,
+        int year)
+    {
+        var totals = await _context.LuongSalaryAdjustmentHistories
+            .AsNoTracking()
+            .Where(h => h.UserId == userId && h.Month == month && h.Year == year)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Bonus = g.Sum(h => h.BonusAmount),
+                Penalty = g.Sum(h => h.PenaltyAmount)
+            })
+            .FirstOrDefaultAsync();
+
+        return totals == null
+            ? (0, 0)
+            : (totals.Bonus, totals.Penalty);
     }
 
     private async Task<SalaryRuleAdjustmentDto> BuildAdjustmentDtoAsync(NsUser user, int month, int year, LuongSalaryRule? rule)

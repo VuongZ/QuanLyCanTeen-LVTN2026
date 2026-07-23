@@ -275,8 +275,8 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
   return (
     <div className="sd-salary-admin-page">
       <div className="sd-stat-grid sd-salary-admin-stats">
-        <SalaryRuleMetric label="Tổng thưởng dự kiến" value={formatMoney(summary.bonus)} />
-        <SalaryRuleMetric label="Tổng phạt dự kiến" value={formatMoney(summary.penalty)} />
+        <SalaryRuleMetric label="Tổng thưởng theo rule" value={formatMoney(summary.bonus)} />
+        <SalaryRuleMetric label="Tổng phạt theo rule" value={formatMoney(summary.penalty)} />
         <SalaryRuleMetric label="Số lần đi trễ" value={formatNumber(summary.late)} />
         <SalaryRuleMetric label="Số ca vắng" value={formatNumber(summary.absent)} />
       </div>
@@ -435,11 +435,11 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                   </td>
                   <td>
                     <strong>{formatMoney(employee.calculatedBonus)}</strong>
-                    <span className="sd-subline">Đang ghi: {formatMoney(employee.currentBonus)}</span>
+                    <span className="sd-subline">Tổng đã cộng vào lương: {formatMoney(employee.currentBonus)}</span>
                   </td>
                   <td>
                     <strong>{formatMoney(employee.calculatedPenalty)}</strong>
-                    <span className="sd-subline">Đang ghi: {formatMoney(employee.currentPenalty)}</span>
+                    <span className="sd-subline">Tổng đã trừ vào lương: {formatMoney(employee.currentPenalty)}</span>
                   </td>
                   <td>
                     <strong>{formatMoney(employee.totalSalary)}</strong>
