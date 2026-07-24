@@ -45,7 +45,7 @@ function SortIcon({ active, direction }) {
 }
 
 const EMPTY_FORM = {
-  email: '', fullName: '', phoneNumber: '', bankName: '', bankAccountNumber: '', bankAccountName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '',
+  email: '', fullName: '', phoneNumber: '', bankName: '', bankAccountNumber: '', bankAccountName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '', salaryCoefficient: 1,
 }
 
 const ROLE_COLORS = {
@@ -141,6 +141,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       const next = { ...f, [name]: value }
       if (name === 'branchId') { const b = branches.find((b) => String(b.id) === value); next.branchName = b?.name || b?.branchName || '' }
       if (name === 'roleId') { const r = roles.find((r) => String(r.id) === value); next.roleName = r?.roleName || '' }
+      if (name === 'salaryCoefficient') next.salaryCoefficientIsManual = true
       return next
     })
   }
@@ -158,6 +159,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   async function handleSaveEdit() {
     if (!form.email && !form.phoneNumber && !form.phone) return setFormErr('Vui lòng nhập email hoặc số điện thoại')
     if (!form.fullName) return setFormErr('Họ tên không được để trống')
+    if (!Number.isFinite(Number(form.salaryCoefficient)) || Number(form.salaryCoefficient) <= 0) return setFormErr('Hệ số lương phải lớn hơn 0')
     setSaving(true); setFormErr('')
     try {
       await updateUser(form.id, form)
@@ -442,6 +444,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                           <InfoRow label="Tên tài khoản" value={selectedUser.bankAccountName || 'Chưa có'} />
                           <InfoRow label="Chi nhánh" value={selectedUser.branchName || 'Chưa gán'} />
                           <InfoRow label="Ngày vào làm" value={formatDate(selectedUser.hireDate)} />
+                          <InfoRow
+                            label="Hệ số lương"
+                            value={`${Number(selectedUser.salaryCoefficient || 1).toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${selectedUser.salaryCoefficientIsManual ? ' (điều chỉnh thủ công)' : ' (theo thâm niên)'}`}
+                          />
                         </dl>
                         {employmentStatus === 'ACTIVE' && (
                           <div className="sd-detail-actions">
@@ -525,6 +531,12 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                 {modal === 'edit' && <div className="sd-field"><label>Tên tài khoản</label><input name="bankAccountName" value={form.bankAccountName || ''} onChange={handleFormChange} /></div>}
                 <div className="sd-field"><label>{modal === 'add' ? 'Password *' : 'Password mới'}</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder={modal === 'add' ? '••••••' : 'Để trống nếu giữ nguyên'} /></div>
                 <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
+                {modal === 'edit' && canManageUsers && (
+                  <div className="sd-field">
+                    <label>Hệ số lương</label>
+                    <input type="number" name="salaryCoefficient" min="0.01" max="999.99" step="0.01" value={form.salaryCoefficient ?? 1} onChange={handleFormChange} />
+                  </div>
+                )}
                 <div className="sd-field">
                   <label>Role</label>
                   <select name="roleId" value={form.roleId || ''} onChange={handleFormChange}>

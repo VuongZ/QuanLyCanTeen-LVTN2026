@@ -13,7 +13,5 @@ public partial class NsRole
 
     public decimal? HourlyWage { get; set; }
 
-    public decimal? SeniorWage { get; set; }
-
     public virtual ICollection<NsUser> NsUsers { get; set; } = new List<NsUser>();
 }

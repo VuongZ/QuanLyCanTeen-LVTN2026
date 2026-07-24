@@ -287,15 +287,27 @@ export function AdminSalaryTab({ isAdmin = true }) {
 
 function SalaryEmployeeTable({ history, isAdmin, items, loading, onSelect }) {
   return <div className="sd-table-wrap"><table className="sd-table sd-salary-employee-table"><thead><tr>
-    <th>Nhân viên</th><th>Cơ sở</th><th>Tháng</th><th>Giờ làm</th><th>Thực nhận</th><th>Ngân hàng</th><th>Trạng thái</th><th>Thao tác</th>
+    <th>Nhân viên</th><th>Cơ sở</th><th>Tháng</th><th>Giờ làm</th><th>Thực nhận</th><th>Ngân hàng</th><th>Trạng thái</th>
   </tr></thead><tbody>
-    {loading ? <tr><td colSpan={8} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={8} className="sd-td-empty">{isAdmin ? (history ? 'Chưa có bảng lương admin đã chốt.' : 'Chưa có bảng lương nào được manager chốt gửi lên.') : (history ? 'Chưa có lịch sử trả lương.' : 'Không có bảng lương đang chờ xử lý.')}</td></tr> : items.map((item) => <tr key={item.id}>
+    {loading ? <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="sd-td-empty">{isAdmin ? (history ? 'Chưa có bảng lương admin đã chốt.' : 'Chưa có bảng lương nào được manager chốt gửi lên.') : (history ? 'Chưa có lịch sử trả lương.' : 'Không có bảng lương đang chờ xử lý.')}</td></tr> : items.map((item) => <tr
+      className="sd-tr"
+      key={item.id}
+      onClick={() => onSelect(item)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect(item);
+        }
+      }}
+      role="button"
+      style={{ cursor: 'pointer' }}
+      tabIndex={0}
+    >
       <td><strong>{item.fullName || item.username}</strong></td>
       <td>{item.branchName || 'Chưa gán cơ sở'}</td>
       <td>{item.month}/{item.year}</td><td>{number(item.totalHours)} giờ</td><td className="sd-salary-admin-total">{money(item.totalSalary)}</td>
       <td><strong>{item.bankName || 'Chưa có'}</strong><span className="sd-subline">{item.bankAccountNumber || 'Chưa có STK'}</span></td>
       <td><span className={`sd-status-pill ${statusClass(item.status)}`}>{statusLabel(item.status)}</span></td>
-      <td><button className={history ? 'sd-btn-ghost' : 'sd-btn-primary'} onClick={() => onSelect(item)} type="button">{history ? 'Xem chi tiết' : 'Chi tiết lương'}</button></td>
     </tr>)}
   </tbody></table></div>;
 }

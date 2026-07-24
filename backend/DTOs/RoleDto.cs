@@ -6,5 +6,4 @@ public class RoleDto
     public string? RoleName { get; set; }
     public string? Description { get; set; }
     public decimal? HourlyWage { get; set; }
-    public decimal? SeniorWage { get; set; }
 }

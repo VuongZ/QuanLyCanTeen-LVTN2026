@@ -45,7 +45,11 @@ namespace LuanVanTotNghiep.Controllers
                     BranchName = u.Branch?.Name,
                     RoleId = u.RoleId,
                     RoleName = u.Role?.RoleName,
-                    HireDate = u.HireDate
+                    HireDate = u.HireDate,
+                    SalaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                        u,
+                        DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                    SalaryCoefficientIsManual = u.SalaryCoefficientIsManual
                 }),
 
                 Roles = roles.Select(r => new RoleDto
@@ -53,8 +57,7 @@ namespace LuanVanTotNghiep.Controllers
                     Id = r.Id,
                     RoleName = r.RoleName,
                     Description = r.Description,
-                    HourlyWage = r.HourlyWage,
-                    SeniorWage = r.SeniorWage
+                    HourlyWage = r.HourlyWage
                 }),
 
             };
@@ -78,6 +81,7 @@ namespace LuanVanTotNghiep.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> UpdateUser(int id, UserDto user)
         {
             if (id != user.Id)
@@ -124,7 +128,11 @@ namespace LuanVanTotNghiep.Controllers
                 roleName = user.Role?.RoleName,
                 branchId = user.BranchId,
                 branchName = user.Branch?.Name,
-                hireDate = user.HireDate
+                hireDate = user.HireDate,
+                salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                    user,
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                salaryCoefficientIsManual = user.SalaryCoefficientIsManual
             });
         }
 
@@ -226,15 +234,18 @@ namespace LuanVanTotNghiep.Controllers
                     BranchName = u.Branch?.Name,
                     RoleId = u.RoleId,
                     RoleName = u.Role?.RoleName,
-                    HireDate = u.HireDate
+                    HireDate = u.HireDate,
+                    SalaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                        u,
+                        DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                    SalaryCoefficientIsManual = u.SalaryCoefficientIsManual
                 }),
                 Roles = roles.Select(r => new RoleDto
                 {
                     Id = r.Id,
                     RoleName = r.RoleName,
                     Description = r.Description,
-                    HourlyWage = r.HourlyWage,
-                    SeniorWage = r.SeniorWage
+                    HourlyWage = r.HourlyWage
                 }),
             };
             return Ok(result);
@@ -305,7 +316,11 @@ namespace LuanVanTotNghiep.Controllers
                 roleName = user.Role != null ? user.Role.RoleName : roleClaim,
                 branchId = user.BranchId,
                 branchName = user.Branch != null ? user.Branch.Name : "Chưa có",
-                hireDate = user.HireDate 
+                hireDate = user.HireDate,
+                salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                    user,
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                salaryCoefficientIsManual = user.SalaryCoefficientIsManual
             }
         });
     }
@@ -360,7 +375,11 @@ namespace LuanVanTotNghiep.Controllers
                 roleName = user.Role?.RoleName,
                 branchId = user.BranchId,
                 branchName = user.Branch?.Name,
-                hireDate = user.HireDate
+                hireDate = user.HireDate,
+                salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                    user,
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                salaryCoefficientIsManual = user.SalaryCoefficientIsManual
             };
         }
     }

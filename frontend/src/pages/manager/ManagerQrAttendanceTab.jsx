@@ -8,11 +8,15 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('vi-VN').format(new Date(value))
 }
 
-function formatLocalDateInput(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+function getVietnamDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
 }
 
 function formatVietnamDateTime(value) {
@@ -43,7 +47,6 @@ function InfoRow({ label, value }) {
 export function ManagerQrAttendanceTab({ user }) {
   const [shifts, setShifts] = useState([])
   const [shiftId, setShiftId] = useState('')
-  const [workDate, setWorkDate] = useState(() => formatLocalDateInput())
   const [scanAction, setScanAction] = useState('CHECKIN')
   const [manualQr, setManualQr] = useState('')
   const [status, setStatus] = useState(null)
@@ -83,7 +86,7 @@ export function ManagerQrAttendanceTab({ user }) {
     const scanner = new Html5QrcodeScanner('manager-qr-reader', { fps: 8, qrbox: { width: 240, height: 240 } }, false)
     scannerRef.current = scanner
     scanner.render((decodedText) => {
-      const scanKey = `${scanAction}|${shiftId}|${workDate}|${decodedText}`
+      const scanKey = `${scanAction}|${shiftId}|${getVietnamDateString()}|${decodedText}`
       if (decodedText && scanKey !== lastQrTextRef.current) {
         lastQrTextRef.current = scanKey
         handleQrText(decodedText)
@@ -98,7 +101,7 @@ export function ManagerQrAttendanceTab({ user }) {
           if (!isMounted && scannerRef.current === scanner) scannerRef.current = null
         })
     }
-  }, [isScannerOpen, shiftId, workDate, scanAction])
+  }, [isScannerOpen, shiftId, scanAction])
 
   async function closeScanner() {
     setIsScannerOpen(false)
@@ -118,7 +121,8 @@ export function ManagerQrAttendanceTab({ user }) {
   }
 
   async function handleQrText(text) {
-    if (!shiftId || !workDate) { setStatus({ type: 'error', msg: 'Vui lòng chọn ngày và ca trước khi quét QR.' }); return }
+    if (!shiftId) { setStatus({ type: 'error', msg: 'Vui lòng chọn ca trước khi quét QR.' }); return }
+    const workDate = getVietnamDateString()
     setIsSubmitting(true); setStatus(null)
     try {
       const employeeQr = parseEmployeeQr(text)
@@ -133,7 +137,7 @@ export function ManagerQrAttendanceTab({ user }) {
   function handleManualSubmit(e) {
     e.preventDefault()
     if (!manualQr.trim()) return
-    lastQrTextRef.current = `${scanAction}|${shiftId}|${workDate}|${manualQr.trim()}`
+    lastQrTextRef.current = `${scanAction}|${shiftId}|${getVietnamDateString()}|${manualQr.trim()}`
     handleQrText(manualQr.trim())
   }
 
@@ -150,7 +154,6 @@ export function ManagerQrAttendanceTab({ user }) {
       <div className="sd-card sd-qr-scan-card">
         <div className="sd-card-header"><p className="sd-eyebrow">Chấm công</p><h2>Quét QR nhân viên</h2></div>
         <div className="sd-modal-grid">
-          <div className="sd-field"><label>Ngày làm việc</label><input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} /></div>
           <div className="sd-field">
             <label>Ca làm</label>
             <select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
@@ -170,7 +173,7 @@ export function ManagerQrAttendanceTab({ user }) {
           {isScannerOpen ? (
             <button className="sd-btn-ghost" type="button" onClick={closeScanner}>Tắt camera</button>
           ) : (
-            <button className="sd-btn-primary" disabled={!shiftId || !workDate} type="button" onClick={() => setIsScannerOpen(true)}>Mở camera quét QR</button>
+            <button className="sd-btn-primary" disabled={!shiftId} type="button" onClick={() => setIsScannerOpen(true)}>Mở camera quét QR</button>
           )}
         </div>
         {isScannerOpen && <div id="manager-qr-reader" className="sd-qr-reader"></div>}
@@ -179,7 +182,7 @@ export function ManagerQrAttendanceTab({ user }) {
             <label>Nhập dữ liệu QR nếu không mở được camera</label>
             <textarea value={manualQr} onChange={(e) => setManualQr(e.target.value)} placeholder='{"type":"EMPLOYEE","id":1,...}' />
           </div>
-          <button className="sd-btn-primary" disabled={isSubmitting || !shiftId || !workDate} type="submit">{isSubmitting ? 'Đang lưu...' : 'Lưu dữ liệu QR'}</button>
+          <button className="sd-btn-primary" disabled={isSubmitting || !shiftId} type="submit">{isSubmitting ? 'Đang lưu...' : 'Lưu dữ liệu QR'}</button>
         </form>
         {status && <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>}
       </div>

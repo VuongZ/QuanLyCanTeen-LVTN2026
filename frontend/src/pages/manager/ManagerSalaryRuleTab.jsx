@@ -71,6 +71,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [attendanceTarget, setAttendanceTarget] = useState(null);
+  const [employeeDetailTarget, setEmployeeDetailTarget] = useState(null);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
@@ -405,7 +406,20 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
               const isSaving = savingUserId === employee.userId;
 
               return (
-                <tr key={employee.userId}>
+                <tr
+                  className="sd-tr"
+                  key={employee.userId}
+                  onClick={() => setEmployeeDetailTarget(employee)}
+                  onKeyDown={(event) => {
+                    if (event.currentTarget === event.target && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      setEmployeeDetailTarget(employee);
+                    }
+                  }}
+                  role="button"
+                  style={{ cursor: 'pointer' }}
+                  tabIndex={0}
+                >
                   <td>
                     <strong>{employee.fullName || employee.email || employee.phoneNumber}</strong>
                     <span className="sd-subline">{employee.roleName || 'Nhân viên'}</span>
@@ -415,7 +429,10 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                     {employee.lateCount > 0 ? (
                       <button
                         className="sd-attendance-detail-button"
-                        onClick={() => setAttendanceTarget({ employee, type: 'late' })}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setAttendanceTarget({ employee, type: 'late' });
+                        }}
                         type="button"
                       >
                         {employee.lateCount} · Xem ngày
@@ -426,7 +443,10 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                     {employee.absentCount > 0 ? (
                       <button
                         className="sd-attendance-detail-button sd-attendance-detail-button--absent"
-                        onClick={() => setAttendanceTarget({ employee, type: 'absent' })}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setAttendanceTarget({ employee, type: 'absent' });
+                        }}
                         type="button"
                       >
                         {employee.absentCount} · Xem ngày
@@ -448,13 +468,13 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
                   {!isAdmin && (
                     <td>
                       <div className="sd-salary-actions">
-                        <button className="sd-btn-ghost" onClick={() => openHistory(employee)} type="button">
+                        <button className="sd-btn-ghost" onClick={(event) => { event.stopPropagation(); openHistory(employee); }} type="button">
                           Lịch sử
                         </button>
                         <button
                           className="sd-btn-primary"
                           disabled={isLocked || isSaving}
-                          onClick={() => openManualAdjustment(employee)}
+                          onClick={(event) => { event.stopPropagation(); openManualAdjustment(employee); }}
                           type="button"
                         >
                           {isLocked ? (salaryStatus === 'PAID' ? 'Đã trả' : 'Đã chốt') : isSaving ? 'Đang lưu...' : 'Thưởng phạt'}
@@ -468,6 +488,61 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
           </tbody>
         </table>
       </div>
+
+      {employeeDetailTarget && (() => {
+        const issueDetails = [
+          ...(employeeDetailTarget.lateDetails || []).map((detail) => ({ ...detail, issueType: 'Đi trễ' })),
+          ...(employeeDetailTarget.absentDetails || []).map((detail) => ({ ...detail, issueType: 'Vắng ca' })),
+        ];
+
+        return (
+          <div className="sd-overlay" onClick={() => setEmployeeDetailTarget(null)}>
+            <div className="sd-modal sd-modal--wide" onClick={(event) => event.stopPropagation()}>
+              <div className="sd-modal-header">
+                <div>
+                  <p className="sd-eyebrow">Tháng {period.month}/{period.year}</p>
+                  <h2>Chi tiết thưởng phạt - {employeeDetailTarget.fullName || employeeDetailTarget.email}</h2>
+                </div>
+                <button onClick={() => setEmployeeDetailTarget(null)} type="button">✕</button>
+              </div>
+              <div className="sd-modal-body">
+                <dl className="sd-dl">
+                  <div className="sd-info-row"><dt>Ngày làm</dt><dd>{employeeDetailTarget.workedDays} ngày</dd></div>
+                  <div className="sd-info-row"><dt>Đi trễ</dt><dd>{employeeDetailTarget.lateCount} lần</dd></div>
+                  <div className="sd-info-row"><dt>Vắng ca</dt><dd>{employeeDetailTarget.absentCount} lần</dd></div>
+                  <div className="sd-info-row"><dt>Thưởng theo rule</dt><dd>{formatMoney(employeeDetailTarget.calculatedBonus)}</dd></div>
+                  <div className="sd-info-row"><dt>Phạt theo rule</dt><dd>{formatMoney(employeeDetailTarget.calculatedPenalty)}</dd></div>
+                  <div className="sd-info-row"><dt>Tổng thưởng hiện tại</dt><dd>{formatMoney(employeeDetailTarget.currentBonus)}</dd></div>
+                  <div className="sd-info-row"><dt>Tổng phạt hiện tại</dt><dd>{formatMoney(employeeDetailTarget.currentPenalty)}</dd></div>
+                  <div className="sd-info-row"><dt>Lương hiện tại</dt><dd>{formatMoney(employeeDetailTarget.totalSalary)}</dd></div>
+                </dl>
+
+                <h3 className="sd-salary-detail-title">Các ngày phát sinh vi phạm</h3>
+                {issueDetails.length === 0 ? (
+                  <p className="sd-salary-empty">Không có ngày đi trễ hoặc vắng ca trong kỳ này.</p>
+                ) : (
+                  <div className="sd-table-wrap">
+                    <table className="sd-table">
+                      <thead><tr><th>Loại</th><th>Ngày</th><th>Ca làm</th><th>Giờ ca</th><th>Giờ vào thực tế</th></tr></thead>
+                      <tbody>
+                        {issueDetails.map((detail, index) => (
+                          <tr key={`${detail.issueType}-${detail.workDate}-${detail.scheduledTime}-${index}`}>
+                            <td><strong>{detail.issueType}</strong></td>
+                            <td>{formatWorkDate(detail.workDate)}</td>
+                            <td>{detail.shiftName || '—'}</td>
+                            <td>{detail.scheduledTime || '—'}</td>
+                            <td>{detail.actualCheckInTime || 'Không có chấm công hoàn tất'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {attendanceTarget && (() => {
         const isLate = attendanceTarget.type === 'late';

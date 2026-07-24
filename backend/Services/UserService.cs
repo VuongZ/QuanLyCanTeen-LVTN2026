@@ -34,7 +34,11 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             Password = dto.Password ?? string.Empty,
             BranchId = dto.BranchId,
             RoleId = dto.RoleId,
-            HireDate = dto.HireDate
+            HireDate = dto.HireDate,
+            SalaryCoefficient = SalaryWagePolicy.GetSalaryCoefficient(
+                dto.HireDate,
+                DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+            SalaryCoefficientIsManual = false
         };
         user.Password = HashPassword(user.Password);
         await userRepo.Add(user);
@@ -55,6 +59,21 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             us1.BranchId = user.BranchId;
             us1.RoleId = user.RoleId;
             us1.HireDate = user.HireDate;
+            if (user.SalaryCoefficientIsManual)
+            {
+                if (user.SalaryCoefficient <= 0 || user.SalaryCoefficient > 999.99m)
+                    throw new ArgumentException("Hệ số lương phải từ 0,01 đến 999,99.");
+
+                us1.SalaryCoefficient = user.SalaryCoefficient;
+                us1.SalaryCoefficientIsManual = true;
+            }
+            else
+            {
+                us1.SalaryCoefficient = SalaryWagePolicy.GetSalaryCoefficient(
+                    user.HireDate,
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)));
+                us1.SalaryCoefficientIsManual = false;
+            }
             await userRepo.Update(us1);
             await UpsertBankAccountAsync(us1.Id, user.BankName, user.BankAccountNumber, user.BankAccountName);
         }

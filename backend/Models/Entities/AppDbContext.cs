@@ -912,10 +912,6 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.RoleName)
                 .HasMaxLength(50)
                 .HasColumnName("role_name");
-            entity.Property(e => e.SeniorWage)
-                .HasPrecision(10, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("senior_wage");
         });
 
         modelBuilder.Entity<NsUser>(entity =>
@@ -948,6 +944,13 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.HireDate)
                 .HasDefaultValueSql("curdate()")
                 .HasColumnName("hire_date");
+            entity.Property(e => e.SalaryCoefficient)
+                .HasPrecision(5, 2)
+                .HasDefaultValueSql("'1.00'")
+                .HasColumnName("salary_coefficient");
+            entity.Property(e => e.SalaryCoefficientIsManual)
+                .HasDefaultValueSql("'0'")
+                .HasColumnName("salary_coefficient_is_manual");
             entity.Property(e => e.IsDeleted)
                 .HasDefaultValueSql("'0'")
                 .HasColumnName("is_deleted");

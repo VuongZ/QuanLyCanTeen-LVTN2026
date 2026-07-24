@@ -21,6 +21,10 @@ public partial class NsUser
 
     public DateOnly? HireDate { get; set; }
 
+    public decimal SalaryCoefficient { get; set; }
+
+    public bool SalaryCoefficientIsManual { get; set; }
+
     public string? ResetPasswordCode { get; set; }
 
     public DateTime? ResetPasswordExpiry { get; set; }
