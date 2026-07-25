@@ -82,7 +82,7 @@ namespace LuanVanTotNghiep.Controllers
 
                 return Ok(new
                 {
-                    message = "Đã gửi báo cáo kết ca và đang chờ Quản lý duyệt.",
+                    message = "Đã gửi báo cáo kết ca và đang chờ Quản lý duyệt. Các nhân viên khác trong cùng ca tạm thời không thể gửi thêm báo cáo.",
                     reportId
                 });
             }
@@ -209,7 +209,7 @@ namespace LuanVanTotNghiep.Controllers
 
                 return Ok(new
                 {
-                    message = "Duyệt báo cáo thành công. Tồn quầy đã được cập nhật."
+                    message = "Duyệt báo cáo thành công. Tồn quầy đã được cập nhật và các nhân viên trong ca có thể checkout."
                 });
             }
             catch (InvalidOperationException ex)
@@ -239,7 +239,7 @@ namespace LuanVanTotNghiep.Controllers
 
                 return Ok(new
                 {
-                    message = "Đã từ chối báo cáo. Tồn quầy được giữ nguyên."
+                    message = "Đã từ chối báo cáo. Tồn quầy được giữ nguyên và tất cả nhân viên trong ca có thể gửi lại báo cáo."
                 });
             }
             catch (InvalidOperationException ex)

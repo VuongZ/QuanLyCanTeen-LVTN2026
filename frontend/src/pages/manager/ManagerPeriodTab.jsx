@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
-import { getAllPeriods, createPeriod, updatePeriod, deletePeriod } from '../../api/PeriodApi'
+import {
+  getAllPeriods,
+  createPeriod,
+  updatePeriod,
+  updatePeriodStatus,
+  deletePeriod
+} from '../../api/PeriodApi'
+
+import {
+  getRegistrationsByPeriod,
+  getFinalScheduleByPeriod,
+  publishSchedule
+} from '../../api/StaffRegistrationApi'
+
 import { getAllShifts } from '../../api/ShiftApi'
 
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
@@ -441,16 +453,28 @@ function PeriodReviewScreen({ period, onBack, user }) {
       setLoading(true)
 
       try {
-        const [regRes, shiftRes] = await Promise.all([
-          axios.get(`/api/StaffRegistration/period/${period.id}`),
-          getAllShifts()
-        ])
+        const isPublishedPeriod =
+          String(currentStatus || period.status || '').toUpperCase() === 'PUBLISHED'
 
-        const allRegs = regRes.data || []
-        const branchShifts = shiftRes.filter((s) => String(s.branchId) === String(period.branchId))
+        const schedulePromise = isPublishedPeriod
+  ? getFinalScheduleByPeriod(period.id)
+  : getRegistrationsByPeriod(period.id)
 
-        setRegistrations(allRegs)
-        setShifts(branchShifts)
+const [scheduleRows, shiftRows] = await Promise.all([
+  schedulePromise,
+  getAllShifts()
+])
+
+const branchShifts = (shiftRows || []).filter(
+  (shift) =>
+    String(shift.branchId) === String(period.branchId)
+)
+
+setRegistrations(
+  Array.isArray(scheduleRows) ? scheduleRows : []
+)
+
+setShifts(branchShifts)
 
         const dArray = []
         let curr = new Date(period.startDate)
@@ -480,7 +504,8 @@ function PeriodReviewScreen({ period, onBack, user }) {
     period.id,
     period.branchId,
     period.startDate,
-    period.endDate
+    period.endDate,
+    currentStatus
   ])
 
   function toDateString(dateObj) {
@@ -491,13 +516,22 @@ function PeriodReviewScreen({ period, onBack, user }) {
   }
 
   function isActiveRegistration(reg) {
-    const status = reg.status || ''
+    const status = String(reg.status || '').toUpperCase()
 
     return ![
       'CANCELLED',
-      'Từ Chối',
-      'REJECTED',
+      'TỪ CHỐI',
+      'REJECTED'
     ].includes(status)
+  }
+
+  function isManagerRow(row) {
+    const roleName = String(row?.user?.roleName || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+
+    return roleName.includes('MANAGER') || roleName.includes('QUAN LY')
   }
 
   function getRegistrationStatusLabel(status) {
@@ -537,73 +571,72 @@ function PeriodReviewScreen({ period, onBack, user }) {
   })
 
   const handleLockPeriod = async () => {
-    if (!window.confirm('Bạn có chắc muốn khóa đăng ký đợt này?')) return
-
-    try {
-      await axios.patch(`/api/SchedulePeriod/${period.id}/status`, {
-        status: 'CLOSED'
-      })
-
-      alert('Đã khóa đăng ký thành công!')
-      setCurrentStatus('CLOSED')
-    } catch (error) {
-      alert(
-        getApiErrorMessage(
-          error,
-          'Không thể khóa đợt đăng ký.'
-        )
-      )
-    }
+  if (!window.confirm('Bạn có chắc muốn khóa đăng ký đợt này?')) {
+    return
   }
 
-  const handleReopenPeriod = async () => {
-    if (hasPeriodStarted(period.startDate)) {
-      alert('Không thể mở lại đợt đăng ký khi đã đến ngày bắt đầu lịch làm.')
-      return
-    }
+  try {
+    await updatePeriodStatus(period.id, 'CLOSED')
 
-    if (!window.confirm('Bạn muốn mở lại đợt đăng ký này?')) return
-
-    try {
-      await axios.patch(`/api/SchedulePeriod/${period.id}/status`, {
-        status: 'OPEN'
-      })
-
-      alert('Đã mở lại đợt đăng ký!')
-      setCurrentStatus('OPEN')
-    } catch (error) {
-      alert(
-        getApiErrorMessage(
-          error,
-          'Không thể mở lại đợt đăng ký.'
-        )
+    alert('Đã khóa đăng ký thành công!')
+    setCurrentStatus('CLOSED')
+  } catch (error) {
+    alert(
+      getApiErrorMessage(
+        error,
+        'Không thể khóa đợt đăng ký.'
       )
-    }
+    )
+  }
+}
+
+ const handleReopenPeriod = async () => {
+  if (hasPeriodStarted(period.startDate)) {
+    alert(
+      'Không thể mở lại đợt đăng ký khi đã đến ngày bắt đầu lịch làm.'
+    )
+    return
   }
 
-  const handlePublish = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn công bố lịch làm?')) return
-
-    try {
-      const payload = {
-        periodId: period.id,
-        approvedRegistrationIds: []
-      }
-
-      await axios.post('/api/StaffRegistration/publish', payload)
-
-      alert('Đã công bố lịch làm việc thành công!')
-      setCurrentStatus('PUBLISHED')
-      onBack()
-    } catch (error) {
-      alert(
-        getApiErrorMessage(
-          error,
-          'Không thể công bố lịch.'
-        )
-      )
-    }
+  if (!window.confirm('Bạn muốn mở lại đợt đăng ký này?')) {
+    return
   }
+
+  try {
+    await updatePeriodStatus(period.id, 'OPEN')
+
+    alert('Đã mở lại đợt đăng ký!')
+    setCurrentStatus('OPEN')
+  } catch (error) {
+    alert(
+      getApiErrorMessage(
+        error,
+        'Không thể mở lại đợt đăng ký.'
+      )
+    )
+  }
+}
+
+ const handlePublish = async () => {
+  if (!window.confirm('Bạn có chắc chắn muốn công bố lịch làm?')) {
+    return
+  }
+
+  try {
+    await publishSchedule(period.id)
+
+    alert('Đã công bố lịch làm việc thành công!')
+    setCurrentStatus('PUBLISHED')
+    await onBack()
+  } catch (error) {
+    alert(
+      getApiErrorMessage(
+        error,
+        'Không thể công bố lịch.'
+      )
+    )
+  }
+}
 
   const isOpen = currentStatus === 'OPEN'
   const isClosed = [
@@ -803,10 +836,16 @@ function PeriodReviewScreen({ period, onBack, user }) {
 
                     {shifts.map((shift) => {
                       const cellRegs = boardMatrix[dStr][shift.id] || []
-                      const max = shift.maxStaff || 0
-                      const staffSlot = Math.max(max - 1, 0)
-                      const remainingSlots = Math.max(staffSlot - cellRegs.length, 0)
-                      const isFull = staffSlot > 0 && remainingSlots === 0
+                      const max = Number(shift.maxStaff || 0)
+
+                      // Trước công bố: danh sách chỉ gồm Staff đăng ký, Manager được hiển thị riêng.
+                      // Sau công bố: cellRegs lấy trực tiếp từ ca_final_schedule và đã gồm cả Manager.
+                      const occupiedCount = isPublished
+                        ? cellRegs.length
+                        : cellRegs.length + (max > 0 ? 1 : 0)
+
+                      const remainingSlots = Math.max(max - occupiedCount, 0)
+                      const isFull = max > 0 && remainingSlots === 0
 
                       return (
                         <td
@@ -819,30 +858,44 @@ function PeriodReviewScreen({ period, onBack, user }) {
                             </div>
                           ) : (
                             <div className="sd-slot-list">
-                              <div className="sd-slot-person sd-slot-manager">
-                                <span className="sd-slot-name">
-                                  {user.fullName || user.username || 'Quản lý'}
-                                </span>
-
-                                <span className="sd-slot-role">
-                                  Quản lý
-                                </span>
-                              </div>
-
-                              {cellRegs.map((r) => (
-                                <div
-                                  key={r.id}
-                                  className="sd-slot-person sd-slot-staff"
-                                >
+                              {!isPublished && (
+                                <div className="sd-slot-person sd-slot-manager">
                                   <span className="sd-slot-name">
-                                    {r.user?.fullName || 'Nhân viên'}
+                                    {user.fullName || user.username || 'Quản lý'}
                                   </span>
 
                                   <span className="sd-slot-role">
-                                    {getRegistrationStatusLabel(r.status)}
+                                    Quản lý
                                   </span>
                                 </div>
-                              ))}
+                              )}
+
+                              {cellRegs.map((row) => {
+                                const managerRow = isPublished && isManagerRow(row)
+
+                                return (
+                                  <div
+                                    key={row.id}
+                                    className={`sd-slot-person ${
+                                      managerRow
+                                        ? 'sd-slot-manager'
+                                        : 'sd-slot-staff'
+                                    }`}
+                                  >
+                                    <span className="sd-slot-name">
+                                      {row.user?.fullName || row.user?.email || 'Nhân viên'}
+                                    </span>
+
+                                    <span className="sd-slot-role">
+                                      {isPublished
+                                        ? managerRow
+                                          ? 'Quản lý'
+                                          : 'Lịch chính thức'
+                                        : getRegistrationStatusLabel(row.status)}
+                                    </span>
+                                  </div>
+                                )
+                              })}
 
                               {Array.from({ length: remainingSlots }).map((_, index) => (
                                 <div

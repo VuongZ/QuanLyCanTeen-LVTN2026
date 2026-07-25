@@ -1724,6 +1724,58 @@
 }
 
 
+/* Trạng thái đăng ký ca rõ ràng hơn */
+.sd-registration-cell .sd-shift-cell-v.selected {
+  background: #fff7ed;
+  outline: 2px solid #f97316;
+  outline-offset: -2px;
+}
+
+.sd-registration-cell .sd-shift-cell-v.pending-cancel {
+  background: #fef2f2;
+  outline: 2px dashed #ef4444;
+  outline-offset: -2px;
+}
+
+.sd-registration-cell .sd-shift-cell-v.pending-cancel:hover {
+  background: #fee2e2;
+}
+
+.sd-slot-saved {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #bfdbfe;
+  color: #1e40af;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sd-slot-cancel-pending {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px dashed #f87171;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #b91c1c;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sd-slot-cancel-pending small {
+  color: #dc2626;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+
 /* =========================================================
    MÀU TRẠNG THÁI BÁO CÁO KẾT CA — STAFF
    PENDING: vàng, APPROVED: xanh lá, REJECTED: đỏ

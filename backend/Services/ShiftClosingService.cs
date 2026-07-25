@@ -10,6 +10,8 @@ namespace LuanVanTotNghiep.Services
         private const string StatusApproved = "APPROVED";
         private const string StatusRejected = "REJECTED";
 
+
+
         private readonly AppDbContext _context;
 
         public ShiftClosingService(AppDbContext context)
@@ -135,8 +137,6 @@ namespace LuanVanTotNghiep.Services
 
             var hasCheckedIn = attendance?.CheckInTime != null;
             var hasCheckedOut = attendance?.CheckOutTime != null;
-            var hasConfirmedCheckout = hasCheckedOut &&
-                !string.Equals(attendance?.Status, CheckoutRequestService.AutoCheckoutPending, StringComparison.OrdinalIgnoreCase);
 
             var startTime = ToTimeSpan(selectedSchedule.Shift!.StartTime);
             var endTime = ToTimeSpan(selectedSchedule.Shift.EndTime);
@@ -144,14 +144,12 @@ namespace LuanVanTotNghiep.Services
             var selectedWorkDate =
                 ToDateOnly(selectedSchedule.WorkDate) ?? today;
 
-            var shiftEndDateTime = selectedWorkDate
-                .ToDateTime(TimeOnly.MinValue)
-                .Add(endTime);
+            // IsShiftEnded chỉ dùng để hiển thị thông tin trên giao diện.
+            // Quyền gửi báo cáo không còn phụ thuộc vào giờ bắt đầu hoặc giờ kết thúc ca.
+            var (_, shiftEndDateTime) =
+                GetShiftDateTimeRange(selectedWorkDate, startTime, endTime);
 
-            if (endTime < startTime)
-                shiftEndDateTime = shiftEndDateTime.AddDays(1);
-
-            var isShiftEnded = DateTime.Now >= shiftEndDateTime;
+            var isShiftEnded = DateTime.Now > shiftEndDateTime;
 
             var isPublished = string.Equals(
                 selectedSchedule.Status,
@@ -159,12 +157,13 @@ namespace LuanVanTotNghiep.Services
                 StringComparison.OrdinalIgnoreCase
             );
 
-            // Chỉ báo cáo kết ca sau khi checkout thật hoặc checkout bổ sung đã được duyệt.
-            // Một báo cáo PENDING/APPROVED của bất kỳ nhân viên nào trong ca sẽ khóa gửi mới.
+            // Staff được gửi báo cáo vào bất kỳ thời điểm nào sau khi check-in
+            // và trước khi checkout. PENDING/APPROVED của bất kỳ Staff nào
+            // trong cùng ca sẽ khóa quyền gửi của toàn bộ Staff còn lại.
             var canSubmit =
                 isPublished &&
                 hasCheckedIn &&
-                hasConfirmedCheckout &&
+                !hasCheckedOut &&
                 activeShiftReport == null;
 
             string? submitBlockReason = null;
@@ -185,19 +184,18 @@ namespace LuanVanTotNghiep.Services
                      reportStatus == StatusApproved)
             {
                 submitBlockReason = activeReportIsOwn
-                    ? "Báo cáo của bạn đã được Quản lý duyệt."
-                    : "Ca này đã có báo cáo được Quản lý duyệt.";
+                    ? "Báo cáo của bạn đã được Quản lý duyệt. Bạn có thể checkout."
+                    : "Ca này đã có báo cáo được Quản lý duyệt. Bạn có thể checkout.";
             }
             else if (!hasCheckedIn)
             {
                 submitBlockReason =
                     "Bạn chưa được điểm danh vào ca này.";
             }
-            else if (!hasConfirmedCheckout)
+            else if (hasCheckedOut)
             {
-                submitBlockReason = attendance?.Status == CheckoutRequestService.AutoCheckoutPending
-                    ? "Checkout tạm đang chờ xác nhận và phê duyệt."
-                    : "Bạn chưa checkout ca làm này.";
+                submitBlockReason =
+                    "Bạn đã checkout nên không thể gửi báo cáo kết ca.";
             }
 
             return new ClosingShiftInfoDto
@@ -214,7 +212,7 @@ namespace LuanVanTotNghiep.Services
                 RejectReason = rejectReason,
                 AlreadyReported = alreadyReported,
                 HasCheckedIn = hasCheckedIn,
-                HasCheckedOut = hasConfirmedCheckout,
+                HasCheckedOut = hasCheckedOut,
                 IsShiftEnded = isShiftEnded,
                 CanSubmit = canSubmit,
                 SubmitBlockReason = submitBlockReason
@@ -303,13 +301,16 @@ namespace LuanVanTotNghiep.Services
                 );
             }
 
-            if (attendance.CheckOutTime == null ||
-                string.Equals(attendance.Status, CheckoutRequestService.AutoCheckoutPending, StringComparison.OrdinalIgnoreCase))
+            if (attendance.CheckOutTime != null)
             {
                 throw new InvalidOperationException(
-                    "Bạn cần checkout hoặc hoàn tất duyệt yêu cầu quên checkout trước khi báo cáo kết ca."
+                    "Bạn đã checkout nên không thể gửi báo cáo kết ca."
                 );
             }
+
+            // Không giới hạn thời điểm gửi báo cáo theo giờ ca.
+            // Chỉ cần Staff đã check-in, chưa checkout và ca chưa có
+            // báo cáo PENDING hoặc APPROVED của một Staff khác.
 
             var submittedItems = dto.Items
                 .Where(i => i.ProductId > 0)
@@ -987,6 +988,26 @@ namespace LuanVanTotNghiep.Services
                 return parsedTime;
 
             return TimeSpan.Zero;
+        }
+
+        private static (DateTime Start, DateTime End) GetShiftDateTimeRange(
+            DateOnly workDate,
+            TimeSpan startTime,
+            TimeSpan endTime)
+        {
+            var startDateTime = workDate
+                .ToDateTime(TimeOnly.MinValue)
+                .Add(startTime);
+
+            var endDateTime = workDate
+                .ToDateTime(TimeOnly.MinValue)
+                .Add(endTime);
+
+            // Hỗ trợ ca qua đêm, ví dụ 22:00 - 06:00.
+            if (endTime < startTime)
+                endDateTime = endDateTime.AddDays(1);
+
+            return (startDateTime, endDateTime);
         }
 
         private static string FormatTime(TimeSpan time)

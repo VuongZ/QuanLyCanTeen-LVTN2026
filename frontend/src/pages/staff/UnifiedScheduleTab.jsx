@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { getAllPeriods } from '../../api/PeriodApi';
-import { getAllShifts } from '../../api/ShiftApi';
+import { useState, useEffect } from 'react'
+import axios from 'axios'
+import { getAllPeriods } from '../../api/PeriodApi'
+import { getAllShifts } from '../../api/ShiftApi'
+import {
+  getFinalScheduleByPeriod
+} from '../../api/StaffRegistrationApi'
 
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -366,52 +369,59 @@ function PublishedScheduleView({ period, user }) {
   const [dates, setDates] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadBoard() {
-      setLoading(true);
-      try {
-        const [regRes, shiftRes, configRes] = await Promise.all([
-          axios.get(`/api/StaffRegistration/period/${period.id}`),
+ useEffect(() => {
+  async function loadBoard() {
+    setLoading(true)
+
+    try {
+      const [scheduleRows, shiftRes, configRes] =
+        await Promise.all([
+          getFinalScheduleByPeriod(period.id),
           getAllShifts(),
           axios.get('/api/BranchShiftConfig'),
-        ]);
+        ])
 
-        const approvedRegs = (regRes.data || []).filter((r) => {
-          return (
-            r.status === 'REGISTERED' ||
-            r.status === 'Đã Duyệt' ||
-            r.status === 'APPROVED'
-          )
+      setRegistrations(
+        Array.isArray(scheduleRows)
+          ? scheduleRows
+          : []
+      )
+
+      const branchShifts = (shiftRes || []).filter((shift) => {
+        return String(shift.branchId) === String(user.branchId)
+      })
+
+      const branchShiftIds = new Set(
+        branchShifts.map((shift) => shift.id)
+      )
+
+      setShifts(branchShifts)
+
+      setShiftConfigs(
+        (configRes.data || []).filter((config) => {
+          return branchShiftIds.has(config.shiftId)
         })
-        setRegistrations(approvedRegs);
+      )
 
-        const branchShifts = (shiftRes || []).filter((shift) => {
-          return String(shift.branchId) === String(user.branchId);
-        });
+      const dArray = []
+      let curr = new Date(period.startDate)
+      const end = new Date(period.endDate)
 
-        const branchShiftIds = new Set(
-          branchShifts.map((shift) => shift.id)
-        );
+      while (curr <= end) {
+        dArray.push(new Date(curr))
+        curr.setDate(curr.getDate() + 1)
+      }
 
-        setShifts(branchShifts);
-        setShiftConfigs(
-          (configRes.data || []).filter((config) => {
-            return branchShiftIds.has(config.shiftId);
-          })
-        );
-
-        const dArray = [];
-        let curr = new Date(period.startDate);
-        const end = new Date(period.endDate);
-        while (curr <= end) {
-          dArray.push(new Date(curr));
-          curr.setDate(curr.getDate() + 1);
-        }
-        setDates(dArray);
-      } catch (e) { console.error("Lỗi:", e); } finally { setLoading(false); }
+      setDates(dArray)
+    } catch (error) {
+      console.error('Lỗi tải lịch chính thức:', error)
+    } finally {
+      setLoading(false)
     }
-    loadBoard();
-  }, [period.id, user.branchId]);
+  }
+
+  loadBoard()
+}, [period.id, user.branchId])
 
   function toDateString(dateObj) {
     const offset = dateObj.getTimezoneOffset();
@@ -930,7 +940,15 @@ function RegistrationView({ period, user }) {
 
                 const totalMaxStaff = getTotalMaxStaffForShiftDate(shift.id, dateObj);
                 const staffSlot = getStaffSlotForShiftDate(shift.id, dateObj);
-                const isFull = !isOn && isShiftFull(dateStr, shift.id, dateObj);
+                const hasSavedRegistration = Boolean(dbItem);
+                const isPendingCancel = hasSavedRegistration && !isOn;
+
+                // Chỉ khóa vì đầy chỗ khi người dùng chưa có đăng ký trong ca.
+                // Nếu vừa bỏ chọn ca đã lưu, vẫn cho phép bấm lại để hoàn tác trước khi lưu.
+                const isFull =
+                  !isOn &&
+                  !hasSavedRegistration &&
+                  isShiftFull(dateStr, shift.id, dateObj);
 
                 const savedStaffList = allRegistrations.filter((item) => {
                   return (
@@ -941,18 +959,33 @@ function RegistrationView({ period, user }) {
                 });
 
                 const hasMeInSavedList = savedStaffList.some(
-                  (item) => item.userId === user.id
+                  (item) => String(item.userId) === String(user.id)
                 );
 
-                const displayStaffList = savedStaffList.map((item) => ({
-                  id: item.id,
-                  name:
-                    item.userId === user.id
-                      ? user.fullName || 'Bạn'
-                      : item.user?.fullName || item.user?.username || 'Nhân viên',
-                  isMe: item.userId === user.id,
-                  isPending: false,
-                }));
+                // Khi người dùng bỏ chọn, ẩn tên khỏi ô ngay lập tức.
+                // Bản ghi trong CSDL chỉ bị hủy sau khi bấm "Xác nhận lưu thay đổi".
+                const displayStaffList = savedStaffList
+                  .filter((item) => {
+                    const isMe =
+                      String(item.userId) === String(user.id);
+
+                    return !isMe || isOn;
+                  })
+                  .map((item) => {
+                    const isMe =
+                      String(item.userId) === String(user.id);
+
+                    return {
+                      id: item.id,
+                      name: isMe
+                        ? user.fullName || 'Bạn'
+                        : item.user?.fullName ||
+                          item.user?.username ||
+                          'Nhân viên',
+                      isMe,
+                      isPending: false,
+                    };
+                  });
 
                 if (isOn && !hasMeInSavedList) {
                   displayStaffList.push({
@@ -968,10 +1001,24 @@ function RegistrationView({ period, user }) {
                 return (
                   <td key={shift.id} className="sd-registration-cell">
                     <button
-                      className={`sd-shift-cell-v sd-shift-cell-slots ${isOn ? 'selected' : ''} ${(isFull || isCellLocked) ? 'disabled' : ''}`}
+                      className={`sd-shift-cell-v sd-shift-cell-slots ${
+                        isOn ? 'selected' : ''
+                      } ${
+                        isPendingCancel ? 'pending-cancel' : ''
+                      } ${
+                        (isFull || isCellLocked) ? 'disabled' : ''
+                      }`}
                       onClick={() => toggle(dateStr, shift.id, dateObj)}
                       type="button"
                       disabled={isCellLocked || isFull}
+                      aria-pressed={isOn}
+                      title={
+                        isPendingCancel
+                          ? 'Ca này đã được bỏ chọn. Bấm lại để hoàn tác hoặc lưu thay đổi để hủy ca.'
+                          : isOn
+                            ? 'Ca đang được chọn. Bấm để bỏ chọn.'
+                            : 'Bấm để chọn ca.'
+                      }
                     >
                       <div className="sd-slot-list">
                         {totalMaxStaff > 0 && (
@@ -989,13 +1036,24 @@ function RegistrationView({ period, user }) {
                               {staff.name}
                             </span>
 
-                            {staff.isPending && (
+                            {staff.isPending ? (
                               <span className="sd-slot-pending">
                                 Chưa lưu
                               </span>
-                            )}
+                            ) : staff.isMe ? (
+                              <span className="sd-slot-saved">
+                                Đã đăng ký
+                              </span>
+                            ) : null}
                           </div>
                         ))}
+
+                        {isPendingCancel && (
+                          <div className="sd-slot-cancel-pending">
+                            <span>Đã bỏ chọn</span>
+                            <small>Chưa lưu</small>
+                          </div>
+                        )}
 
                         {Array.from({ length: emptySlotCount }).map((_, index) => (
                           <div

@@ -1,35 +1,42 @@
 import axios from 'axios'
 
-// 1. Lấy toàn bộ danh sách đợt đăng ký
+const BASE_URL = '/api/SchedulePeriod'
+
+// Lấy toàn bộ đợt đăng ký
 export async function getAllPeriods() {
-  const res = await axios.get(
-    '/api/SchedulePeriod'
-  )
-  return res.data
+  const response = await axios.get(BASE_URL)
+  return response.data
 }
 
-// 2. Tạo mới một đợt đăng ký lịch làm
+// Lấy các đợt đang mở
+export async function getOpenPeriods() {
+  const response = await axios.get(`${BASE_URL}/open`)
+  return response.data
+}
+
+// Tạo đợt đăng ký
 export async function createPeriod(payload) {
-  const res = await axios.post(
-    '/api/SchedulePeriod',
-    payload
-  )
-  return res.data
+  const response = await axios.post(BASE_URL, payload)
+  return response.data
 }
 
-// 3. Cập nhật thông tin đợt đăng ký
+// Cập nhật thông tin đợt
 export async function updatePeriod(id, payload) {
-  const res = await axios.put(
-    `/api/SchedulePeriod/${id}`,
-    payload
-  )
-  return res.data
+  const response = await axios.put(`${BASE_URL}/${id}`, payload)
+  return response.data
 }
 
-// 4. Xóa một đợt đăng ký
+// Cập nhật trạng thái: OPEN hoặc CLOSED
+export async function updatePeriodStatus(id, status) {
+  const response = await axios.patch(`${BASE_URL}/${id}/status`, {
+    status
+  })
+
+  return response.data
+}
+
+// Xóa đợt đăng ký
 export async function deletePeriod(id) {
-  const res = await axios.delete(
-    `/api/SchedulePeriod/${id}`
-  )
-  return res.data
+  const response = await axios.delete(`${BASE_URL}/${id}`)
+  return response.data
 }
