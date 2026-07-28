@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import { getAllPeriods } from '../../api/PeriodApi'
 import { getAllShifts } from '../../api/ShiftApi'
+
+import {
+  getFinalScheduleByPeriod
+} from '../../api/StaffRegistrationApi'
+
+import {
+  getScheduleUserName,
+  isManagerScheduleRow
+} from '../../utils/scheduleRoleUtils'
 
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
 
@@ -42,9 +50,29 @@ export function AdminSystemScheduleTab({ branches }) {
       try {
         const period = periods.find((p) => p.id.toString() === selectedPeriodId)
         if (!period) return
-        const [regRes, shiftRes] = await Promise.all([axios.get(`/api/StaffRegistration/period/${period.id}`), getAllShifts()])
-        setRegistrations((regRes.data || []).filter((r) => r.status === 'Đã Duyệt'))
-        setShifts(shiftRes.filter((s) => String(s.branchId) === String(selectedBranchId)))
+        // Đợt đã PUBLISHED nên phải lấy dữ liệu
+        // từ lịch làm chính thức.
+        const [scheduleRows, shiftRows] =
+          await Promise.all([
+            getFinalScheduleByPeriod(period.id),
+            getAllShifts()
+          ])
+
+        // Danh sách này đã gồm cả Manager
+        // và các Staff thuộc lịch chính thức.
+        setRegistrations(
+          Array.isArray(scheduleRows)
+            ? scheduleRows
+            : []
+        )
+
+        setShifts(
+          (shiftRows || []).filter(
+            (shift) =>
+              String(shift.branchId) ===
+              String(selectedBranchId)
+          )
+        )
         const dArray = []
         let curr = new Date(period.startDate)
         const end = new Date(period.endDate)
@@ -61,12 +89,26 @@ export function AdminSystemScheduleTab({ branches }) {
     return d.toISOString().split('T')[0]
   }
 
-  const boardMatrix = {}
-  dates.forEach((dObj) => {
-    const dStr = toDateString(dObj)
-    boardMatrix[dStr] = {}
-    shifts.forEach((s) => { boardMatrix[dStr][s.id] = registrations.filter((r) => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id) })
+ // Tạo ma trận lịch theo ngày và ca.
+const boardMatrix = {}
+
+dates.forEach((dateObj) => {
+  const dStr = toDateString(dateObj)
+
+  boardMatrix[dStr] = {}
+
+  shifts.forEach((shift) => {
+    boardMatrix[dStr][shift.id] =
+      registrations.filter((row) => {
+        return (
+          row.workDate?.slice(0, 10) === dStr &&
+          Number(row.shiftId) ===
+            Number(shift.id)
+        )
+      })
   })
+})
+
 
   return (
     <div className="sd-card" style={{ padding: '20px 0' }}>
@@ -104,23 +146,98 @@ export function AdminSystemScheduleTab({ branches }) {
                     <tr key={dStr}>
                       <td className="sd-board-date-col"><strong>{dayOfWeek}</strong><small>{dateObj.getDate()}/{dateObj.getMonth() + 1}</small></td>
                       {shifts.map((shift) => {
-                        const cellRegs = boardMatrix[dStr][shift.id] || []
-                        const isWeekend = dayOfWeek === 'Thứ 7' || dayOfWeek === 'Chủ nhật'
-                        const isShiftClosed = isWeekend && cellRegs.length === 0
+                        const cellRows =
+                          boardMatrix[dStr][shift.id] || []
+
+                        // Manager vẫn nằm trong lịch chính thức
+                        // để chiếm một slot.
+                        const managerRow =
+                          cellRows.find(isManagerScheduleRow)
+
+                        // Chỉ lấy những người không phải Manager
+                        // để hiển thị trong danh sách Staff.
+                        const staffRows =
+                          cellRows.filter(
+                            (row) => !isManagerScheduleRow(row)
+                          )
+
+                        // Lịch đã công bố và không có dòng nào
+                        // thì xem như ô không có ca làm.
+                        const isShiftClosed =
+                          cellRows.length === 0
+
+                        const managerName =
+                          managerRow
+                            ? getScheduleUserName(managerRow)
+                            : 'Quản lý ca'
                         return (
                           <td key={shift.id}>
                             {!isShiftClosed ? (
-                              <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
-                                <span className="sd-reg-name"> Quản lý ca</span>
-                              </div>
+                              <>
+                                {/* Manager được hiển thị riêng */}
+                                <div
+                                  className="sd-reg-card"
+                                  style={{
+                                    background: '#ffedd5',
+                                    borderColor: '#fdba74',
+                                    color: '#9a3412',
+                                    padding: '6px 8px',
+                                    borderRadius: 6,
+                                    marginBottom: 6,
+                                    fontSize: 12,
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  <span className="sd-reg-name">
+                                    {managerName}
+                                  </span>
+
+                                  <span
+                                    style={{
+                                      marginLeft: 6,
+                                      fontSize: 11,
+                                      fontWeight: 500
+                                    }}
+                                  >
+                                    Quản lý
+                                  </span>
+                                </div>
+
+                                {/* Danh sách này chỉ còn Staff */}
+                                {staffRows.map((row) => (
+                                  <div
+                                    key={row.id}
+                                    className="sd-reg-cardapproved"
+                                    style={{
+                                      background: '#f8fafc',
+                                      borderColor: '#e2e8f0',
+                                      color: '#475569',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      marginBottom: 6,
+                                      fontSize: 12,
+                                      fontWeight: 600
+                                    }}
+                                  >
+                                    <span>
+                                      {getScheduleUserName(row)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </>
                             ) : (
-                              <div style={{ textAlign: 'center', padding: '16px 0', color: '#cbd5e1', fontSize: 12, fontWeight: 600 }}>CA NGHỈ</div>
-                            )}
-                            {cellRegs.map((r) => (
-                              <div key={r.id} className="sd-reg-cardapproved" style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#475569', padding: '6px 8px', borderRadius: 6, marginBottom: 6, fontSize: 12, fontWeight: 600 }}>
-                                <span>{r.user?.fullName}</span>
+                              <div
+                                style={{
+                                  textAlign: 'center',
+                                  padding: '16px 0',
+                                  color: '#cbd5e1',
+                                  fontSize: 12,
+                                  fontWeight: 600
+                                }}
+                              >
+                                KHÔNG CÓ CA LÀM
                               </div>
-                            ))}
+                            )}
                           </td>
                         )
                       })}

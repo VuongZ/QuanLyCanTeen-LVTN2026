@@ -3,34 +3,74 @@ using LuanVanTotNghiep.Repositories;
 
 namespace LuanVanTotNghiep.Services
 {
+    /// <summary>
+    /// Xử lý nghiệp vụ liên quan đến tồn kho chi nhánh.
+    ///
+    /// Luồng xử lý:
+    /// Controller -> Service -> Repository -> Database.
+    /// </summary>
     public class InventoryService
     {
-        private readonly InventoryRepo _repo;
+        private readonly InventoryRepo _inventoryRepo;
 
-        public InventoryService(InventoryRepo repo)
+        /// <summary>
+        /// Nhận InventoryRepo thông qua Dependency Injection.
+        /// </summary>
+        public InventoryService(
+            InventoryRepo inventoryRepo)
         {
-            _repo = repo;
+            _inventoryRepo = inventoryRepo;
         }
 
-     public async Task<IEnumerable<InventoryDto>> GetReportAsync(int? branchId, string? roleName, int? userBranchId)
-{
-    // Nếu là Admin -> Cho phép xem toàn cục hoặc theo branchId được chọn
-    if (roleName == "ADMIN")
-    {
-        if (branchId.HasValue && branchId > 0)
-            return await _repo.GetInventoryByBranchIdAsync(branchId.Value);
-        
-        return await _repo.GetAllInventoryAsync();
-    }
+        /// <summary>
+        /// Lấy danh sách tồn kho theo quyền người dùng.
+        ///
+        /// Admin:
+        /// - Có requestedBranchId: xem một chi nhánh.
+        /// - Không có requestedBranchId: xem toàn hệ thống.
+        ///
+        /// Manager hoặc Staff:
+        /// - Chỉ xem chi nhánh có trong token.
+        /// - Không sử dụng branchId do Frontend truyền lên.
+        /// </summary>
+        public async Task<List<InventoryDto>>
+            GetInventoryAsync(
+                bool isAdmin,
+                int? tokenBranchId,
+                int? requestedBranchId)
+        {
+            // Người dùng không phải Admin chỉ được
+            // xem tồn kho thuộc chi nhánh trong token.
+            if (!isAdmin)
+            {
+                if (!tokenBranchId.HasValue ||
+                    tokenBranchId.Value <= 0)
+                {
+                    throw new UnauthorizedAccessException(
+                        "Không tìm thấy thông tin chi nhánh trong token."
+                    );
+                }
 
-    // Nếu là Manager hoặc Staff -> Ép buộc lấy đúng BranchId của người đó
-    // Dù trên giao diện họ có gửi sai lên thì Backend vẫn chặn lại
-    if (userBranchId.HasValue)
-    {
-        return await _repo.GetInventoryByBranchIdAsync(userBranchId.Value);
-    }
+                return await _inventoryRepo
+                    .GetInventoryByBranchIdAsync(
+                        tokenBranchId.Value
+                    );
+            }
 
-    return new List<InventoryDto>();
-}
+            // Admin có chọn một chi nhánh cụ thể.
+            if (requestedBranchId.HasValue &&
+                requestedBranchId.Value > 0)
+            {
+                return await _inventoryRepo
+                    .GetInventoryByBranchIdAsync(
+                        requestedBranchId.Value
+                    );
+            }
+
+            // Admin không chọn chi nhánh
+            // thì lấy tồn kho toàn hệ thống.
+            return await _inventoryRepo
+                .GetAllInventoryAsync();
+        }
     }
 }

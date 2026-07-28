@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
-import axios from 'axios'
-import { getAllPeriods } from '../../api/PeriodApi'
-import { getAllShifts } from '../../api/ShiftApi'
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { getAllPeriods } from '../../api/PeriodApi';
+import { getAllShifts } from '../../api/ShiftApi';
 import {
   getFinalScheduleByPeriod
-} from '../../api/StaffRegistrationApi'
+} from '../../api/StaffRegistrationApi';
+import {
+  getScheduleUserName,
+  isManagerScheduleRow
+} from '../../utils/scheduleRoleUtils';
 
 const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -76,6 +80,8 @@ export function UnifiedScheduleTab({ user }) {
       try {
         const allPeriods = await getAllPeriods()
 
+        const today = getVietnamDateString()
+
         const branchPeriods = (allPeriods || [])
           .filter((period) => {
             return String(period.branchId) === String(user.branchId)
@@ -94,7 +100,49 @@ export function UnifiedScheduleTab({ user }) {
             ].includes(status)
           })
           .sort((first, second) => {
-            return new Date(second.startDate) - new Date(first.startDate)
+            const firstStart =
+              String(first.startDate || '').slice(0, 10)
+
+            const firstEnd =
+              String(first.endDate || '').slice(0, 10)
+
+            const secondStart =
+              String(second.startDate || '').slice(0, 10)
+
+            const secondEnd =
+              String(second.endDate || '').slice(0, 10)
+
+            const firstIsCurrent =
+              firstStart <= today &&
+              today <= firstEnd
+
+            const secondIsCurrent =
+              secondStart <= today &&
+              today <= secondEnd
+
+            // Tuần đang diễn ra luôn nằm đầu dropdown.
+            if (firstIsCurrent !== secondIsCurrent) {
+              return firstIsCurrent ? -1 : 1
+            }
+
+            const firstIsFuture =
+              firstStart > today
+
+            const secondIsFuture =
+              secondStart > today
+
+            // Các tuần tương lai: tuần gần nhất nằm trước.
+            if (firstIsFuture && secondIsFuture) {
+              return firstStart.localeCompare(secondStart)
+            }
+
+            // Tuần tương lai nằm trước các tuần đã qua.
+            if (firstIsFuture !== secondIsFuture) {
+              return firstIsFuture ? -1 : 1
+            }
+
+            // Các tuần đã qua: tuần gần nhất nằm trước.
+            return secondStart.localeCompare(firstStart)
           })
 
         if (!isMounted) return
@@ -111,15 +159,35 @@ export function UnifiedScheduleTab({ user }) {
             return currentId
           }
 
+          /**
+ * Tìm đợt đang diễn ra theo ngày hiện tại.
+ */
+          const currentPeriod = branchPeriods.find((period) => {
+            const startDate =
+              String(period.startDate || '').slice(0, 10)
+
+            const endDate =
+              String(period.endDate || '').slice(0, 10)
+
+            return (
+              startDate <= today &&
+              today <= endDate
+            )
+          })
+
           const openPeriod = branchPeriods.find(
             isPeriodOpenForRegistration
           )
 
           const publishedPeriod = branchPeriods.find((period) => {
-            return String(period.status || '').toUpperCase() === 'PUBLISHED'
+            return (
+              String(period.status || '').toUpperCase() ===
+              'PUBLISHED'
+            )
           })
 
           const firstPeriod =
+            currentPeriod ||
             openPeriod ||
             publishedPeriod ||
             branchPeriods[0]
@@ -369,59 +437,51 @@ function PublishedScheduleView({ period, user }) {
   const [dates, setDates] = useState([]);
   const [loading, setLoading] = useState(true);
 
- useEffect(() => {
-  async function loadBoard() {
-    setLoading(true)
-
-    try {
-      const [scheduleRows, shiftRes, configRes] =
-        await Promise.all([
+  useEffect(() => {
+    async function loadBoard() {
+      setLoading(true);
+      try {
+        // Lịch đã công bố phải lấy từ bảng lịch làm chính thức.
+        const [scheduleRows, shiftRows, configRes] = await Promise.all([
           getFinalScheduleByPeriod(period.id),
           getAllShifts(),
           axios.get('/api/BranchShiftConfig'),
-        ])
+        ]);
 
-      setRegistrations(
-        Array.isArray(scheduleRows)
-          ? scheduleRows
-          : []
-      )
+        // Danh sách lịch chính thức đã gồm Manager và Staff.
+        setRegistrations(
+          Array.isArray(scheduleRows)
+            ? scheduleRows
+            : []
+        );
 
-      const branchShifts = (shiftRes || []).filter((shift) => {
-        return String(shift.branchId) === String(user.branchId)
-      })
+        const branchShifts = (shiftRows || []).filter((shift) => {
+          return String(shift.branchId) === String(user.branchId);
+        });
 
-      const branchShiftIds = new Set(
-        branchShifts.map((shift) => shift.id)
-      )
+        const branchShiftIds = new Set(
+          branchShifts.map((shift) => shift.id)
+        );
 
-      setShifts(branchShifts)
+        setShifts(branchShifts);
+        setShiftConfigs(
+          (configRes.data || []).filter((config) => {
+            return branchShiftIds.has(config.shiftId);
+          })
+        );
 
-      setShiftConfigs(
-        (configRes.data || []).filter((config) => {
-          return branchShiftIds.has(config.shiftId)
-        })
-      )
-
-      const dArray = []
-      let curr = new Date(period.startDate)
-      const end = new Date(period.endDate)
-
-      while (curr <= end) {
-        dArray.push(new Date(curr))
-        curr.setDate(curr.getDate() + 1)
-      }
-
-      setDates(dArray)
-    } catch (error) {
-      console.error('Lỗi tải lịch chính thức:', error)
-    } finally {
-      setLoading(false)
+        const dArray = [];
+        let curr = new Date(period.startDate);
+        const end = new Date(period.endDate);
+        while (curr <= end) {
+          dArray.push(new Date(curr));
+          curr.setDate(curr.getDate() + 1);
+        }
+        setDates(dArray);
+      } catch (e) { console.error("Lỗi:", e); } finally { setLoading(false); }
     }
-  }
-
-  loadBoard()
-}, [period.id, user.branchId])
+    loadBoard();
+  }, [period.id, user.branchId]);
 
   function toDateString(dateObj) {
     const offset = dateObj.getTimezoneOffset();
@@ -439,19 +499,27 @@ function PublishedScheduleView({ period, user }) {
       return (
         item.shiftId === shiftId &&
         String(item.dayOfWeek).toLowerCase() ===
-          dayName.toLowerCase()
+        dayName.toLowerCase()
       );
     });
 
     return Number(config?.maxStaff ?? 0) > 0;
   }
 
+  // Tạo ma trận lịch chính thức theo ngày và ca.
   const boardMatrix = {};
-  dates.forEach(dObj => {
-    const dStr = toDateString(dObj);
-    boardMatrix[dStr] = {};
-    shifts.forEach(s => {
-      boardMatrix[dStr][s.id] = registrations.filter(r => r.workDate.slice(0, 10) === dStr && r.shiftId === s.id);
+
+  dates.forEach((dateObj) => {
+    const dateString = toDateString(dateObj);
+    boardMatrix[dateString] = {};
+
+    shifts.forEach((shift) => {
+      boardMatrix[dateString][shift.id] = registrations.filter((row) => {
+        return (
+          row.workDate?.slice(0, 10) === dateString &&
+          Number(row.shiftId) === Number(shift.id)
+        );
+      });
     });
   });
 
@@ -489,43 +557,96 @@ function PublishedScheduleView({ period, user }) {
                     <small>{shortDate}</small>
                   </td>
 
-                  {shifts.map(shift => {
-                    const cellRegs = boardMatrix[dStr][shift.id] || [];
+                  {shifts.map((shift) => {
+                    const cellRows = boardMatrix[dStr][shift.id] || [];
                     const isShiftOpen = isShiftOpenOnDate(
                       shift.id,
                       dateObj
                     );
 
+                    // Manager vẫn nằm trong lịch chính thức để chiếm một slot.
+                    const managerRow = cellRows.find(isManagerScheduleRow);
+
+                    // Chỉ loại Manager khỏi danh sách Staff khi hiển thị.
+                    const staffRows = cellRows.filter(
+                      (row) => !isManagerScheduleRow(row)
+                    );
+
+                    const managerName = managerRow
+                      ? getScheduleUserName(managerRow)
+                      : 'Quản lý ca';
+
                     return (
                       <td key={shift.id}>
                         {isShiftOpen ? (
-                          <div className="sd-reg-card" style={{ background: '#ffedd5', borderColor: '#fdba74', color: '#9a3412' }}>
-                            <span className="sd-reg-name"> Quản lý ca</span>
-                          </div>
+                          <>
+                            {/* Manager được hiển thị đúng một lần */}
+                            <div
+                              className="sd-reg-card"
+                              style={{
+                                background: '#ffedd5',
+                                borderColor: '#fdba74',
+                                color: '#9a3412'
+                              }}
+                            >
+                              <span
+                                className="sd-reg-name"
+                                title={managerName}
+                              >
+                                {managerName}
+                              </span>
+
+                              <span
+                                style={{
+                                  marginLeft: 6,
+                                  fontSize: 11,
+                                  fontWeight: 500
+                                }}
+                              >
+                                Quản lý
+                              </span>
+                            </div>
+
+                            {/* Danh sách bên dưới chỉ còn Staff */}
+                            {staffRows.map((row) => {
+                              const staffName = getScheduleUserName(row);
+                              const isMe =
+                                String(row.userId) === String(user.id);
+
+                              return (
+                                <div
+                                  key={row.id}
+                                  className="sd-reg-card"
+                                  style={{
+                                    background: isMe ? '#dbeafe' : '#f8fafc',
+                                    borderColor: isMe ? '#93c5fd' : '#e2e8f0',
+                                    color: isMe ? '#1e3a8a' : '#475569',
+                                    fontWeight: isMe ? 700 : 500
+                                  }}
+                                >
+                                  <span
+                                    className="sd-reg-name"
+                                    title={staffName}
+                                  >
+                                    {staffName}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </>
                         ) : (
-                          <div style={{ textAlign: 'center', padding: '16px 0', color: '#cbd5e1', fontSize: 12, fontWeight: 600 }}>
+                          <div
+                            style={{
+                              textAlign: 'center',
+                              padding: '16px 0',
+                              color: '#cbd5e1',
+                              fontSize: 12,
+                              fontWeight: 600
+                            }}
+                          >
                             KHÔNG CÓ CA LÀM
                           </div>
                         )}
-
-                        {cellRegs.map(r => {
-                          const staffName = r.user?.fullName || r.user?.username || 'Nhân viên';
-                          const isMe = r.userId === user.id;
-                          return (
-                            <div
-                              key={r.id}
-                              className="sd-reg-card"
-                              style={{
-                                background: isMe ? '#dbeafe' : '#f8fafc',
-                                borderColor: isMe ? '#93c5fd' : '#e2e8f0',
-                                color: isMe ? '#1e3a8a' : '#475569',
-                                fontWeight: isMe ? 700 : 500
-                              }}
-                            >
-                              <span className="sd-reg-name" title={staffName}>{isMe ? ' ' + staffName : staffName}</span>
-                            </div>
-                          );
-                        })}
                       </td>
                     );
                   })}
@@ -797,25 +918,25 @@ function RegistrationView({ period, user }) {
       const dbMap = {}
       const initRegs = {}
 
-      ;(regRes.data || [])
-        .filter((registration) => {
-          return !isRejectedStatus(registration.status)
-        })
-        .forEach((r) => {
-          const dStr = r.workDate.slice(0, 10)
+        ; (regRes.data || [])
+          .filter((registration) => {
+            return !isRejectedStatus(registration.status)
+          })
+          .forEach((r) => {
+            const dStr = r.workDate.slice(0, 10)
 
-          if (!dbMap[dStr]) {
-            dbMap[dStr] = {}
-            initRegs[dStr] = {}
-          }
+            if (!dbMap[dStr]) {
+              dbMap[dStr] = {}
+              initRegs[dStr] = {}
+            }
 
-          dbMap[dStr][r.shiftId] = {
-            id: r.id,
-            status: r.status
-          }
+            dbMap[dStr][r.shiftId] = {
+              id: r.id,
+              status: r.status
+            }
 
-          initRegs[dStr][r.shiftId] = true
-        })
+            initRegs[dStr][r.shiftId] = true
+          })
 
       setDbRegistrations(dbMap)
       setRegistered(initRegs)
@@ -858,11 +979,10 @@ function RegistrationView({ period, user }) {
         <h2 style={{ color: '#ea580c', margin: '0 0 4px' }}>Đăng ký ca làm việc</h2>
         {isLocked && (
           <div
-            className={`sd-period-message ${
-              isOverdue
+            className={`sd-period-message ${isOverdue
                 ? 'sd-period-message--overdue'
                 : 'sd-period-message--locked'
-            }`}
+              }`}
           >
             <strong>
               {isOverdue
@@ -894,199 +1014,196 @@ function RegistrationView({ period, user }) {
 
 
 
-     {shifts.length > 0 && dates.length > 0 && (
-  <div className="sd-board-wrap" style={{ borderRadius: 12 }}>
-    <table className="sd-schedule-board sd-registration-board">
-      <thead>
-        <tr>
-          <th style={{ width: 90 }}>NGÀY</th>
+      {shifts.length > 0 && dates.length > 0 && (
+        <div className="sd-board-wrap" style={{ borderRadius: 12 }}>
+          <table className="sd-schedule-board sd-registration-board">
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>NGÀY</th>
 
-          {shifts.map((s) => (
-            <th key={s.id}>
-              {s.shiftName}
-              <br />
-              <span style={{ fontWeight: 500, fontSize: 11 }}>
-                {s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}
-              </span>
-            </th>
-          ))}
-        </tr>
-      </thead>
+                {shifts.map((s) => (
+                  <th key={s.id}>
+                    {s.shiftName}
+                    <br />
+                    <span style={{ fontWeight: 500, fontSize: 11 }}>
+                      {s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
 
-      <tbody>
-        {dates.map((dateObj) => {
-          const dateStr = toDateString(dateObj);
-          const dayOfWeek = DAY_NAMES[dateObj.getDay()];
-          const shortDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
-
-          return (
-            <tr key={dateStr}>
-              <td className="sd-board-date-col">
-                <strong>{dayOfWeek}</strong>
-                <small>{shortDate}</small>
-              </td>
-
-              {shifts.map((shift) => {
-                const isOn = registered[dateStr]?.[shift.id] || false;
-                const dbItem = dbRegistrations[dateStr]?.[shift.id];
-
-                const isCellLocked =
-                  isLocked ||
-                  (
-                    dbItem &&
-                    dbItem.status !== 'REGISTERED' &&
-                    dbItem.status !== 'Chờ Duyệt'
-                  );
-
-                const totalMaxStaff = getTotalMaxStaffForShiftDate(shift.id, dateObj);
-                const staffSlot = getStaffSlotForShiftDate(shift.id, dateObj);
-                const hasSavedRegistration = Boolean(dbItem);
-                const isPendingCancel = hasSavedRegistration && !isOn;
-
-                // Chỉ khóa vì đầy chỗ khi người dùng chưa có đăng ký trong ca.
-                // Nếu vừa bỏ chọn ca đã lưu, vẫn cho phép bấm lại để hoàn tác trước khi lưu.
-                const isFull =
-                  !isOn &&
-                  !hasSavedRegistration &&
-                  isShiftFull(dateStr, shift.id, dateObj);
-
-                const savedStaffList = allRegistrations.filter((item) => {
-                  return (
-                    item.workDate?.slice(0, 10) === dateStr &&
-                    item.shiftId === shift.id &&
-                    !isRejectedStatus(item.status)
-                  );
-                });
-
-                const hasMeInSavedList = savedStaffList.some(
-                  (item) => String(item.userId) === String(user.id)
-                );
-
-                // Khi người dùng bỏ chọn, ẩn tên khỏi ô ngay lập tức.
-                // Bản ghi trong CSDL chỉ bị hủy sau khi bấm "Xác nhận lưu thay đổi".
-                const displayStaffList = savedStaffList
-                  .filter((item) => {
-                    const isMe =
-                      String(item.userId) === String(user.id);
-
-                    return !isMe || isOn;
-                  })
-                  .map((item) => {
-                    const isMe =
-                      String(item.userId) === String(user.id);
-
-                    return {
-                      id: item.id,
-                      name: isMe
-                        ? user.fullName || 'Bạn'
-                        : item.user?.fullName ||
-                          item.user?.username ||
-                          'Nhân viên',
-                      isMe,
-                      isPending: false,
-                    };
-                  });
-
-                if (isOn && !hasMeInSavedList) {
-                  displayStaffList.push({
-                    id: `new-${dateStr}-${shift.id}`,
-                    name: user.fullName || 'Bạn',
-                    isMe: true,
-                    isPending: true,
-                  });
-                }
-
-                const emptySlotCount = Math.max(staffSlot - displayStaffList.length, 0);
+            <tbody>
+              {dates.map((dateObj) => {
+                const dateStr = toDateString(dateObj);
+                const dayOfWeek = DAY_NAMES[dateObj.getDay()];
+                const shortDate = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
 
                 return (
-                  <td key={shift.id} className="sd-registration-cell">
-                    <button
-                      className={`sd-shift-cell-v sd-shift-cell-slots ${
-                        isOn ? 'selected' : ''
-                      } ${
-                        isPendingCancel ? 'pending-cancel' : ''
-                      } ${
-                        (isFull || isCellLocked) ? 'disabled' : ''
-                      }`}
-                      onClick={() => toggle(dateStr, shift.id, dateObj)}
-                      type="button"
-                      disabled={isCellLocked || isFull}
-                      aria-pressed={isOn}
-                      title={
-                        isPendingCancel
-                          ? 'Ca này đã được bỏ chọn. Bấm lại để hoàn tác hoặc lưu thay đổi để hủy ca.'
-                          : isOn
-                            ? 'Ca đang được chọn. Bấm để bỏ chọn.'
-                            : 'Bấm để chọn ca.'
+                  <tr key={dateStr}>
+                    <td className="sd-board-date-col">
+                      <strong>{dayOfWeek}</strong>
+                      <small>{shortDate}</small>
+                    </td>
+
+                    {shifts.map((shift) => {
+                      const isOn = registered[dateStr]?.[shift.id] || false;
+                      const dbItem = dbRegistrations[dateStr]?.[shift.id];
+
+                      const isCellLocked =
+                        isLocked ||
+                        (
+                          dbItem &&
+                          dbItem.status !== 'REGISTERED' &&
+                          dbItem.status !== 'Chờ Duyệt'
+                        );
+
+                      const totalMaxStaff = getTotalMaxStaffForShiftDate(shift.id, dateObj);
+                      const staffSlot = getStaffSlotForShiftDate(shift.id, dateObj);
+                      const hasSavedRegistration = Boolean(dbItem);
+                      const isPendingCancel = hasSavedRegistration && !isOn;
+
+                      // Chỉ khóa vì đầy chỗ khi người dùng chưa có đăng ký trong ca.
+                      // Nếu vừa bỏ chọn ca đã lưu, vẫn cho phép bấm lại để hoàn tác trước khi lưu.
+                      const isFull =
+                        !isOn &&
+                        !hasSavedRegistration &&
+                        isShiftFull(dateStr, shift.id, dateObj);
+
+                      const savedStaffList = allRegistrations.filter((item) => {
+                        return (
+                          item.workDate?.slice(0, 10) === dateStr &&
+                          item.shiftId === shift.id &&
+                          !isRejectedStatus(item.status)
+                        );
+                      });
+
+                      const hasMeInSavedList = savedStaffList.some(
+                        (item) => String(item.userId) === String(user.id)
+                      );
+
+                      // Khi người dùng bỏ chọn, ẩn tên khỏi ô ngay lập tức.
+                      // Bản ghi trong CSDL chỉ bị hủy sau khi bấm "Xác nhận lưu thay đổi".
+                      const displayStaffList = savedStaffList
+                        .filter((item) => {
+                          const isMe =
+                            String(item.userId) === String(user.id);
+
+                          return !isMe || isOn;
+                        })
+                        .map((item) => {
+                          const isMe =
+                            String(item.userId) === String(user.id);
+
+                          return {
+                            id: item.id,
+                            name: isMe
+                              ? user.fullName || 'Bạn'
+                              : item.user?.fullName ||
+                              item.user?.username ||
+                              'Nhân viên',
+                            isMe,
+                            isPending: false,
+                          };
+                        });
+
+                      if (isOn && !hasMeInSavedList) {
+                        displayStaffList.push({
+                          id: `new-${dateStr}-${shift.id}`,
+                          name: user.fullName || 'Bạn',
+                          isMe: true,
+                          isPending: true,
+                        });
                       }
-                    >
-                      <div className="sd-slot-list">
-                        {totalMaxStaff > 0 && (
-                          <div className="sd-slot-person sd-slot-manager">
-                            <span className="sd-slot-name">Quản lý</span>
-                          </div>
-                        )}
 
-                        {displayStaffList.map((staff) => (
-                          <div
-                            key={staff.id}
-                            className={`sd-slot-person ${staff.isMe ? 'sd-slot-me' : 'sd-slot-staff'}`}
+                      const emptySlotCount = Math.max(staffSlot - displayStaffList.length, 0);
+
+                      return (
+                        <td key={shift.id} className="sd-registration-cell">
+                          <button
+                            className={`sd-shift-cell-v sd-shift-cell-slots ${isOn ? 'selected' : ''
+                              } ${isPendingCancel ? 'pending-cancel' : ''
+                              } ${(isFull || isCellLocked) ? 'disabled' : ''
+                              }`}
+                            onClick={() => toggle(dateStr, shift.id, dateObj)}
+                            type="button"
+                            disabled={isCellLocked || isFull}
+                            aria-pressed={isOn}
+                            title={
+                              isPendingCancel
+                                ? 'Ca này đã được bỏ chọn. Bấm lại để hoàn tác hoặc lưu thay đổi để hủy ca.'
+                                : isOn
+                                  ? 'Ca đang được chọn. Bấm để bỏ chọn.'
+                                  : 'Bấm để chọn ca.'
+                            }
                           >
-                            <span className="sd-slot-name">
-                              {staff.name}
-                            </span>
+                            <div className="sd-slot-list">
+                              {totalMaxStaff > 0 && (
+                                <div className="sd-slot-person sd-slot-manager">
+                                  <span className="sd-slot-name">Quản lý</span>
+                                </div>
+                              )}
 
-                            {staff.isPending ? (
-                              <span className="sd-slot-pending">
-                                Chưa lưu
-                              </span>
-                            ) : staff.isMe ? (
-                              <span className="sd-slot-saved">
-                                Đã đăng ký
-                              </span>
-                            ) : null}
-                          </div>
-                        ))}
+                              {displayStaffList.map((staff) => (
+                                <div
+                                  key={staff.id}
+                                  className={`sd-slot-person ${staff.isMe ? 'sd-slot-me' : 'sd-slot-staff'}`}
+                                >
+                                  <span className="sd-slot-name">
+                                    {staff.name}
+                                  </span>
 
-                        {isPendingCancel && (
-                          <div className="sd-slot-cancel-pending">
-                            <span>Đã bỏ chọn</span>
-                            <small>Chưa lưu</small>
-                          </div>
-                        )}
+                                  {staff.isPending ? (
+                                    <span className="sd-slot-pending">
+                                      Chưa lưu
+                                    </span>
+                                  ) : staff.isMe ? (
+                                    <span className="sd-slot-saved">
+                                      Đã đăng ký
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ))}
 
-                        {Array.from({ length: emptySlotCount }).map((_, index) => (
-                          <div
-                            key={`empty-${dateStr}-${shift.id}-${index}`}
-                            className="sd-slot-empty"
-                          >
-                            Còn trống
-                          </div>
-                        ))}
+                              {isPendingCancel && (
+                                <div className="sd-slot-cancel-pending">
+                                  <span>Đã bỏ chọn</span>
+                                  <small>Chưa lưu</small>
+                                </div>
+                              )}
 
-                        {staffSlot <= 0 && (
-                          <div className="sd-slot-empty">
-                            Không có slot nhân viên
-                          </div>
-                        )}
+                              {Array.from({ length: emptySlotCount }).map((_, index) => (
+                                <div
+                                  key={`empty-${dateStr}-${shift.id}-${index}`}
+                                  className="sd-slot-empty"
+                                >
+                                  Còn trống
+                                </div>
+                              ))}
 
-                        {isFull && (
-                          <div className="sd-slot-full-text">
-                            Ca đã đủ người
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  </td>
+                              {staffSlot <= 0 && (
+                                <div className="sd-slot-empty">
+                                  Không có slot nhân viên
+                                </div>
+                              )}
+
+                              {isFull && (
+                                <div className="sd-slot-full-text">
+                                  Ca đã đủ người
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
                 );
               })}
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  </div>
-)}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="sd-shift-actions">
         <button className="sd-btn-ghost" onClick={handleReset} type="button" disabled={totalChanges === 0}>Hoàn tác thay đổi</button>

@@ -134,11 +134,18 @@ builder.Services.AddScoped<SupplierService>();
 builder.Services.AddScoped<InventoryRepo>();
 builder.Services.AddScoped<InventoryService>();
 
+builder.Services.AddScoped<KhoImportRepo>();
 builder.Services.AddScoped<KhoImportService>();
+
+builder.Services.AddScoped<KhoExportRepo>();
 builder.Services.AddScoped<KhoExportService>();
 
-// Tồn quầy và báo cáo kết ca
+// Tồn quầy
 builder.Services.AddScoped<FrontStockRepo>();
+builder.Services.AddScoped<FrontStockService>();
+
+// Báo cáo kết ca
+builder.Services.AddScoped<ShiftClosingRepo>();
 builder.Services.AddScoped<ShiftClosingService>();
 
 // Quên checkout

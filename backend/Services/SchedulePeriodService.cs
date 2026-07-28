@@ -224,4 +224,16 @@ public class SchedulePeriodService
 
         await _repo.Delete(id);
     }
+
+    // Worker gọi phương thức này để tự động khóa
+    // các đợt OPEN đã đến ngày bắt đầu.
+    public async Task<int> CloseExpiredOpenPeriodsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var today = GetVietnamToday();
+
+        return await _repo.CloseExpiredOpenPeriodsAsync(
+            today,
+            cancellationToken);
+    }
 }

@@ -1,432 +1,794 @@
 using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.DTOs;
-using Microsoft.EntityFrameworkCore;
+using LuanVanTotNghiep.Repositories;
 
 namespace LuanVanTotNghiep.Services
 {
-    
+    /// <summary>
+    /// Xử lý nghiệp vụ xuất hàng
+    /// từ kho chi nhánh ra quầy.
+    ///
+    /// Service chịu trách nhiệm:
+    /// - Kiểm tra người thực hiện.
+    /// - Kiểm tra lịch làm chính thức.
+    /// - Kiểm tra khung giờ được phép xuất.
+    /// - Kiểm tra số lượng tồn kho.
+    /// - Điều phối tạo phiếu và cập nhật tồn kho.
+    ///
+    /// Luồng xử lý:
+    /// Controller -> Service -> Repository -> Database.
+    /// </summary>
     public class KhoExportService
     {
+        /// <summary>
+        /// Cho phép chuẩn bị hàng trước giờ bắt đầu ca
+        /// tối đa 60 phút.
+        /// </summary>
         private const int ExportPreparationMinutes = 60;
-        private readonly AppDbContext _context;
 
-        public KhoExportService(AppDbContext context)
+        private readonly KhoExportRepo _exportRepo;
+
+        /// <summary>
+        /// Nhận KhoExportRepo thông qua
+        /// Dependency Injection.
+        /// </summary>
+        public KhoExportService(
+            KhoExportRepo exportRepo)
         {
-            _context = context;
+            _exportRepo = exportRepo;
         }
 
-        public async Task<List<ExportScheduleOptionDto>> GetTodayExportSchedulesAsync(int managerId)
+        /// <summary>
+        /// Lấy các ca làm trong ngày hiện tại
+        /// mà Manager có thể chọn để xuất hàng.
+        /// </summary>
+        public async Task<List<ExportScheduleOptionDto>>
+            GetTodayExportSchedulesAsync(
+                int managerId)
         {
-            var manager = await _context.NsUsers
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Id == managerId);
+            if (managerId <= 0)
+            {
+                throw new InvalidOperationException(
+                    "Không tìm thấy thông tin quản lý."
+                );
+            }
+
+            // Tìm tài khoản và vai trò của người dùng.
+            var manager =
+                await _exportRepo.GetUserByIdAsync(
+                    managerId
+                );
 
             if (manager == null)
-                throw new InvalidOperationException("Không tìm thấy tài khoản quản lý.");
+            {
+                throw new InvalidOperationException(
+                    "Không tìm thấy tài khoản quản lý."
+                );
+            }
 
-            var roleName = manager.Role?.RoleName?.ToUpperInvariant() ?? "";
+            // Chỉ Manager mới được xuất hàng ra quầy.
+            var roleName =
+                manager.Role?.RoleName
+                    ?.Trim()
+                    .ToUpperInvariant() ??
+                string.Empty;
+
             var isManager =
                 roleName == "MANAGER" ||
                 roleName.Contains("QUẢN LÝ") ||
                 roleName.Contains("QUAN LY");
 
             if (!isManager)
-                throw new InvalidOperationException("Chỉ quản lý chi nhánh mới được xuất hàng ra quầy.");
+            {
+                throw new InvalidOperationException(
+                    "Chỉ quản lý chi nhánh mới được xuất hàng ra quầy."
+                );
+            }
 
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var now = DateTime.Now.TimeOfDay;
+            // Manager phải được gán vào một chi nhánh.
+            if (
+                !manager.BranchId.HasValue ||
+                manager.BranchId.Value <= 0
+            )
+            {
+                throw new InvalidOperationException(
+                    "Tài khoản quản lý chưa được gán chi nhánh."
+                );
+            }
 
-            var schedules = await _context.CaFinalSchedules
-                .AsNoTracking()
-                .Include(s => s.Shift)
-                .Where(s => s.UserId == managerId)
-                .ToListAsync();
+            var today =
+                DateOnly.FromDateTime(
+                    DateTime.Today
+                );
+
+            var now =
+                DateTime.Now.TimeOfDay;
+
+            // Lấy lịch làm chính thức của Manager.
+            var schedules =
+                await _exportRepo
+                    .GetSchedulesByUserIdAsync(
+                        managerId
+                    );
 
             return schedules
-                .Where(s => ToDateOnly(s.WorkDate) == today)
-                .Where(s => s.Shift != null)
-                .Where(s => s.Shift.BranchId == manager.BranchId)
-                .Select(s =>
+                // Chỉ lấy lịch làm trong ngày hiện tại.
+                .Where(schedule =>
+                    ToDateOnly(schedule.WorkDate) ==
+                    today
+                )
+
+                // Lịch phải có thông tin ca.
+                .Where(schedule =>
+                    schedule.Shift != null
+                )
+
+                // Ca phải thuộc đúng chi nhánh
+                // của Manager.
+                .Where(schedule =>
+                    schedule.Shift!.BranchId ==
+                    manager.BranchId.Value
+                )
+
+                .Select(schedule =>
                 {
-                    var startTime = ToTimeSpan(s.Shift!.StartTime);
-var endTime = ToTimeSpan(s.Shift.EndTime);
+                    var shift = schedule.Shift!;
 
-var isInShift = IsNowInShift(now, startTime, endTime);
-var canExportNow = IsNowInExportWindow(now, startTime, endTime);
+                    var startTime =
+                        ToTimeSpan(
+                            shift.StartTime
+                        );
 
-return new ExportScheduleOptionDto
-{
-    ScheduleId = s.Id,
-    ShiftId = s.ShiftId,
-    ShiftName = s.Shift.ShiftName ?? $"Ca #{s.ShiftId}",
-    WorkDate = today.ToString("yyyy-MM-dd"),
-    StartTime = FormatTime(startTime),
-    EndTime = FormatTime(endTime),
-    CanExportNow = canExportNow,
-    StatusLabel = isInShift
-        ? "Đang trong ca"
-        : canExportNow
-            ? $"Chuẩn bị trước ca {ExportPreparationMinutes} phút"
-            : "Ngoài giờ ca"
-};
+                    var endTime =
+                        ToTimeSpan(
+                            shift.EndTime
+                        );
+
+                    var isInShift =
+                        IsNowInShift(
+                            now,
+                            startTime,
+                            endTime
+                        );
+
+                    var canExportNow =
+                        IsNowInExportWindow(
+                            now,
+                            startTime,
+                            endTime
+                        );
+
+                    return new ExportScheduleOptionDto
+                    {
+                        ScheduleId =
+                            schedule.Id,
+
+                        ShiftId =
+                            schedule.ShiftId,
+
+                        ShiftName =
+                            shift.ShiftName ??
+                            $"Ca #{schedule.ShiftId}",
+
+                        WorkDate =
+                            today.ToString(
+                                "yyyy-MM-dd"
+                            ),
+
+                        StartTime =
+                            FormatTime(startTime),
+
+                        EndTime =
+                            FormatTime(endTime),
+
+                        CanExportNow =
+                            canExportNow,
+
+                        StatusLabel =
+                            isInShift
+                                ? "Đang trong ca"
+                                : canExportNow
+                                    ? $"Chuẩn bị trước ca {ExportPreparationMinutes} phút"
+                                    : "Ngoài giờ ca"
+                    };
                 })
-                .OrderBy(s => s.StartTime)
+
+                // Chuỗi thời gian có dạng HH:mm
+                // nên có thể sắp xếp trực tiếp.
+                .OrderBy(schedule =>
+                    schedule.StartTime
+                )
                 .ToList();
         }
 
-        public async Task<int> CreateExportTicketAsync(CreateExportTicketDto dto)
+        /// <summary>
+        /// Tạo phiếu xuất hàng từ kho chi nhánh
+        /// ra tồn quầy.
+        ///
+        /// Khi thành công:
+        /// - Tạo phiếu xuất.
+        /// - Tạo chi tiết phiếu.
+        /// - Trừ số lượng trong kho.
+        /// - Cộng số lượng vào tồn quầy.
+        /// </summary>
+        public async Task<int>
+            CreateExportTicketAsync(
+                CreateExportTicketDto dto)
         {
+            // Kiểm tra người thực hiện.
             if (dto.ManagerId <= 0)
-                throw new InvalidOperationException("Không tìm thấy thông tin quản lý.");
+            {
+                throw new InvalidOperationException(
+                    "Không tìm thấy thông tin quản lý."
+                );
+            }
 
+            // Kiểm tra chi nhánh xuất hàng.
             if (dto.BranchId <= 0)
-                throw new InvalidOperationException("Không tìm thấy thông tin chi nhánh.");
+            {
+                throw new InvalidOperationException(
+                    "Không tìm thấy thông tin chi nhánh."
+                );
+            }
 
-            if (!dto.ScheduleId.HasValue || dto.ScheduleId.Value <= 0)
-                throw new InvalidOperationException("Vui lòng chọn ca làm cần xuất hàng ra quầy.");
+            // Bắt buộc chọn lịch làm chính thức.
+            if (
+                !dto.ScheduleId.HasValue ||
+                dto.ScheduleId.Value <= 0
+            )
+            {
+                throw new InvalidOperationException(
+                    "Vui lòng chọn ca làm cần xuất hàng ra quầy."
+                );
+            }
 
-            if (dto.Items == null || dto.Items.Count == 0)
-                throw new InvalidOperationException("Phiếu xuất không có sản phẩm nào.");
+            // Phiếu phải có ít nhất một sản phẩm.
+            if (
+                dto.Items == null ||
+                dto.Items.Count == 0
+            )
+            {
+                throw new InvalidOperationException(
+                    "Phiếu xuất không có sản phẩm nào."
+                );
+            }
 
-            var manager = await GetValidManagerAsync(dto.ManagerId, dto.BranchId);
+            // Kiểm tra Manager và chi nhánh.
+            var manager =
+                await GetValidManagerAsync(
+                    dto.ManagerId,
+                    dto.BranchId
+                );
 
-            await ValidateScheduleForExportAsync(dto, manager);
+            // Kiểm tra lịch làm và khung giờ.
+            await ValidateScheduleForExportAsync(
+                dto,
+                manager
+            );
 
+            // Loại bỏ dòng không hợp lệ
+            // và gộp sản phẩm bị lặp.
             var validItems = dto.Items
-                .Where(i => i.ProductId > 0 && i.Quantity > 0)
-                .GroupBy(i => i.ProductId)
-                .Select(g => new ExportItemDto
-                {
-                    ProductId = g.Key,
-                    Quantity = g.Sum(x => x.Quantity)
-                })
+                .Where(item =>
+                    item.ProductId > 0 &&
+                    item.Quantity > 0
+                )
+                .GroupBy(item =>
+                    item.ProductId
+                )
+                .Select(group =>
+                    new ExportItemDto
+                    {
+                        ProductId =
+                            group.Key,
+
+                        Quantity =
+                            group.Sum(item =>
+                                item.Quantity
+                            )
+                    }
+                )
                 .ToList();
 
             if (validItems.Count == 0)
-                throw new InvalidOperationException("Danh sách hàng xuất không hợp lệ.");
-
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
-            try
             {
-                var ticket = new KhoExportTicket
-                {
-                    ManagerId = dto.ManagerId,
-                    BranchId = dto.BranchId,
-                    ScheduleId = dto.ScheduleId,
-                    ExportDate = DateTime.Now,
-                    Note = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim()
-                };
+                throw new InvalidOperationException(
+                    "Danh sách hàng xuất không hợp lệ."
+                );
+            }
 
-                _context.KhoExportTickets.Add(ticket);
-                await _context.SaveChangesAsync();
-
-                foreach (var item in validItems)
-                {
-                    var product = await _context.KhoProducts
-                        .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-
-                    if (product == null)
-                        throw new InvalidOperationException($"Không tìm thấy sản phẩm có ID {item.ProductId}.");
-
-                    var inventory = await _context.KhoBranchInventories
-                        .FirstOrDefaultAsync(i =>
-                            i.BranchId == dto.BranchId &&
-                            i.ProductId == item.ProductId);
-
-                    var currentWarehouseQuantity = inventory == null
-                        ? 0
-                        : Convert.ToInt32(inventory.Quantity);
-
-                    if (inventory == null || currentWarehouseQuantity < item.Quantity)
+            // Toàn bộ thao tác tạo phiếu,
+            // trừ kho và cộng tồn quầy
+            // được thực hiện trong transaction.
+            return await _exportRepo
+                .ExecuteInTransactionAsync(
+                    async () =>
                     {
-                        throw new InvalidOperationException(
-                            $"Sản phẩm '{product.ProductName}' không đủ số lượng trong kho. " +
-                            $"Tồn hiện tại: {currentWarehouseQuantity}, cần xuất: {item.Quantity}."
-                        );
-                    }
+                        // Tạo phiếu xuất.
+                        var ticket =
+                            new KhoExportTicket
+                            {
+                                ManagerId =
+                                    dto.ManagerId,
 
-                    var detail = new KhoExportDetail
-                    {
-                        ExportId = ticket.Id,
-                        ProductId = item.ProductId,
-                        Quantity = item.Quantity
-                    };
+                                BranchId =
+                                    dto.BranchId,
 
-                    _context.KhoExportDetails.Add(detail);
+                                ScheduleId =
+                                    dto.ScheduleId,
 
-                    inventory.Quantity = currentWarehouseQuantity - item.Quantity;
+                                ExportDate =
+                                    DateTime.Now,
 
-                    var frontStock = await _context.KhoBranchFrontStocks
-                        .FirstOrDefaultAsync(f =>
-                            f.BranchId == dto.BranchId &&
-                            f.ProductId == item.ProductId);
+                                Note =
+                                    string.IsNullOrWhiteSpace(
+                                        dto.Note
+                                    )
+                                        ? null
+                                        : dto.Note.Trim()
+                            };
 
-                    if (frontStock == null)
-                    {
-                        frontStock = new KhoBranchFrontStock
+                        // Lưu phiếu trước để lấy ID.
+                        await _exportRepo
+                            .AddExportTicketAsync(
+                                ticket
+                            );
+
+                        // Xử lý từng sản phẩm.
+                        foreach (
+                            var item in validItems
+                        )
                         {
-                            BranchId = dto.BranchId,
-                            ProductId = item.ProductId,
-                            Quantity = item.Quantity
-                        };
+                            // Kiểm tra sản phẩm tồn tại.
+                            var product =
+                                await _exportRepo
+                                    .GetProductByIdAsync(
+                                        item.ProductId
+                                    );
 
-                        _context.KhoBranchFrontStocks.Add(frontStock);
+                            if (product == null)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Không tìm thấy sản phẩm có ID {item.ProductId}."
+                                );
+                            }
+
+                            // Lấy tồn kho của sản phẩm
+                            // tại chi nhánh.
+                            var inventory =
+                                await _exportRepo
+                                    .GetBranchInventoryAsync(
+                                        dto.BranchId,
+                                        item.ProductId
+                                    );
+
+                            var currentWarehouseQuantity =
+                                inventory?.Quantity ?? 0;
+
+                            // Kiểm tra đủ số lượng xuất.
+                            if (
+                                inventory == null ||
+                                currentWarehouseQuantity <
+                                item.Quantity
+                            )
+                            {
+                                throw new InvalidOperationException(
+                                    $"Sản phẩm '{product.ProductName}' không đủ số lượng trong kho. " +
+                                    $"Tồn hiện tại: {currentWarehouseQuantity}, " +
+                                    $"cần xuất: {item.Quantity}."
+                                );
+                            }
+
+                            // Tạo chi tiết phiếu xuất.
+                            var detail =
+                                new KhoExportDetail
+                                {
+                                    ExportId =
+                                        ticket.Id,
+
+                                    ProductId =
+                                        item.ProductId,
+
+                                    Quantity =
+                                        item.Quantity
+                                };
+
+                            _exportRepo.AddExportDetail(
+                                detail
+                            );
+
+                            // Trừ số lượng khỏi kho chi nhánh.
+                            inventory.Quantity =
+                                currentWarehouseQuantity -
+                                item.Quantity;
+
+                            // Tìm tồn quầy hiện tại.
+                            var frontStock =
+                                await _exportRepo
+                                    .GetBranchFrontStockAsync(
+                                        dto.BranchId,
+                                        item.ProductId
+                                    );
+
+                            if (frontStock == null)
+                            {
+                                // Chưa có dòng tồn quầy:
+                                // tạo mới.
+                                frontStock =
+                                    new KhoBranchFrontStock
+                                    {
+                                        BranchId =
+                                            dto.BranchId,
+
+                                        ProductId =
+                                            item.ProductId,
+
+                                        Quantity =
+                                            item.Quantity
+                                    };
+
+                                _exportRepo
+                                    .AddBranchFrontStock(
+                                        frontStock
+                                    );
+                            }
+                            else
+                            {
+                                // Đã có tồn quầy:
+                                // cộng thêm số lượng xuất.
+                                frontStock.Quantity =
+                                    (frontStock.Quantity ?? 0) +
+                                    item.Quantity;
+                            }
+                        }
+
+                        // Lưu chi tiết phiếu,
+                        // tồn kho và tồn quầy.
+                        await _exportRepo
+                            .SaveChangesAsync();
+
+                        return ticket.Id;
                     }
-                    else
-                    {
-                        var currentFrontQuantity = Convert.ToInt32(frontStock.Quantity);
-                        frontStock.Quantity = currentFrontQuantity + item.Quantity;
-                    }
-                }
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return ticket.Id;
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
+                );
         }
 
-        private async Task<NsUser> GetValidManagerAsync(int managerId, int branchId)
+        /// <summary>
+        /// Lấy danh sách lịch sử phiếu xuất ra quầy.
+        ///
+        /// branchId null:
+        /// lấy toàn hệ thống.
+        ///
+        /// branchId có giá trị:
+        /// chỉ lấy một chi nhánh.
+        /// </summary>
+        public async Task<
+            List<FrontStockExportTicketListDto>>
+            GetFrontStockExportTicketsAsync(
+                int? branchId)
         {
-            var manager = await _context.NsUsers
-                .Include(u => u.Role)
-                .FirstOrDefaultAsync(u => u.Id == managerId);
+            return await _exportRepo
+                .GetFrontStockExportTicketsAsync(
+                    branchId
+                );
+        }
+
+        /// <summary>
+        /// Lấy chi tiết một phiếu xuất ra quầy.
+        ///
+        /// Khi branchId có giá trị,
+        /// phiếu phải thuộc đúng chi nhánh đó.
+        /// </summary>
+        public async Task<
+            FrontStockExportTicketDetailDto?>
+            GetFrontStockExportTicketDetailAsync(
+                int ticketId,
+                int? branchId)
+        {
+            if (ticketId <= 0)
+            {
+                return null;
+            }
+
+            return await _exportRepo
+                .GetFrontStockExportTicketDetailAsync(
+                    ticketId,
+                    branchId
+                );
+        }
+
+        /// <summary>
+        /// Kiểm tra người thực hiện có phải Manager
+        /// và thuộc đúng chi nhánh hay không.
+        /// </summary>
+        private async Task<NsUser>
+            GetValidManagerAsync(
+                int managerId,
+                int branchId)
+        {
+            var manager =
+                await _exportRepo.GetUserByIdAsync(
+                    managerId
+                );
 
             if (manager == null)
-                throw new InvalidOperationException("Không tìm thấy tài khoản quản lý.");
+            {
+                throw new InvalidOperationException(
+                    "Không tìm thấy tài khoản quản lý."
+                );
+            }
 
-            var roleName = manager.Role?.RoleName?.ToUpperInvariant() ?? "";
+            var roleName =
+                manager.Role?.RoleName
+                    ?.Trim()
+                    .ToUpperInvariant() ??
+                string.Empty;
+
             var isManager =
                 roleName == "MANAGER" ||
                 roleName.Contains("QUẢN LÝ") ||
                 roleName.Contains("QUAN LY");
 
             if (!isManager)
-                throw new InvalidOperationException("Chỉ quản lý chi nhánh mới được xuất hàng ra quầy.");
+            {
+                throw new InvalidOperationException(
+                    "Chỉ quản lý chi nhánh mới được xuất hàng ra quầy."
+                );
+            }
 
-            if (manager.BranchId != branchId)
-                throw new InvalidOperationException("Quản lý không thuộc chi nhánh đang xuất kho.");
+            if (
+                !manager.BranchId.HasValue ||
+                manager.BranchId.Value <= 0
+            )
+            {
+                throw new InvalidOperationException(
+                    "Tài khoản quản lý chưa được gán chi nhánh."
+                );
+            }
+
+            if (
+                manager.BranchId.Value !=
+                branchId
+            )
+            {
+                throw new InvalidOperationException(
+                    "Quản lý không thuộc chi nhánh đang xuất kho."
+                );
+            }
 
             return manager;
         }
 
-        private async Task ValidateScheduleForExportAsync(CreateExportTicketDto dto, NsUser manager)
+        /// <summary>
+        /// Kiểm tra lịch làm được chọn có hợp lệ
+        /// và có nằm trong khung giờ xuất hàng hay không.
+        /// </summary>
+        private async Task
+            ValidateScheduleForExportAsync(
+                CreateExportTicketDto dto,
+                NsUser manager)
         {
-            var schedule = await _context.CaFinalSchedules
-                .Include(s => s.Shift)
-                .FirstOrDefaultAsync(s =>
-                    s.Id == dto.ScheduleId!.Value &&
-                    s.UserId == manager.Id);
+            var schedule =
+                await _exportRepo
+                    .GetScheduleByIdAndUserIdAsync(
+                        dto.ScheduleId!.Value,
+                        manager.Id
+                    );
 
             if (schedule == null)
-                throw new InvalidOperationException("Không tìm thấy ca làm chính thức của quản lý.");
+            {
+                throw new InvalidOperationException(
+                    "Không tìm thấy ca làm chính thức của quản lý."
+                );
+            }
 
             if (schedule.Shift == null)
-                throw new InvalidOperationException("Ca làm không hợp lệ.");
+            {
+                throw new InvalidOperationException(
+                    "Ca làm không hợp lệ."
+                );
+            }
 
-            if (schedule.Shift.BranchId != dto.BranchId)
-                throw new InvalidOperationException("Ca làm không thuộc chi nhánh đang xuất kho.");
+            if (
+                schedule.Shift.BranchId !=
+                dto.BranchId
+            )
+            {
+                throw new InvalidOperationException(
+                    "Ca làm không thuộc chi nhánh đang xuất kho."
+                );
+            }
 
-            var scheduleDate = ToDateOnly(schedule.WorkDate);
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var scheduleDate =
+                ToDateOnly(
+                    schedule.WorkDate
+                );
+
+            var today =
+                DateOnly.FromDateTime(
+                    DateTime.Today
+                );
 
             if (scheduleDate != today)
-                throw new InvalidOperationException("Chỉ được xuất hàng cho ca làm trong ngày hiện tại.");
+            {
+                throw new InvalidOperationException(
+                    "Chỉ được xuất hàng cho ca làm trong ngày hiện tại."
+                );
+            }
 
-            var now = DateTime.Now.TimeOfDay;
-            var startTime = ToTimeSpan(schedule.Shift.StartTime);
-            var endTime = ToTimeSpan(schedule.Shift.EndTime);
+            var now =
+                DateTime.Now.TimeOfDay;
 
-            if (!IsNowInExportWindow(now, startTime, endTime))
-{
-    throw new InvalidOperationException(
-        $"Chỉ được xuất hàng trong thời gian ca làm hoặc trước ca tối đa {ExportPreparationMinutes} phút. " +
-        $"Ca này diễn ra từ {FormatTime(startTime)} đến {FormatTime(endTime)}."
-    );
-}
+            var startTime =
+                ToTimeSpan(
+                    schedule.Shift.StartTime
+                );
+
+            var endTime =
+                ToTimeSpan(
+                    schedule.Shift.EndTime
+                );
+
+            if (
+                !IsNowInExportWindow(
+                    now,
+                    startTime,
+                    endTime
+                )
+            )
+            {
+                throw new InvalidOperationException(
+                    $"Chỉ được xuất hàng trong thời gian ca làm hoặc trước ca tối đa {ExportPreparationMinutes} phút. " +
+                    $"Ca này diễn ra từ {FormatTime(startTime)} đến {FormatTime(endTime)}."
+                );
+            }
         }
 
-        private static DateOnly? ToDateOnly(object? value)
+        /// <summary>
+        /// Chuyển nhiều kiểu dữ liệu ngày
+        /// về DateOnly.
+        /// </summary>
+        private static DateOnly?
+            ToDateOnly(object? value)
         {
-            if (value == null) return null;
+            if (value == null)
+            {
+                return null;
+            }
 
             if (value is DateOnly dateOnly)
+            {
                 return dateOnly;
+            }
 
             if (value is DateTime dateTime)
-                return DateOnly.FromDateTime(dateTime);
+            {
+                return DateOnly.FromDateTime(
+                    dateTime
+                );
+            }
 
-            if (DateTime.TryParse(value.ToString(), out var parsedDate))
-                return DateOnly.FromDateTime(parsedDate);
+            if (
+                DateTime.TryParse(
+                    value.ToString(),
+                    out var parsedDate
+                )
+            )
+            {
+                return DateOnly.FromDateTime(
+                    parsedDate
+                );
+            }
 
             return null;
         }
 
-        private static TimeSpan ToTimeSpan(object? value)
+        /// <summary>
+        /// Chuyển nhiều kiểu dữ liệu thời gian
+        /// về TimeSpan.
+        /// </summary>
+        private static TimeSpan
+            ToTimeSpan(object? value)
         {
-            if (value == null) return TimeSpan.Zero;
+            if (value == null)
+            {
+                return TimeSpan.Zero;
+            }
 
             if (value is TimeOnly timeOnly)
+            {
                 return timeOnly.ToTimeSpan();
+            }
 
             if (value is TimeSpan timeSpan)
+            {
                 return timeSpan;
+            }
 
             if (value is DateTime dateTime)
+            {
                 return dateTime.TimeOfDay;
+            }
 
-            if (TimeSpan.TryParse(value.ToString(), out var parsedTime))
+            if (
+                TimeSpan.TryParse(
+                    value.ToString(),
+                    out var parsedTime
+                )
+            )
+            {
                 return parsedTime;
+            }
 
             return TimeSpan.Zero;
         }
 
-        private static bool IsNowInShift(TimeSpan now, TimeSpan start, TimeSpan end)
-{
-    if (end >= start)
-    {
-        return now >= start && now <= end;
-    }
-
-    return now >= start || now <= end;
-}
-
-private static bool IsNowInExportWindow(TimeSpan now, TimeSpan start, TimeSpan end)
-{
-    var allowedStart = start.Subtract(TimeSpan.FromMinutes(ExportPreparationMinutes));
-
-    if (end >= allowedStart)
-    {
-        return now >= allowedStart && now <= end;
-    }
-
-    return now >= allowedStart || now <= end;
-}
-
-private static string FormatTime(TimeSpan time)
-{
-    return $"{time.Hours:D2}:{time.Minutes:D2}";
-}
-
-private static string FormatDateTime(object? value)
-{
-    if (value == null) return "";
-
-    if (value is DateTime dateTime)
-        return dateTime.ToString("dd/MM/yyyy HH:mm");
-
-    if (DateTime.TryParse(value.ToString(), out var parsed))
-        return parsed.ToString("dd/MM/yyyy HH:mm");
-
-    return value.ToString() ?? "";
-}
-
-private static string? FormatDate(object? value)
-{
-    if (value == null) return null;
-
-    if (value is DateOnly dateOnly)
-        return dateOnly.ToString("dd/MM/yyyy");
-
-    if (value is DateTime dateTime)
-        return dateTime.ToString("dd/MM/yyyy");
-
-    if (DateTime.TryParse(value.ToString(), out var parsed))
-        return parsed.ToString("dd/MM/yyyy");
-
-    return value.ToString();
-}
-public async Task<List<FrontStockExportTicketListDto>> GetFrontStockExportTicketsAsync(int? branchId)
-{
-    var query = _context.KhoExportTickets
-        .AsNoTracking()
-        .Include(t => t.Branch)
-        .Include(t => t.Manager)
-        .Include(t => t.Schedule)
-            .ThenInclude(s => s.Shift)
-        .Include(t => t.KhoExportDetails)
-        .AsQueryable();
-
-    if (branchId.HasValue && branchId.Value > 0)
-    {
-        query = query.Where(t => t.BranchId == branchId.Value);
-    }
-
-    var tickets = await query
-        .OrderByDescending(t => t.Id)
-        .ToListAsync();
-
-    return tickets.Select(t => new FrontStockExportTicketListDto
-    {
-        Id = t.Id,
-        BranchId = t.BranchId,
-        BranchName = t.Branch?.Name ?? "Chưa rõ cơ sở",
-        ManagerName = t.Manager?.FullName ?? "Chưa rõ người xuất",
-        ScheduleId = t.ScheduleId,
-        ShiftName = t.Schedule?.Shift?.ShiftName,
-        WorkDate = FormatDate(t.Schedule?.WorkDate),
-        ShiftTime = t.Schedule?.Shift == null
-            ? null
-            : $"{FormatTime(ToTimeSpan(t.Schedule.Shift.StartTime))} - {FormatTime(ToTimeSpan(t.Schedule.Shift.EndTime))}",
-        ExportDate = FormatDateTime(t.ExportDate),
-        TotalQuantity = t.KhoExportDetails.Sum(d => Convert.ToInt32(d.Quantity)),
-        ItemCount = t.KhoExportDetails.Count,
-        Note = t.Note
-    }).ToList();
-}
-
-public async Task<FrontStockExportTicketDetailDto?> GetFrontStockExportTicketDetailAsync(int id, int? branchId)
-{
-    var query = _context.KhoExportTickets
-        .AsNoTracking()
-        .Include(t => t.Branch)
-        .Include(t => t.Manager)
-        .Include(t => t.Schedule)
-            .ThenInclude(s => s.Shift)
-        .Include(t => t.KhoExportDetails)
-            .ThenInclude(d => d.Product)
-        .AsQueryable();
-
-    if (branchId.HasValue && branchId.Value > 0)
-    {
-        query = query.Where(t => t.BranchId == branchId.Value);
-    }
-
-    var ticket = await query.FirstOrDefaultAsync(t => t.Id == id);
-
-    if (ticket == null) return null;
-
-    return new FrontStockExportTicketDetailDto
-    {
-        Id = ticket.Id,
-        BranchId = ticket.BranchId,
-        BranchName = ticket.Branch?.Name ?? "Chưa rõ cơ sở",
-        ManagerName = ticket.Manager?.FullName ?? "Chưa rõ người xuất",
-        ScheduleId = ticket.ScheduleId,
-        ShiftName = ticket.Schedule?.Shift?.ShiftName,
-        WorkDate = FormatDate(ticket.Schedule?.WorkDate),
-        ShiftTime = ticket.Schedule?.Shift == null
-            ? null
-            : $"{FormatTime(ToTimeSpan(ticket.Schedule.Shift.StartTime))} - {FormatTime(ToTimeSpan(ticket.Schedule.Shift.EndTime))}",
-        ExportDate = FormatDateTime(ticket.ExportDate),
-        TotalQuantity = ticket.KhoExportDetails.Sum(d => Convert.ToInt32(d.Quantity)),
-        ItemCount = ticket.KhoExportDetails.Count,
-        Note = ticket.Note,
-        Items = ticket.KhoExportDetails.Select(d => new FrontStockExportTicketItemDto
+        /// <summary>
+        /// Kiểm tra thời gian hiện tại
+        /// có nằm trong ca hay không.
+        ///
+        /// Hỗ trợ cả ca qua nửa đêm.
+        /// </summary>
+        private static bool IsNowInShift(
+            TimeSpan now,
+            TimeSpan start,
+            TimeSpan end)
         {
-            ProductId = d.ProductId,
-            ProductCode = d.Product?.ProductCode,
-            ProductName = d.Product?.ProductName ?? "Chưa rõ sản phẩm",
-            Unit = d.Product?.Unit,
-            Quantity = Convert.ToInt32(d.Quantity)
-        }).ToList()
-    };
-}
+            // Ca không đi qua nửa đêm.
+            if (end >= start)
+            {
+                return
+                    now >= start &&
+                    now <= end;
+            }
+
+            // Ca đi qua nửa đêm.
+            return
+                now >= start ||
+                now <= end;
+        }
+
+        /// <summary>
+        /// Kiểm tra thời gian hiện tại có nằm trong
+        /// khung giờ được phép xuất hàng hay không.
+        ///
+        /// Khung giờ bắt đầu trước ca 60 phút
+        /// và kết thúc khi ca kết thúc.
+        /// </summary>
+        private static bool IsNowInExportWindow(
+            TimeSpan now,
+            TimeSpan start,
+            TimeSpan end)
+        {
+            var allowedStart =
+                start.Subtract(
+                    TimeSpan.FromMinutes(
+                        ExportPreparationMinutes
+                    )
+                );
+
+            // Khung giờ không đi qua nửa đêm.
+            if (end >= allowedStart)
+            {
+                return
+                    now >= allowedStart &&
+                    now <= end;
+            }
+
+            // Khung giờ đi qua nửa đêm.
+            return
+                now >= allowedStart ||
+                now <= end;
+        }
+
+        /// <summary>
+        /// Định dạng thời gian theo HH:mm.
+        /// </summary>
+        private static string FormatTime(
+            TimeSpan time)
+        {
+            return
+                $"{time.Hours:D2}:" +
+                $"{time.Minutes:D2}";
+        }
     }
 }

@@ -68,10 +68,13 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<NsUserBankAccount> NsUserBankAccounts { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=localhost;port=3306;database=qlcanteen;uid=root", Microsoft.EntityFrameworkCore.ServerVersion.Parse("9.1.0-mysql"));
-
+    // Không cấu hình connection string trực tiếp tại đây.
+    // AppDbContext được cấu hình bằng Dependency Injection
+    // trong Program.cs.
+    protected override void OnConfiguring(
+        DbContextOptionsBuilder optionsBuilder)
+    {
+    }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder

@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import { getInventory } from '../../api/InventoryApi';
+
+import {
+  getAvailableExportSchedules,
+  submitExportTicket,
+} from '../../api/KhoExportApi';
 
 function formatNumber(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -87,14 +97,23 @@ export function ManagerExportTab({ user, branches = [] }) {
     setMessage(null);
 
     try {
-      const response = await axios.get('/api/Inventory');
-      const data = Array.isArray(response.data) ? response.data : [];
-      setInventory(data.map(normalizeInventoryItem));
+      const data = await getInventory();
+
+      const inventoryData = Array.isArray(data)
+        ? data
+        : [];
+
+      setInventory(
+        inventoryData.map(normalizeInventoryItem)
+      );
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Không tải được dữ liệu tồn kho.',
+        text:
+          error.response?.data?.message ||
+          'Không tải được dữ liệu tồn kho.',
       });
+
       setInventory([]);
     } finally {
       setLoading(false);
@@ -107,14 +126,24 @@ export function ManagerExportTab({ user, branches = [] }) {
     setLoadingSchedules(true);
 
     try {
-      const response = await axios.get(`/api/KhoExport/available-schedules?managerId=${userId}`);
-      const data = Array.isArray(response.data) ? response.data : [];
-      setSchedules(data.map(normalizeScheduleOption));
+      const data =
+        await getAvailableExportSchedules(userId);
+
+      const scheduleData = Array.isArray(data)
+        ? data
+        : [];
+
+      setSchedules(
+        scheduleData.map(normalizeScheduleOption)
+      );
     } catch (error) {
       setSchedules([]);
+
       setMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Không tải được ca làm hôm nay.',
+        text:
+          error.response?.data?.message ||
+          'Không tải được ca làm hôm nay.',
       });
     } finally {
       setLoadingSchedules(false);
@@ -197,11 +226,15 @@ export function ManagerExportTab({ user, branches = [] }) {
     };
 
     try {
-      const response = await axios.post('/api/KhoExport/submit-export', payload);
+      const data = await submitExportTicket(
+        payload
+      );
 
       setMessage({
         type: 'success',
-        text: response.data?.message || 'Xuất hàng ra quầy thành công!',
+        text:
+          data?.message ||
+          'Xuất hàng ra quầy thành công!',
       });
 
       setExportQuantities({});
@@ -212,7 +245,9 @@ export function ManagerExportTab({ user, branches = [] }) {
     } catch (error) {
       setMessage({
         type: 'error',
-        text: error.response?.data?.message || 'Không thể xuất hàng ra quầy.',
+        text:
+          error.response?.data?.message ||
+          'Không thể xuất hàng ra quầy.',
       });
     } finally {
       setIsSubmitting(false);

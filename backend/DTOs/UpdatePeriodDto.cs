@@ -11,5 +11,5 @@ public class UpdatePeriodDto
     public DateOnly EndDate { get; set; }
     
     [Required]
-    public string Status { get; set; } // Cho phép đổi thành DRAFT, OPEN, PUBLISHED
+    public string Status { get; set; } = string.Empty;
 }

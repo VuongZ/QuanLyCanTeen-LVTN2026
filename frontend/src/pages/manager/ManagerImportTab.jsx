@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { getAllSuppliers } from '../../api/SupplierApi';
+import {
+  parseInvoiceImage,
+  submitImportTicket,
+} from '../../api/KhoImportApi';
 
 
 function formatMoney(value) {
@@ -337,16 +340,7 @@ export function ManagerImportTab({ user, branches }) {
     try {
       setIsReadingInvoice(true);
 
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-
-      const response = await axios.post('http://localhost:5275/api/KhoImport/parse-invoice-image', formData, {
-  headers: {
-    'Content-Type': 'multipart/form-data',
-  },
-});
-
-      const data = response.data || {};
+      const data = await parseInvoiceImage(uploadedFile);
       const rawText = data.rawText || '';
 
       const detectedInvoiceCode =
@@ -436,10 +430,10 @@ export function ManagerImportTab({ user, branches }) {
     }
 
     const invalidItem = previewData.find((item) => {
-  return !String(item.productName || '').trim() ||
-    Number(item.quantity || 0) <= 0 ||
-    Number(item.unitPrice || 0) < 0;
-});
+      return !String(item.productName || '').trim() ||
+        Number(item.quantity || 0) <= 0 ||
+        Number(item.unitPrice || 0) < 0;
+    });
 
     if (invalidItem) {
       setMessage({
@@ -460,21 +454,23 @@ export function ManagerImportTab({ user, branches }) {
       invoiceDate: invoiceDate || null,
       note: note || null,
       items: previewData.map((item) => ({
-  productId: Number(item.productId || 0),
-  productCode: String(item.productCode || '').trim() || null,
-  productName: String(item.productName || '').trim(),
-  unit: String(item.unit || 'Cái').trim() || 'Cái',
-  quantity: Number(item.quantity || 0),
-  unitPrice: Number(item.unitPrice || 0),
-})),
+        productId: Number(item.productId || 0),
+        productCode: String(item.productCode || '').trim() || null,
+        productName: String(item.productName || '').trim(),
+        unit: String(item.unit || 'Cái').trim() || 'Cái',
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unitPrice || 0),
+      })),
     };
 
     try {
-    const response = await axios.post('http://localhost:5275/api/KhoImport/submit-import', payload);
+      const data = await submitImportTicket(payload);
 
       setMessage({
         type: 'success',
-        text: response.data?.message || 'Đã xác nhận phiếu và cộng dồn vào kho của cơ sở thành công.',
+        text:
+          data?.message ||
+          'Đã xác nhận phiếu và cộng dồn vào kho của cơ sở thành công.',
       });
 
       setPreviewData([]);
@@ -701,25 +697,25 @@ export function ManagerImportTab({ user, branches }) {
               <tbody>
                 {previewData.map((item, index) => (
                   <tr key={item.idId} className="sd-tr">
-                   <td className="sd-td sd-text-center">
-  <input
-    type="text"
-    value={item.productCode || ''}
-    onChange={(event) => handleEditItem(index, 'productCode', event.target.value)}
-    placeholder="Mã SP"
-    className="sd-import-edit-input sd-import-code-input"
-  />
-</td>
+                    <td className="sd-td sd-text-center">
+                      <input
+                        type="text"
+                        value={item.productCode || ''}
+                        onChange={(event) => handleEditItem(index, 'productCode', event.target.value)}
+                        placeholder="Mã SP"
+                        className="sd-import-edit-input sd-import-code-input"
+                      />
+                    </td>
 
-<td className="sd-td">
-  <input
-    type="text"
-    value={item.productName}
-    onChange={(event) => handleEditItem(index, 'productName', event.target.value)}
-    placeholder="Tên mặt hàng"
-    className="sd-import-edit-input sd-import-name-input"
-  />
-</td>
+                    <td className="sd-td">
+                      <input
+                        type="text"
+                        value={item.productName}
+                        onChange={(event) => handleEditItem(index, 'productName', event.target.value)}
+                        placeholder="Tên mặt hàng"
+                        className="sd-import-edit-input sd-import-name-input"
+                      />
+                    </td>
                     <td className="sd-td">
                       <input
                         type="text"

@@ -1,5 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  getInventoryImportTickets,
+  getInventoryImportTicketDetail,
+} from '../../api/KhoImportApi';
+
+import {
+  getFrontStockExportTickets,
+  getFrontStockExportTicketDetail,
+} from '../../api/KhoExportApi';
 
 
 function normalizeSearchText(value = '') {
@@ -71,14 +84,14 @@ function normalizeDetail(item, type) {
     ...ticket,
     items: Array.isArray(rawItems)
       ? rawItems.map((detail) => ({
-          productId: getValue(detail, ['productId', 'ProductId'], ''),
-          productCode: getValue(detail, ['productCode', 'ProductCode'], ''),
-          productName: getValue(detail, ['productName', 'ProductName'], 'Chưa rõ sản phẩm'),
-          unit: getValue(detail, ['unit', 'Unit'], 'Cái') || 'Cái',
-          quantity: Number(getValue(detail, ['quantity', 'Quantity'], 0) || 0),
-          unitPrice: Number(getValue(detail, ['unitPrice', 'UnitPrice'], 0) || 0),
-          lineTotal: Number(getValue(detail, ['lineTotal', 'LineTotal'], 0) || 0),
-        }))
+        productId: getValue(detail, ['productId', 'ProductId'], ''),
+        productCode: getValue(detail, ['productCode', 'ProductCode'], ''),
+        productName: getValue(detail, ['productName', 'ProductName'], 'Chưa rõ sản phẩm'),
+        unit: getValue(detail, ['unit', 'Unit'], 'Cái') || 'Cái',
+        quantity: Number(getValue(detail, ['quantity', 'Quantity'], 0) || 0),
+        unitPrice: Number(getValue(detail, ['unitPrice', 'UnitPrice'], 0) || 0),
+        lineTotal: Number(getValue(detail, ['lineTotal', 'LineTotal'], 0) || 0),
+      }))
       : [],
   };
 }
@@ -96,24 +109,56 @@ export function TicketHistoryModal({
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
+  // Xác định cấu hình hiển thị và hàm API
+  // dựa trên loại phiếu đang được mở.
   const config = useMemo(() => {
     if (type === 'inventoryImport') {
       return {
         title: 'Phiếu nhập kho',
-        listUrl: '/api/KhoImport/inventory-tickets',
-        detailUrl: (id) => `/api/KhoImport/inventory-tickets/${id}`,
-        emptyText: 'Chưa có phiếu nhập kho nào.',
+
+        // Hàm lấy danh sách phiếu nhập.
+        loadList:
+          getInventoryImportTickets,
+
+        // Hàm lấy chi tiết phiếu nhập.
+        loadDetail:
+          getInventoryImportTicketDetail,
+
+        emptyText:
+          'Chưa có phiếu nhập kho nào.',
+      };
+    }
+
+    if (type === 'frontStockExport') {
+      return {
+        title: 'Phiếu xuất ra quầy',
+
+        // Hàm lấy danh sách phiếu xuất.
+        loadList:
+          getFrontStockExportTickets,
+
+        // Hàm lấy chi tiết phiếu xuất.
+        loadDetail:
+          getFrontStockExportTicketDetail,
+
+        emptyText:
+          'Chưa có phiếu xuất ra quầy nào.',
       };
     }
 
     return {
-      title: 'Phiếu xuất ra quầy',
-      listUrl: '/api/KhoExport/front-stock-tickets',
-      detailUrl: (id) => `/api/KhoExport/front-stock-tickets/${id}`,
-      emptyText: 'Chưa có phiếu xuất ra quầy nào.',
+      title: 'Lịch sử phiếu',
+
+      loadList: async () => [],
+      loadDetail: async () => null,
+
+      emptyText:
+        'Không xác định được loại phiếu.',
     };
   }, [type]);
 
+  // Tải danh sách phiếu theo loại phiếu
+  // và cơ sở đang được chọn.
   async function loadTickets() {
     if (!open) return;
 
@@ -122,39 +167,62 @@ export function TicketHistoryModal({
     setSelectedTicket(null);
 
     try {
-      const params = {};
+      const data = await config.loadList(
+        branchId
+      );
 
-      if (branchId && branchId !== 'ALL') {
-        params.branchId = branchId;
-      }
+      const ticketData = Array.isArray(data)
+        ? data
+        : [];
 
-      const response = await axios.get(config.listUrl, { params });
-      const data = Array.isArray(response.data) ? response.data : [];
+      setTickets(
+        ticketData.map((item) =>
+          normalizeTicket(item, type)
+        )
+      );
+    } catch (error) {
+      console.error(
+        'Lỗi tải danh sách phiếu:',
+        error
+      );
 
-      setTickets(data.map((item) => normalizeTicket(item, type)));
-    } catch (err) {
-      setError(err.response?.data?.message || `Không tải được danh sách ${config.title.toLowerCase()}.`);
+      setError(
+        error.response?.data?.message ||
+        `Không tải được danh sách ${config.title.toLowerCase()}.`
+      );
+
       setTickets([]);
     } finally {
       setLoadingList(false);
     }
   }
 
+  // Tải thông tin chi tiết của phiếu
+  // mà người dùng vừa chọn.
   async function loadDetail(ticketId) {
     setLoadingDetail(true);
     setError('');
 
     try {
-      const params = {};
+      const data = await config.loadDetail(
+        ticketId,
+        branchId
+      );
 
-      if (branchId && branchId !== 'ALL') {
-        params.branchId = branchId;
-      }
+      setSelectedTicket(
+        normalizeDetail(data, type)
+      );
+    } catch (error) {
+      console.error(
+        'Lỗi tải chi tiết phiếu:',
+        error
+      );
 
-      const response = await axios.get(config.detailUrl(ticketId), { params });
-      setSelectedTicket(normalizeDetail(response.data, type));
-    } catch (err) {
-      setError(err.response?.data?.message || 'Không tải được chi tiết phiếu.');
+      setError(
+        error.response?.data?.message ||
+        'Không tải được chi tiết phiếu.'
+      );
+
       setSelectedTicket(null);
     } finally {
       setLoadingDetail(false);

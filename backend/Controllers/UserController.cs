@@ -273,18 +273,49 @@ namespace LuanVanTotNghiep.Controllers
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var key = Encoding.UTF8.GetBytes(configuration["Jwt:Key"] ?? "DayLaChuoiKhoaMacDinhChongLoiNull123456789!");
 
-               string roleClaim = "STAFF";
-        if (user.RoleId == 1) roleClaim = "ADMIN";
-        else if (user.RoleId == 2) roleClaim = "MANAGER";
+                string roleClaim = "STAFF";
+                if (user.RoleId == 1) roleClaim = "ADMIN";
+                else if (user.RoleId == 2) roleClaim = "MANAGER";
 
-                // Khởi tạo ClaimsIdentity mạch lạc
-             var claims = new ClaimsIdentity(new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, GetLoginDisplay(user) ?? user.Id.ToString()),
-            new Claim(ClaimTypes.Role, roleClaim),
-            new Claim("BranchId", (user.BranchId ?? 1).ToString())
-        });
+                // Tạo các claim bắt buộc của tài khoản.
+                var claimList = new List<Claim>
+{
+    new Claim(
+        ClaimTypes.NameIdentifier,
+        user.Id.ToString()
+    ),
+
+    new Claim(
+        ClaimTypes.Name,
+        GetLoginDisplay(user) ??
+            user.Id.ToString()
+    ),
+
+    new Claim(
+        ClaimTypes.Role,
+        roleClaim
+    )
+};
+
+                // Chỉ thêm BranchId khi tài khoản thực sự
+                // được gán vào một chi nhánh.
+                if (
+                    user.BranchId.HasValue &&
+                    user.BranchId.Value > 0
+                )
+                {
+                    claimList.Add(
+                        new Claim(
+                            "BranchId",
+                            user.BranchId.Value.ToString()
+                        )
+                    );
+                }
+
+                // Tạo ClaimsIdentity từ danh sách claim.
+                var claims = new ClaimsIdentity(
+                    claimList
+                );
 
                 var tokenDescriptor = new SecurityTokenDescriptor
                 {
@@ -296,37 +327,37 @@ namespace LuanVanTotNghiep.Controllers
                 };
 
                 var token = tokenHandler.CreateToken(tokenDescriptor);
-        var tokenString = tokenHandler.WriteToken(token);
+                var tokenString = tokenHandler.WriteToken(token);
 
-               return Ok(new
-        {
-            token = tokenString,
-            user = new
-            {
-                id = user.Id,
-                username = GetLoginDisplay(user),
-                email = user.Email,
-                fullName = user.FullName,
-                phone = user.PhoneNumber,
-                phoneNumber = user.PhoneNumber,
-                bankName = user.NsUserBankAccounts.FirstOrDefault()?.BankName,
-                bankAccountNumber = user.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
-                bankAccountName = user.NsUserBankAccounts.FirstOrDefault()?.BankAccountName,
-                role = roleClaim,
-                roleName = user.Role != null ? user.Role.RoleName : roleClaim,
-                branchId = user.BranchId,
-                branchName = user.Branch != null ? user.Branch.Name : "Chưa có",
-                hireDate = user.HireDate,
-                salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
-                    user,
-                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
-                salaryCoefficientIsManual = user.SalaryCoefficientIsManual
+                return Ok(new
+                {
+                    token = tokenString,
+                    user = new
+                    {
+                        id = user.Id,
+                        username = GetLoginDisplay(user),
+                        email = user.Email,
+                        fullName = user.FullName,
+                        phone = user.PhoneNumber,
+                        phoneNumber = user.PhoneNumber,
+                        bankName = user.NsUserBankAccounts.FirstOrDefault()?.BankName,
+                        bankAccountNumber = user.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
+                        bankAccountName = user.NsUserBankAccounts.FirstOrDefault()?.BankAccountName,
+                        role = roleClaim,
+                        roleName = user.Role != null ? user.Role.RoleName : roleClaim,
+                        branchId = user.BranchId,
+                        branchName = user.Branch != null ? user.Branch.Name : "Chưa có",
+                        hireDate = user.HireDate,
+                        salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                     user,
+                     DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                        salaryCoefficientIsManual = user.SalaryCoefficientIsManual
+                    }
+                });
             }
-        });
-    }
 
-    return Unauthorized(new { message = "Tài khoản hoặc mật khẩu không chính xác!" });
-}
+            return Unauthorized(new { message = "Tài khoản hoặc mật khẩu không chính xác!" });
+        }
         // Lớp hứng dữ liệu từ file React gửi lên
         public class LoginRequest
         {
