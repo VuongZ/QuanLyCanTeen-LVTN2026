@@ -14,11 +14,16 @@ namespace LuanVanTotNghiep.Controllers;
 public class SalaryController : ControllerBase
 {
     private readonly SalaryService _salaryService;
+    private readonly SalaryComplaintService _complaintService;
     private readonly AppDbContext _context;
 
-    public SalaryController(SalaryService salaryService, AppDbContext context)
+    public SalaryController(
+        SalaryService salaryService,
+        SalaryComplaintService complaintService,
+        AppDbContext context)
     {
         _salaryService = salaryService;
+        _complaintService = complaintService;
         _context = context;
     }
 
@@ -87,8 +92,96 @@ public class SalaryController : ControllerBase
                 return Forbid();
         }
 
-        var salaries = await _salaryService.GetByUserAsync(userId);
+        var finalizedOnly =
+            currentUser.Id == userId
+            && role != "MANAGER"
+            && role != "ADMIN";
+        var salaries = await _salaryService.GetByUserAsync(userId, finalizedOnly);
         return Ok(salaries);
+    }
+
+    [HttpPost("{salaryId}/complaints")]
+    public async Task<IActionResult> CreateComplaint(
+        int salaryId,
+        [FromBody] CreateSalaryComplaintDto dto)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không xác định được người dùng." });
+        if (IsAdminOrManager())
+            return Forbid();
+
+        try
+        {
+            return Ok(await _complaintService.CreateAsync(
+                salaryId,
+                currentUser.Id,
+                dto));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("complaints/my")]
+    public async Task<IActionResult> GetMyComplaints()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không xác định được người dùng." });
+        if (IsAdminOrManager())
+            return Forbid();
+
+        return Ok(await _complaintService.GetByUserAsync(currentUser.Id));
+    }
+
+    [HttpGet("complaints/branch")]
+    public async Task<IActionResult> GetBranchComplaints()
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không xác định được người dùng." });
+        if (!IsManager())
+            return Forbid();
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tài khoản Manager chưa được gắn cơ sở." });
+
+        return Ok(await _complaintService.GetByBranchAsync(currentUser.BranchId.Value));
+    }
+
+    [HttpPut("complaints/{complaintId}/resolve")]
+    public async Task<IActionResult> ResolveComplaint(
+        int complaintId,
+        [FromBody] ResolveSalaryComplaintDto dto)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không xác định được người dùng." });
+        if (!IsManager())
+            return Forbid();
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tài khoản Manager chưa được gắn cơ sở." });
+
+        try
+        {
+            var result = await _complaintService.ResolveAsync(
+                complaintId,
+                currentUser.BranchId.Value,
+                currentUser.Id,
+                dto);
+            if (result == null)
+                return NotFound(new { message = "Không tìm thấy khiếu nại trong cơ sở." });
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("user/{userId}/work-details")]
@@ -151,8 +244,35 @@ public class SalaryController : ControllerBase
                 return Forbid();
         }
 
+        if (currentUser.Id == userId && role != "MANAGER" && role != "ADMIN")
+        {
+            var salaryIsVisible = await _context.LuongMonthlySalaries
+                .AsNoTracking()
+                .AnyAsync(s =>
+                    s.UserId == userId
+                    && s.Month == month
+                    && s.Year == year
+                    && ((s.Status ?? "").ToUpper() == "FINALIZED"
+                        || (s.Status ?? "").ToUpper() == "PAID"));
+            if (!salaryIsVisible)
+            {
+                return NotFound(new
+                {
+                    message = "Bảng lương chưa được Manager chốt."
+                });
+            }
+        }
+
         var startDate = new DateOnly(year, month, 1);
         var endDate = startDate.AddMonths(1);
+
+        var targetUser = await _context.NsUsers
+            .AsNoTracking()
+            .Include(u => u.Role)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (targetUser == null)
+            return NotFound(new { message = "Không tìm thấy nhân viên." });
 
         var attendances = await _context.CaAttendances
             .AsNoTracking()
@@ -195,6 +315,15 @@ public class SalaryController : ControllerBase
                 displayStatus = "NOT_STARTED";
             }
 
+            var salaryCoefficient =
+                SalaryWagePolicy.GetEffectiveSalaryCoefficient(
+                    targetUser,
+                    attendance.Schedule.WorkDate);
+
+            var hourlyWage =
+                (targetUser.Role?.HourlyWage ?? 0) *
+                salaryCoefficient;
+
             return new SalaryWorkDetailDto
             {
                 AttendanceId = attendance.Id,
@@ -207,9 +336,23 @@ public class SalaryController : ControllerBase
                 CheckInTime = attendance.CheckInTime,
                 CheckOutTime = attendance.CheckOutTime,
                 WorkedHours = workedHours,
+                SalaryCoefficient = salaryCoefficient,
+                IsWeekend =
+                    attendance.Schedule.WorkDate.DayOfWeek is
+                        DayOfWeek.Saturday or DayOfWeek.Sunday,
+                TotalSalary = workedHours * hourlyWage,
                 Status = displayStatus
             };
         }).ToList();
+
+        var dailyTotals = result
+            .GroupBy(item => item.WorkDate)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(item => item.TotalSalary));
+
+        foreach (var item in result)
+            item.TotalSalary = dailyTotals[item.WorkDate];
 
         return Ok(result);
     }
@@ -247,7 +390,63 @@ public class SalaryController : ControllerBase
                 return Forbid();
         }
 
+        if (currentUser.Id == userId && !IsManager() && !IsAdmin())
+        {
+            if (!month.HasValue || !year.HasValue)
+                return BadRequest(new { message = "Vui lòng chọn kỳ lương." });
+
+            var salaryIsVisible = await _context.LuongMonthlySalaries
+                .AsNoTracking()
+                .AnyAsync(s =>
+                    s.UserId == userId
+                    && s.Month == month.Value
+                    && s.Year == year.Value
+                    && ((s.Status ?? "").ToUpper() == "FINALIZED"
+                        || (s.Status ?? "").ToUpper() == "PAID"));
+            if (!salaryIsVisible)
+                return NotFound(new { message = "Bảng lương chưa được Manager chốt." });
+        }
+
         return Ok(await _salaryService.GetAdjustmentHistoryAsync(userId, month, year));
+    }
+
+    [HttpGet("adjustment-requests/pending")]
+    public async Task<IActionResult> GetPendingAdjustmentRequests()
+    {
+        if (!IsAdmin())
+            return Forbid();
+
+        return Ok(await _salaryService.GetPendingAdjustmentRequestsAsync());
+    }
+
+    [HttpPut("adjustment-requests/{adjustmentId}/review")]
+    public async Task<IActionResult> ReviewAdjustmentRequest(
+        int adjustmentId,
+        [FromBody] ReviewSalaryAdjustmentDto dto)
+    {
+        var currentUser = await GetCurrentUserAsync();
+        if (currentUser == null)
+            return Unauthorized(new { message = "Không xác định được người dùng." });
+
+        if (!IsAdmin())
+            return Forbid();
+
+        try
+        {
+            var result = await _salaryService.ReviewAdjustmentAsync(
+                adjustmentId,
+                currentUser.Id,
+                dto);
+
+            if (result == null)
+                return NotFound(new { message = "Không tìm thấy yêu cầu thưởng/phạt." });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPut("branch/{branchId}/period/{year}/{month}/transfer")]
@@ -473,23 +672,25 @@ public class SalaryController : ControllerBase
         }
     }
 
-    [HttpPut("{salaryId}/admin-finalize")]
-    public async Task<IActionResult> AdminFinalizeSalary(int salaryId)
+    [HttpPut("branch/period/{year}/{month}/finalize")]
+    public async Task<IActionResult> FinalizeBranchPeriod(int year, int month)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
             return Unauthorized(new { message = "Không xác định được người dùng." });
-
-        if (!IsAdmin())
+        if (!IsManager())
             return Forbid();
+        if (currentUser.BranchId == null)
+            return BadRequest(new { message = "Tài khoản Manager chưa được gắn cơ sở." });
 
         try
         {
-            var salary = await _salaryService.AdminFinalizeAsync(salaryId, currentUser.Id);
-            if (salary == null)
-                return NotFound(new { message = "Không tìm thấy bảng lương." });
-
-            return Ok(salary);
+            var salaries = await _salaryService.FinalizeBranchPeriodAsync(
+                currentUser.BranchId.Value,
+                month,
+                year,
+                currentUser.Id);
+            return Ok(salaries);
         }
         catch (InvalidOperationException ex)
         {

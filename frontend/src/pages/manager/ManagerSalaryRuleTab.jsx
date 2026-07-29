@@ -18,6 +18,13 @@ function formatNumber(value) {
   return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0));
 }
 
+function adjustmentStatus(status) {
+  const normalized = (status || 'PENDING').toUpperCase();
+  if (normalized === 'APPROVED') return { label: 'Đã duyệt', className: 'approved' };
+  if (normalized === 'REJECTED') return { label: 'Từ chối', className: 'rejected' };
+  return { label: 'Chờ Admin', className: 'pending' };
+}
+
 function getCurrentPeriod() {
   const now = new Date();
   return {
@@ -244,7 +251,8 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
     setSavingUserId(manualTarget.userId);
     setMessage(null);
     try {
-      const updated = await addManualSalaryAdjustment({
+      const employeeName = manualTarget.fullName || manualTarget.email || 'nhân viên';
+      await addManualSalaryAdjustment({
         userId: manualTarget.userId,
         month: period.month,
         year: period.year,
@@ -252,11 +260,11 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
         penaltyAmount,
         reason: manualForm.reason.trim(),
       }, selectedBranchId);
-      setEmployees((items) => items.map((item) => (item.userId === updated.userId ? updated : item)));
+      await loadAdjustments();
       setManualTarget(null);
-      setMessage({ type: 'success', text: `Đã cộng thưởng/phạt thủ công cho ${updated.fullName || updated.email || 'nhân viên'}.` });
+      setMessage({ type: 'success', text: `Đã gửi yêu cầu thưởng/phạt của ${employeeName} cho Admin duyệt.` });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể cộng thưởng/phạt thủ công.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể gửi yêu cầu thưởng/phạt.' });
     } finally {
       setSavingUserId(null);
     }
@@ -402,7 +410,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
               </tr>
             ) : filteredEmployees.map((employee) => {
               const salaryStatus = (employee.status || '').toUpperCase();
-              const isLocked = salaryStatus === 'FINALIZED' || salaryStatus === 'ADMIN_FINALIZED' || salaryStatus === 'PAID';
+              const isLocked = salaryStatus === 'FINALIZED' || salaryStatus === 'PAID';
               const isSaving = savingUserId === employee.userId;
 
               return (
@@ -606,7 +614,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
         <div className="sd-overlay" onClick={() => setManualTarget(null)}>
           <div className="sd-modal" onClick={(event) => event.stopPropagation()}>
             <div className="sd-modal-header">
-              <h2>Thêm thưởng/phạt</h2>
+              <h2>Gửi yêu cầu thưởng/phạt</h2>
               <button onClick={() => setManualTarget(null)} type="button">✕</button>
             </div>
             <form onSubmit={handleManualSubmit}>
@@ -662,7 +670,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
               <div className="sd-modal-footer">
                 <button className="sd-btn-ghost" onClick={() => setManualTarget(null)} type="button">Hủy</button>
                 <button className="sd-btn-primary" disabled={savingUserId === manualTarget.userId} type="submit">
-                  {savingUserId === manualTarget.userId ? 'Đang lưu...' : 'Cộng vào lương'}
+                  {savingUserId === manualTarget.userId ? 'Đang gửi...' : 'Gửi Admin duyệt'}
                 </button>
               </div>
             </form>
@@ -688,17 +696,22 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
               ) : (
                 <div className="sd-table-wrap">
                   <table className="sd-table sd-adjustment-history-table">
-                    <thead><tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người tạo</th></tr></thead>
+                    <thead><tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người tạo</th><th>Trạng thái</th><th>Admin duyệt</th></tr></thead>
                     <tbody>
-                      {history.map((item) => (
+                      {history.map((item) => {
+                        const status = adjustmentStatus(item.status);
+                        return (
                         <tr key={item.id}>
                           <td>{new Date(item.createdAt).toLocaleString('vi-VN')}</td>
                           <td>{formatMoney(item.bonusAmount)}</td>
                           <td>{formatMoney(item.penaltyAmount)}</td>
                           <td>{item.reason}</td>
                           <td>{item.createdByName || 'Quản lý'}</td>
+                          <td><span className={`sd-status-pill ${status.className}`}>{status.label}</span></td>
+                          <td>{item.reviewedByName || '—'}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

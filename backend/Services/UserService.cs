@@ -2,6 +2,7 @@
 using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Repositories;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Mail;
 using System.Security.Cryptography;
 
 namespace LuanVanTotNghiep.Services;
@@ -26,12 +27,39 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
 
     public async Task<NsUser> AddUser(UserDto dto)
     {
+        var email = Normalize(dto.Email);
+        if (string.IsNullOrWhiteSpace(email) || !MailAddress.TryCreate(email, out _))
+            throw new ArgumentException("Vui lòng nhập email hợp lệ để gửi mật khẩu cho nhân viên.");
+
+        var phoneNumber = Normalize(dto.PhoneNumber ?? dto.Phone);
+        var normalizedEmail = email.ToLowerInvariant();
+        var duplicateMessages = new List<string>();
+
+        if (await context.NsUsers.AnyAsync(user =>
+            user.Email != null &&
+            user.Email.ToLower() == normalizedEmail))
+        {
+            duplicateMessages.Add("Email đã được sử dụng bởi tài khoản khác.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(phoneNumber) &&
+            await context.NsUsers.AnyAsync(user => user.PhoneNumber == phoneNumber))
+        {
+            duplicateMessages.Add("Số điện thoại đã được sử dụng bởi tài khoản khác.");
+        }
+
+        if (duplicateMessages.Count > 0)
+            throw new ArgumentException(string.Join(" ", duplicateMessages));
+
+        var initialPassword = GenerateSixDigitPassword();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+
         var user = new NsUser
         {
-            Email = Normalize(dto.Email),
+            Email = email,
             FullName = dto.FullName,
-            PhoneNumber = Normalize(dto.PhoneNumber ?? dto.Phone),
-            Password = dto.Password ?? string.Empty,
+            PhoneNumber = phoneNumber,
+            Password = HashPassword(initialPassword),
             BranchId = dto.BranchId,
             RoleId = dto.RoleId,
             HireDate = dto.HireDate,
@@ -40,9 +68,29 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
                 DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
             SalaryCoefficientIsManual = false
         };
-        user.Password = HashPassword(user.Password);
+
         await userRepo.Add(user);
-        await UpsertBankAccountAsync(user.Id, dto.BankName, dto.BankAccountNumber, dto.BankAccountName);
+        await UpsertBankAccountAsync(
+            user.Id,
+            dto.BankName,
+            dto.BankAccountNumber,
+            dto.BankAccountName);
+
+        try
+        {
+            await emailService.SendInitialPasswordEmailAsync(
+                email,
+                user.FullName,
+                initialPassword);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                "Không thể gửi mật khẩu tới email nhân viên. Tài khoản chưa được tạo.",
+                ex);
+        }
+
+        await transaction.CommitAsync();
         return user;
     }
 
@@ -227,6 +275,13 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
     private static string GenerateOtp()
     {
         return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+    }
+
+    private static string GenerateSixDigitPassword()
+    {
+        return RandomNumberGenerator
+            .GetInt32(0, 1000000)
+            .ToString("D6");
     }
 
     private async Task SendOtpAsync(NsUser user)

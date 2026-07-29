@@ -31,19 +31,15 @@ public partial class LuongMonthlySalary
 
     public int? FinalizedByUserId { get; set; }
 
-    public DateTime? AdminFinalizedAt { get; set; }
-
-    public int? AdminFinalizedByUserId { get; set; }
-
     public DateTime? CreatedAt { get; set; }
 
     public virtual ICollection<CaAttendance> CaAttendances { get; set; } = new List<CaAttendance>();
 
     public virtual ICollection<LuongSalaryAdjustmentHistory> AdjustmentHistories { get; set; } = new List<LuongSalaryAdjustmentHistory>();
 
-    public virtual NsUser? FinalizedByUser { get; set; }
+    public virtual ICollection<LuongSalaryComplaint> Complaints { get; set; } = new List<LuongSalaryComplaint>();
 
-    public virtual NsUser? AdminFinalizedByUser { get; set; }
+    public virtual NsUser? FinalizedByUser { get; set; }
 
     public virtual NsUser User { get; set; } = null!;
 }

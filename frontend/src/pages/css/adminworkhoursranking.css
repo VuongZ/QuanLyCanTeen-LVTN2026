@@ -1,0 +1,262 @@
+.sd-hours-ranking-card {
+  overflow: hidden;
+}
+
+.sd-hours-ranking-header {
+  align-items: flex-end;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.sd-hours-ranking-header h2 {
+  color: #0f172a;
+  font-size: 20px;
+  margin: 2px 0 4px;
+}
+
+.sd-hours-ranking-subtitle {
+  color: #64748b;
+  font-size: 13px;
+  margin: 0;
+}
+
+.sd-hours-ranking-filters {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sd-hours-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sd-hours-filter-field label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sd-hours-filter-field select {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  height: 42px;
+  min-width: 105px;
+  padding: 0 30px 0 11px;
+}
+
+.sd-hours-filter-branch select {
+  min-width: 190px;
+}
+
+.sd-hours-period-mode {
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 10px;
+  display: flex;
+  height: 42px;
+  padding: 3px;
+}
+
+.sd-hours-period-mode button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.sd-hours-period-mode button.active {
+  background: #ea580c;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.22);
+  color: #fff;
+}
+
+.sd-hours-ranking-content {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(520px, 1.6fr);
+}
+
+.sd-hours-top-employee {
+  align-items: center;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 18px;
+}
+
+.sd-hours-trophy {
+  align-items: center;
+  background: #ea580c;
+  border-radius: 12px;
+  color: #fff;
+  display: flex;
+  font-size: 20px;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.sd-hours-top-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sd-hours-top-copy span,
+.sd-hours-top-copy small {
+  color: #9a3412;
+  font-size: 12px;
+}
+
+.sd-hours-top-copy strong {
+  color: #0f172a;
+  font-size: 18px;
+  margin: 3px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-hours-top-value {
+  border-top: 1px solid #fed7aa;
+  display: flex;
+  flex-direction: column;
+  grid-column: 1 / -1;
+  padding-top: 14px;
+}
+
+.sd-hours-top-value strong {
+  color: #c2410c;
+  font-size: 30px;
+}
+
+.sd-hours-top-value span {
+  color: #9a3412;
+  font-size: 12px;
+}
+
+.sd-hours-ranking-table-wrap {
+  box-shadow: none;
+}
+
+.sd-hours-ranking-table {
+  min-width: 620px;
+}
+
+.sd-hours-ranking-table th,
+.sd-hours-ranking-table td {
+  padding: 11px 12px;
+}
+
+.sd-hours-ranking-table th:first-child,
+.sd-hours-ranking-table td:first-child {
+  text-align: center;
+  width: 64px;
+}
+
+.sd-hours-ranking-table th:nth-child(4),
+.sd-hours-ranking-table td:nth-child(4) {
+  text-align: center;
+  width: 76px;
+}
+
+.sd-hours-ranking-table th:last-child,
+.sd-hours-ranking-table td:last-child {
+  text-align: right;
+  width: 120px;
+}
+
+.sd-hours-rank {
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 50%;
+  color: #64748b;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.sd-hours-rank-1 {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.sd-hours-rank-2 {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.sd-hours-rank-3 {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.sd-hours-total {
+  color: #c2410c;
+  font-weight: 800;
+}
+
+.sd-hours-ranking-empty {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  padding: 30px;
+  text-align: center;
+}
+
+@media (max-width: 1350px) {
+  .sd-hours-ranking-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sd-hours-ranking-filters {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1000px) {
+  .sd-hours-ranking-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .sd-hours-ranking-filters,
+  .sd-hours-filter-field,
+  .sd-hours-period-mode {
+    width: 100%;
+  }
+
+  .sd-hours-filter-field select {
+    width: 100%;
+  }
+
+  .sd-hours-period-mode button {
+    flex: 1;
+  }
+}

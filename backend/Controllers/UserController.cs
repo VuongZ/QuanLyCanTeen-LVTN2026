@@ -74,10 +74,29 @@ namespace LuanVanTotNghiep.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> AddUser(UserDto user)
         {
-            var created = await userService.AddUser(user);
-            return Ok(ToUserResponse(created));
+            try
+            {
+                var created = await userService.AddUser(user);
+                return Ok(ToUserResponse(created));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (DbUpdateException)
+            {
+                return Conflict(new
+                {
+                    message = "Email hoặc số điện thoại đã được sử dụng bởi tài khoản khác."
+                });
+            }
         }
 
         [HttpPut("{id}")]

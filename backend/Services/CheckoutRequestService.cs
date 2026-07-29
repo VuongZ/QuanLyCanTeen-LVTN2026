@@ -213,7 +213,6 @@ public class CheckoutRequestService
             s.UserId == user.Id && s.Month == schedule.WorkDate.Month && s.Year == schedule.WorkDate.Year);
         if (salary != null && (
             string.Equals(salary.Status, "FINALIZED", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(salary.Status, "ADMIN_FINALIZED", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(salary.Status, "PAID", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Bảng lương tháng này đã chốt hoặc thanh toán, không thể điều chỉnh checkout.");
 

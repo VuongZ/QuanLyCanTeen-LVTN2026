@@ -339,7 +339,6 @@ public class StaffRegistrationService
     }
 
     registration.Status = "CANCELLED";
-
     await _repo.Update(registration);
 }
 }

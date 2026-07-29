@@ -88,7 +88,19 @@ public class SalaryAdjustmentHistoryDto
     public decimal BonusAmount { get; set; }
     public decimal PenaltyAmount { get; set; }
     public string Reason { get; set; } = string.Empty;
+    public string Status { get; set; } = "PENDING";
     public int CreatedByUserId { get; set; }
     public string? CreatedByName { get; set; }
+    public string? BranchName { get; set; }
+    public int? ReviewedByUserId { get; set; }
+    public string? ReviewedByName { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewNote { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+public class ReviewSalaryAdjustmentDto
+{
+    public bool IsApproved { get; set; }
+    public string? ReviewNote { get; set; }
 }

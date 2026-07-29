@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  adminFinalizeSalary,
-  finalizeSalary,
+  finalizeBranchSalaryPeriod,
   getAllSalaries,
+  getBranchSalaryComplaints,
   getBranchSalaries,
+  getPendingSalaryAdjustments,
   getSalaryAdjustmentHistory,
   getSalaryWorkDetails,
   markSalaryPaid,
+  reviewSalaryAdjustment,
+  resolveSalaryComplaint,
 } from '../../api/SalaryApi';
 
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -16,8 +19,7 @@ const periodKey = (item) => `${item.year}-${String(item.month).padStart(2, '0')}
 
 function statusLabel(status) {
   if ((status || '').toUpperCase() === 'PAID') return 'Đã thanh toán';
-  if ((status || '').toUpperCase() === 'ADMIN_FINALIZED') return 'Admin đã chốt - chờ trả';
-  if ((status || '').toUpperCase() === 'FINALIZED') return 'Manager đã chốt - chờ admin';
+  if ((status || '').toUpperCase() === 'FINALIZED') return 'Manager đã chốt - chờ trả';
   if ((status || '').toUpperCase() === 'CANCELLED') return 'Đã huỷ';
   return 'Chưa thanh toán';
 }
@@ -25,9 +27,21 @@ function statusLabel(status) {
 function statusClass(status) {
   const normalized = (status || '').toUpperCase();
   if (normalized === 'PAID') return 'paid';
-  if (normalized === 'ADMIN_FINALIZED') return 'approved';
   if (normalized === 'FINALIZED') return 'finalized';
   return 'pending';
+}
+
+function adjustmentStatus(status) {
+  const normalized = (status || 'PENDING').toUpperCase();
+  if (normalized === 'APPROVED') return { label: 'Đã duyệt', className: 'approved' };
+  if (normalized === 'REJECTED') return { label: 'Từ chối', className: 'rejected' };
+  return { label: 'Chờ duyệt', className: 'pending' };
+}
+
+function complaintStatus(status) {
+  return (status || 'PENDING').toUpperCase() === 'RESOLVED'
+    ? { label: 'Đã phản hồi', className: 'approved' }
+    : { label: 'Chờ xử lý', className: 'pending' };
 }
 
 function InfoRow({ label, value }) {
@@ -38,6 +52,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState('CURRENT');
+  const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('ALL');
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +60,13 @@ export function AdminSalaryTab({ isAdmin = true }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [workDetails, setWorkDetails] = useState([]);
   const [adjustmentHistory, setAdjustmentHistory] = useState([]);
+  const [pendingAdjustments, setPendingAdjustments] = useState([]);
+  const [reviewingId, setReviewingId] = useState(null);
+  const [complaints, setComplaints] = useState([]);
+  const [complaintPeriod, setComplaintPeriod] = useState('ALL');
+  const [complaintTarget, setComplaintTarget] = useState(null);
+  const [complaintResponse, setComplaintResponse] = useState('');
+  const [bulkFinalizing, setBulkFinalizing] = useState(false);
   const [message, setMessage] = useState(null);
 
   async function fetchItems() {
@@ -55,11 +77,20 @@ export function AdminSalaryTab({ isAdmin = true }) {
     setLoading(true);
     setMessage(null);
     try {
-      const data = await fetchItems();
+      const [data, requests, complaintData] = await Promise.all([
+        fetchItems(),
+        isAdmin ? getPendingSalaryAdjustments() : Promise.resolve([]),
+        isAdmin ? Promise.resolve([]) : getBranchSalaryComplaints(),
+      ]);
       const nextItems = Array.isArray(data) ? data : [];
       setItems(nextItems);
+      setPendingAdjustments(Array.isArray(requests) ? requests : []);
+      setComplaints(Array.isArray(complaintData) ? complaintData : []);
       if (selectedPeriod !== 'ALL' && !nextItems.some((item) => periodKey(item) === selectedPeriod)) {
         setSelectedPeriod(nextItems[0] ? periodKey(nextItems[0]) : 'ALL');
+      }
+      if (selectedBranch !== 'ALL' && !nextItems.some((item) => String(item.branchId) === selectedBranch)) {
+        setSelectedBranch('ALL');
       }
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được dữ liệu lương.' });
@@ -72,8 +103,16 @@ export function AdminSalaryTab({ isAdmin = true }) {
     let ignore = false;
     async function load() {
       try {
-        const data = isAdmin ? await getAllSalaries() : await getBranchSalaries();
-        if (!ignore) setItems(Array.isArray(data) ? data : []);
+        const [data, requests, complaintData] = await Promise.all([
+          isAdmin ? getAllSalaries() : getBranchSalaries(),
+          isAdmin ? getPendingSalaryAdjustments() : Promise.resolve([]),
+          isAdmin ? Promise.resolve([]) : getBranchSalaryComplaints(),
+        ]);
+        if (!ignore) {
+          setItems(Array.isArray(data) ? data : []);
+          setPendingAdjustments(Array.isArray(requests) ? requests : []);
+          setComplaints(Array.isArray(complaintData) ? complaintData : []);
+        }
       } catch (err) {
         if (!ignore) setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được dữ liệu lương.' });
       } finally {
@@ -93,31 +132,74 @@ export function AdminSalaryTab({ isAdmin = true }) {
     return Array.from(uniquePeriods.values()).sort((a, b) => b.key.localeCompare(a.key));
   }, [items]);
 
+  const branchOptions = useMemo(() => {
+    const uniqueBranches = new Map();
+    items.forEach((item) => {
+      if (item.branchId != null && !uniqueBranches.has(String(item.branchId))) {
+        uniqueBranches.set(String(item.branchId), {
+          id: String(item.branchId),
+          name: item.branchName || `Cơ sở ${item.branchId}`,
+        });
+      }
+    });
+    return Array.from(uniqueBranches.values())
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  }, [items]);
+
+  const complaintPeriodOptions = useMemo(() => {
+    const uniquePeriods = new Map();
+    complaints.forEach((item) => {
+      const key = periodKey(item);
+      if (!uniquePeriods.has(key)) {
+        uniquePeriods.set(key, {
+          key,
+          month: item.month,
+          year: item.year,
+        });
+      }
+    });
+    return Array.from(uniquePeriods.values())
+      .sort((a, b) => b.key.localeCompare(a.key));
+  }, [complaints]);
+
+  const filteredComplaints = useMemo(
+    () => complaints.filter(
+      (item) => complaintPeriod === 'ALL'
+        || periodKey(item) === complaintPeriod,
+    ),
+    [complaints, complaintPeriod],
+  );
+
+  const pendingComplaintCount = useMemo(
+    () => filteredComplaints.filter(
+      (item) => (item.status || 'PENDING').toUpperCase() === 'PENDING',
+    ).length,
+    [filteredComplaints],
+  );
+
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     return items.filter((item) => {
+      if (isAdmin && selectedBranch !== 'ALL' && String(item.branchId) !== selectedBranch) return false;
       if (selectedPeriod !== 'ALL' && periodKey(item) !== selectedPeriod) return false;
       const normalizedStatus = (item.status || '').toUpperCase();
-      const history = isAdmin
-        ? normalizedStatus === 'ADMIN_FINALIZED' || normalizedStatus === 'PAID'
-        : normalizedStatus === 'PAID';
+      const history = normalizedStatus === 'PAID';
       if ((viewMode === 'HISTORY') !== history) return false;
       const values = [item.fullName, item.username, item.branchName, item.bankName, item.bankAccountNumber, `${item.month}/${item.year}`];
       return !keyword || values.some((value) => String(value || '').toLowerCase().includes(keyword));
     });
-  }, [items, query, viewMode, isAdmin, selectedPeriod]);
+  }, [items, query, viewMode, isAdmin, selectedBranch, selectedPeriod]);
 
   const summary = useMemo(() => items
-    .filter((item) => selectedPeriod === 'ALL' || periodKey(item) === selectedPeriod)
+    .filter((item) => (!isAdmin || selectedBranch === 'ALL' || String(item.branchId) === selectedBranch)
+      && (selectedPeriod === 'ALL' || periodKey(item) === selectedPeriod))
     .reduce((total, item) => {
     const normalizedStatus = (item.status || '').toUpperCase();
-    const completed = isAdmin
-      ? normalizedStatus === 'ADMIN_FINALIZED' || normalizedStatus === 'PAID'
-      : normalizedStatus === 'PAID';
+    const completed = normalizedStatus === 'PAID';
     total.count += 1;
     total[completed ? 'paid' : 'pending'] += Number(item.totalSalary || 0);
     return total;
-  }, { count: 0, pending: 0, paid: 0 }), [items, isAdmin, selectedPeriod]);
+  }, { count: 0, pending: 0, paid: 0 }), [items, isAdmin, selectedBranch, selectedPeriod]);
 
   async function confirmPayment() {
     if (!selected) return;
@@ -135,35 +217,63 @@ export function AdminSalaryTab({ isAdmin = true }) {
     }
   }
 
-  async function confirmAdminFinalization() {
-    if (!selected || !isAdmin) return;
+  async function confirmBranchFinalization() {
+    if (isAdmin || selectedPeriod === 'ALL') {
+      setMessage({ type: 'error', text: 'Vui lòng chọn một kỳ lương cụ thể trước khi chốt.' });
+      return;
+    }
+    const [year, month] = selectedPeriod.split('-').map(Number);
+    setBulkFinalizing(true);
+    setMessage(null);
+    try {
+      const updated = await finalizeBranchSalaryPeriod(month, year);
+      const updatedMap = new Map((Array.isArray(updated) ? updated : []).map((item) => [item.id, item]));
+      setItems((current) => current.map((item) => updatedMap.get(item.id) || item));
+      setMessage({ type: 'success', text: `Đã chốt lương toàn bộ nhân viên cơ sở tháng ${month}/${year}.` });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể chốt lương toàn cơ sở.' });
+    } finally {
+      setBulkFinalizing(false);
+    }
+  }
+
+  async function submitComplaintResponse(event) {
+    event.preventDefault();
+    if (!complaintTarget || !complaintResponse.trim()) return;
     setSaving(true);
     setMessage(null);
     try {
-      const updated = await adminFinalizeSalary(selected.id);
-      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setSelected(null);
-      setMessage({ type: 'success', text: 'Admin đã chốt bảng lương của nhân viên.' });
+      const updated = await resolveSalaryComplaint(complaintTarget.id, complaintResponse.trim());
+      setComplaints((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setComplaintTarget(null);
+      setComplaintResponse('');
+      setMessage({ type: 'success', text: 'Đã gửi phản hồi khiếu nại cho nhân viên.' });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể chốt bảng lương.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể phản hồi khiếu nại.' });
     } finally {
       setSaving(false);
     }
   }
 
-  async function confirmFinalization() {
-    if (!selected || isAdmin) return;
-    setSaving(true);
+  async function reviewAdjustment(item, isApproved) {
+    if (!isAdmin) return;
+    setReviewingId(item.id);
     setMessage(null);
     try {
-      const updated = await finalizeSalary(selected.id);
-      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setSelected(updated);
-      setMessage({ type: 'success', text: 'Đã chốt bảng lương. Các số liệu của kỳ này đã được khóa.' });
+      await reviewSalaryAdjustment(item.id, isApproved);
+      setPendingAdjustments((current) => current.filter((request) => request.id !== item.id));
+      setMessage({
+        type: 'success',
+        text: isApproved
+          ? 'Đã duyệt và cập nhật khoản thưởng/phạt vào lương.'
+          : 'Đã từ chối yêu cầu thưởng/phạt.',
+      });
+      const salaryData = await getAllSalaries();
+      setItems(Array.isArray(salaryData) ? salaryData : []);
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể chốt bảng lương.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể xử lý yêu cầu thưởng/phạt.' });
     } finally {
-      setSaving(false);
+      setReviewingId(null);
     }
   }
 
@@ -189,10 +299,109 @@ export function AdminSalaryTab({ isAdmin = true }) {
   return (
     <div className={`sd-salary-admin-page ${isAdmin ? 'sd-salary-admin-page--admin' : ''}`}>
       <div className="sd-stat-grid sd-salary-admin-stats">
-        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>{isAdmin ? 'Bảng lương manager đã gửi' : 'Bảng lương cơ sở'}</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{money(summary.pending)}</h3><p>{isAdmin ? 'Chờ admin chốt' : 'Chưa thanh toán'}</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">✓</span><h3>{money(summary.paid)}</h3><p>{isAdmin ? 'Admin đã chốt' : 'Đã thanh toán'}</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>{isAdmin ? 'Bảng lương manager đã chốt' : 'Bảng lương cơ sở'}</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{money(summary.pending)}</h3><p>Chưa thanh toán</p></div>
+        <div className="sd-stat-card"><span className="sd-stat-icon">✓</span><h3>{money(summary.paid)}</h3><p>Đã thanh toán</p></div>
       </div>
+
+      {isAdmin && (
+        <div className="sd-card sd-adjustment-approval-card">
+          <div className="sd-card-header">
+            <div>
+              <p className="sd-eyebrow">Phê duyệt</p>
+              <h2>Yêu cầu thưởng/phạt đang chờ ({pendingAdjustments.length})</h2>
+            </div>
+          </div>
+          <div className="sd-table-wrap">
+            <table className="sd-table sd-adjustment-approval-table">
+              <thead>
+                <tr><th>Nhân viên</th><th>Cơ sở</th><th>Kỳ lương</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người gửi</th><th>Thao tác</th></tr>
+              </thead>
+              <tbody>
+                {pendingAdjustments.length === 0 ? (
+                  <tr><td className="sd-td-empty" colSpan={8}>Không có yêu cầu thưởng/phạt đang chờ duyệt.</td></tr>
+                ) : pendingAdjustments.map((item) => (
+                  <tr key={item.id}>
+                    <td><strong>{item.employeeName}</strong></td>
+                    <td>{item.branchName || 'Chưa gán'}</td>
+                    <td>{item.month}/{item.year}</td>
+                    <td>{money(item.bonusAmount)}</td>
+                    <td>{money(item.penaltyAmount)}</td>
+                    <td>{item.reason}</td>
+                    <td>{item.createdByName || 'Quản lý'}<span className="sd-subline">{date(item.createdAt)}</span></td>
+                    <td>
+                      <div className="sd-salary-actions">
+                        <button className="sd-btn-primary" disabled={reviewingId === item.id} onClick={() => reviewAdjustment(item, true)} type="button">
+                          {reviewingId === item.id ? 'Đang xử lý...' : 'Duyệt'}
+                        </button>
+                        <button className="sd-btn-primary btn-danger" disabled={reviewingId === item.id} onClick={() => reviewAdjustment(item, false)} type="button">Từ chối</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!isAdmin && (
+        <div className="sd-card sd-salary-complaint-card">
+          <div className="sd-card-header sd-salary-complaint-header">
+            <div>
+              <p className="sd-eyebrow">Phản hồi nhân viên</p>
+              <h2>Khiếu nại lương ({pendingComplaintCount} chờ xử lý)</h2>
+            </div>
+            <div className="sd-salary-period-filter sd-complaint-period-filter">
+              <label htmlFor="complaint-period">Tháng khiếu nại</label>
+              <select
+                id="complaint-period"
+                onChange={(event) => setComplaintPeriod(event.target.value)}
+                value={complaintPeriod}
+              >
+                <option value="ALL">Tất cả các tháng</option>
+                {complaintPeriodOptions.map((period) => (
+                  <option key={period.key} value={period.key}>
+                    Tháng {period.month}/{period.year}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="sd-table-wrap">
+            <table className="sd-table sd-salary-complaint-table">
+              <thead><tr><th>Nhân viên</th><th>Kỳ lương</th><th>Nội dung</th><th>Thời gian gửi</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+              <tbody>
+                {filteredComplaints.length === 0 ? (
+                  <tr>
+                    <td className="sd-td-empty" colSpan={6}>
+                      {complaintPeriod === 'ALL'
+                        ? 'Chưa có khiếu nại lương từ nhân viên.'
+                        : 'Không có khiếu nại trong tháng đã chọn.'}
+                    </td>
+                  </tr>
+                ) : filteredComplaints.map((item) => {
+                  const status = complaintStatus(item.status);
+                  return (
+                    <tr key={item.id}>
+                      <td><strong>{item.employeeName}</strong></td>
+                      <td>{item.month}/{item.year}</td>
+                      <td>{item.content}{item.managerResponse && <span className="sd-subline">Phản hồi: {item.managerResponse}</span>}</td>
+                      <td>{date(item.createdAt)}</td>
+                      <td><span className={`sd-status-pill ${status.className}`}>{status.label}</span></td>
+                      <td>
+                        {(item.status || 'PENDING').toUpperCase() === 'PENDING'
+                          ? <button className="sd-btn-primary" onClick={() => { setComplaintTarget(item); setComplaintResponse(''); }} type="button">Phản hồi</button>
+                          : 'Đã xử lý'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="sd-users-toolbar">
         <div className="sd-users-toolbar-left">
@@ -202,9 +411,24 @@ export function AdminSalaryTab({ isAdmin = true }) {
             {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
           </div>
           <div className="sd-filter-chips">
-            <button className={`sd-filter-chip ${viewMode === 'CURRENT' ? 'active' : ''}`} onClick={() => setViewMode('CURRENT')} type="button">{isAdmin ? 'Chờ admin chốt' : 'Chờ trả'}</button>
-            <button className={`sd-filter-chip ${viewMode === 'HISTORY' ? 'active' : ''}`} onClick={() => setViewMode('HISTORY')} type="button">{isAdmin ? 'Admin đã chốt' : 'Lịch sử trả lương'}</button>
+            <button className={`sd-filter-chip ${viewMode === 'CURRENT' ? 'active' : ''}`} onClick={() => setViewMode('CURRENT')} type="button">Chờ trả</button>
+            <button className={`sd-filter-chip ${viewMode === 'HISTORY' ? 'active' : ''}`} onClick={() => setViewMode('HISTORY')} type="button">Lịch sử trả lương</button>
           </div>
+          {isAdmin && branchOptions.length > 0 && (
+            <div className="sd-salary-period-filter sd-salary-branch-filter">
+              <label htmlFor="salary-branch">Cơ sở</label>
+              <select
+                id="salary-branch"
+                onChange={(event) => setSelectedBranch(event.target.value)}
+                value={selectedBranch}
+              >
+                <option value="ALL">Tất cả cơ sở</option>
+                {branchOptions.map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {periodOptions.length > 0 && (
             <div className="sd-salary-period-filter">
               <label htmlFor="salary-period">Kỳ lương</label>
@@ -215,7 +439,19 @@ export function AdminSalaryTab({ isAdmin = true }) {
             </div>
           )}
         </div>
-        <button className="sd-btn-ghost" onClick={reload} type="button">Làm mới</button>
+        <div className="sd-salary-toolbar-actions">
+          {!isAdmin && (
+            <button
+              className="sd-btn-primary"
+              disabled={bulkFinalizing || selectedPeriod === 'ALL'}
+              onClick={confirmBranchFinalization}
+              type="button"
+            >
+              {bulkFinalizing ? 'Đang chốt...' : 'Chốt lương cả cơ sở'}
+            </button>
+          )}
+          <button className="sd-btn-ghost" onClick={reload} type="button">Làm mới</button>
+        </div>
       </div>
 
       {message && <p className={`sd-status sd-status-${message.type}`}>{message.text}</p>}
@@ -224,7 +460,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
       {selected && (
         <div className="sd-overlay" onClick={() => setSelected(null)}>
           <div className="sd-modal sd-salary-pay-modal sd-modal--wide" onClick={(event) => event.stopPropagation()}>
-            <div className="sd-modal-header"><h2>{isAdmin ? 'Chi tiết và chốt lương nhân viên' : 'Chi tiết và chốt lương'}</h2><button onClick={() => setSelected(null)} type="button">✕</button></div>
+            <div className="sd-modal-header"><h2>Chi tiết bảng lương</h2><button onClick={() => setSelected(null)} type="button">✕</button></div>
             <div className="sd-modal-body">
               <dl className="sd-dl">
                 <InfoRow label="Nhân viên" value={selected.fullName || selected.username} />
@@ -247,7 +483,6 @@ export function AdminSalaryTab({ isAdmin = true }) {
                   </div>
 
                   {selected.finalizedAt && <p className="sd-salary-finalized-note">Chốt lúc {date(selected.finalizedAt)} bởi {selected.finalizedByName || 'Manager'}</p>}
-                  {selected.adminFinalizedAt && <p className="sd-salary-finalized-note sd-salary-finalized-note--admin">Admin chốt lúc {date(selected.adminFinalizedAt)} bởi {selected.adminFinalizedByName || 'Admin'}</p>}
 
                   {detailLoading ? <p className="sd-salary-empty">Đang tải chi tiết lương...</p> : (
                     <>
@@ -262,10 +497,14 @@ export function AdminSalaryTab({ isAdmin = true }) {
 
                       <h3 className="sd-salary-detail-title">Chi tiết thưởng/phạt</h3>
                       <div className="sd-table-wrap sd-salary-detail-table-wrap">
-                        <table className="sd-table sd-salary-detail-table"><thead><tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th></tr></thead><tbody>
-                          {adjustmentHistory.length === 0 ? <tr><td colSpan={4} className="sd-td-empty">Chưa có thưởng/phạt thủ công.</td></tr> : adjustmentHistory.map((item) => <tr key={item.id}>
-                            <td>{date(item.createdAt)}</td><td>{money(item.bonusAmount)}</td><td>{money(item.penaltyAmount)}</td><td>{item.reason}</td>
-                          </tr>)}
+                        <table className="sd-table sd-salary-detail-table"><thead><tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Trạng thái</th><th>Admin duyệt</th></tr></thead><tbody>
+                          {adjustmentHistory.length === 0 ? <tr><td colSpan={6} className="sd-td-empty">Chưa có thưởng/phạt thủ công.</td></tr> : adjustmentHistory.map((item) => {
+                            const status = adjustmentStatus(item.status);
+                            return <tr key={item.id}>
+                              <td>{date(item.createdAt)}</td><td>{money(item.bonusAmount)}</td><td>{money(item.penaltyAmount)}</td><td>{item.reason}</td>
+                              <td><span className={`sd-status-pill ${status.className}`}>{status.label}</span></td><td>{item.reviewedByName || '—'}</td>
+                            </tr>;
+                          })}
                         </tbody></table>
                       </div>
                     </>
@@ -274,10 +513,42 @@ export function AdminSalaryTab({ isAdmin = true }) {
             </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={() => setSelected(null)} type="button">Đóng</button>
-              {!isAdmin && (selected.status || '').toUpperCase() === 'ADMIN_FINALIZED' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmPayment} type="button">{saving ? 'Đang cập nhật...' : 'Xác nhận đã trả'}</button>}
-              {!isAdmin && (selected.status || 'PENDING').toUpperCase() === 'PENDING' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmFinalization} type="button">{saving ? 'Đang chốt...' : 'Chốt lương'}</button>}
-              {isAdmin && (selected.status || '').toUpperCase() === 'FINALIZED' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmAdminFinalization} type="button">{saving ? 'Đang chốt...' : 'Admin chốt lương'}</button>}
+              {!isAdmin && (selected.status || '').toUpperCase() === 'FINALIZED' && <button className="sd-btn-primary" disabled={saving || detailLoading} onClick={confirmPayment} type="button">{saving ? 'Đang cập nhật...' : 'Xác nhận đã trả'}</button>}
             </div>
+          </div>
+        </div>
+      )}
+
+      {complaintTarget && (
+        <div className="sd-overlay" onClick={() => setComplaintTarget(null)}>
+          <div className="sd-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="sd-modal-header">
+              <h2>Phản hồi khiếu nại lương</h2>
+              <button onClick={() => setComplaintTarget(null)} type="button">✕</button>
+            </div>
+            <form onSubmit={submitComplaintResponse}>
+              <div className="sd-modal-body">
+                <dl className="sd-dl">
+                  <InfoRow label="Nhân viên" value={complaintTarget.employeeName} />
+                  <InfoRow label="Kỳ lương" value={`${complaintTarget.month}/${complaintTarget.year}`} />
+                  <InfoRow label="Nội dung" value={complaintTarget.content} />
+                </dl>
+                <div className="sd-field">
+                  <label>Phản hồi của Manager</label>
+                  <textarea
+                    maxLength="1000"
+                    onChange={(event) => setComplaintResponse(event.target.value)}
+                    required
+                    rows="5"
+                    value={complaintResponse}
+                  />
+                </div>
+              </div>
+              <div className="sd-modal-footer">
+                <button className="sd-btn-ghost" onClick={() => setComplaintTarget(null)} type="button">Hủy</button>
+                <button className="sd-btn-primary" disabled={saving || !complaintResponse.trim()} type="submit">{saving ? 'Đang gửi...' : 'Gửi phản hồi'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -289,7 +560,7 @@ function SalaryEmployeeTable({ history, isAdmin, items, loading, onSelect }) {
   return <div className="sd-table-wrap"><table className="sd-table sd-salary-employee-table"><thead><tr>
     <th>Nhân viên</th><th>Cơ sở</th><th>Tháng</th><th>Giờ làm</th><th>Thực nhận</th><th>Ngân hàng</th><th>Trạng thái</th>
   </tr></thead><tbody>
-    {loading ? <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="sd-td-empty">{isAdmin ? (history ? 'Chưa có bảng lương admin đã chốt.' : 'Chưa có bảng lương nào được manager chốt gửi lên.') : (history ? 'Chưa có lịch sử trả lương.' : 'Không có bảng lương đang chờ xử lý.')}</td></tr> : items.map((item) => <tr
+    {loading ? <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="sd-td-empty">{history ? 'Chưa có lịch sử trả lương.' : (isAdmin ? 'Chưa có bảng lương nào được manager chốt.' : 'Không có bảng lương đang chờ trả.')}</td></tr> : items.map((item) => <tr
       className="sd-tr"
       key={item.id}
       onClick={() => onSelect(item)}

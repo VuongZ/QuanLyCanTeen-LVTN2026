@@ -16,5 +16,8 @@ public class SalaryWorkDetailDto
     public DateTime? CheckOutTime { get; set; }
 
     public decimal WorkedHours { get; set; }
+    public decimal SalaryCoefficient { get; set; }
+    public bool IsWeekend { get; set; }
+    public decimal TotalSalary { get; set; }
     public string Status { get; set; } = string.Empty;
 }

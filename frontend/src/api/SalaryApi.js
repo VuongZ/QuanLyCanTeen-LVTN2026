@@ -50,8 +50,33 @@ export async function finalizeSalary(salaryId) {
   return response.data;
 }
 
-export async function adminFinalizeSalary(salaryId) {
-  const response = await axios.put(`${BASE_URL}/${salaryId}/admin-finalize`);
+export async function finalizeBranchSalaryPeriod(month, year) {
+  const response = await axios.put(
+    `${BASE_URL}/branch/period/${year}/${month}/finalize`,
+  );
+  return response.data;
+}
+
+export async function createSalaryComplaint(salaryId, content) {
+  const response = await axios.post(`${BASE_URL}/${salaryId}/complaints`, { content });
+  return response.data;
+}
+
+export async function getMySalaryComplaints() {
+  const response = await axios.get(`${BASE_URL}/complaints/my`);
+  return response.data;
+}
+
+export async function getBranchSalaryComplaints() {
+  const response = await axios.get(`${BASE_URL}/complaints/branch`);
+  return response.data;
+}
+
+export async function resolveSalaryComplaint(complaintId, responseText) {
+  const response = await axios.put(
+    `${BASE_URL}/complaints/${complaintId}/resolve`,
+    { response: responseText },
+  );
   return response.data;
 }
 
@@ -59,6 +84,19 @@ export async function getSalaryAdjustmentHistory(userId, month, year) {
   const response = await axios.get(`${BASE_URL}/user/${userId}/adjustment-history`, {
     params: { month: month || undefined, year: year || undefined },
   });
+  return response.data;
+}
+
+export async function getPendingSalaryAdjustments() {
+  const response = await axios.get(`${BASE_URL}/adjustment-requests/pending`);
+  return response.data;
+}
+
+export async function reviewSalaryAdjustment(adjustmentId, isApproved, reviewNote = '') {
+  const response = await axios.put(
+    `${BASE_URL}/adjustment-requests/${adjustmentId}/review`,
+    { isApproved, reviewNote },
+  );
   return response.data;
 }
 

@@ -15,6 +15,7 @@ import { ManagerImportTab } from './manager/ManagerImportTab'
 import { ManagerSalaryRuleTab } from './manager/ManagerSalaryRuleTab'
 import { AdminSupplierTab } from './admin/AdminSupplierTab';
 import { AdminSalaryTab } from './admin/AdminSalaryTab';
+import { AdminWorkHoursRanking } from './admin/AdminWorkHoursRanking';
 import { InventoryTab } from './shared/InventoryTab';
 import { ManagerExportTab } from './manager/ManagerExportTab';
 import { FrontStockTab } from './shared/FrontStockTab';
@@ -147,13 +148,13 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   }
 
   async function handleSaveAdd() {
-    if (!form.email && !form.phoneNumber && !form.phone) return setFormErr('Vui lòng nhập email hoặc số điện thoại')
-    if (!form.fullName || !form.password) return setFormErr('Vui lòng điền đầy đủ họ tên và password')
+    if (!form.email?.trim()) return setFormErr('Vui lòng nhập email để gửi mật khẩu cho nhân viên')
+    if (!form.fullName) return setFormErr('Vui lòng nhập họ tên nhân viên')
     setSaving(true); setFormErr('')
     try {
       const res = await axios.post('/api/User', form)
       setLocalUsers((prev) => [...(prev ?? activeUsers), res.data]); closeModal()
-    } catch (err) { setFormErr(err.message || 'Không thể thêm nhân viên') } finally { setSaving(false) }
+    } catch (err) { setFormErr(err.response?.data?.message || err.message || 'Không thể thêm nhân viên') } finally { setSaving(false) }
   }
 
   async function handleSaveEdit() {
@@ -321,23 +322,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {/* THỐNG KÊ (Giữ lại trong file chính vì liên kết với user data trực tiếp) */}
             {activeTab === 'overview' && isAdmin && (
               <div className="sd-profile-layout">
-                <div className="sd-stat-grid">
-                  <div className="sd-stat-card"><span className="sd-stat-icon">●</span><h3>{activeUsers.length}</h3><p>Tổng nhân viên</p></div>
-                  <div className="sd-stat-card"><span className="sd-stat-icon">⊞</span><h3>{branches.length}</h3><p>Chi nhánh</p></div>
-                </div>
-                <div className="sd-card">
-                  <div className="sd-card-header"><p className="sd-eyebrow">Thống kê</p><h2>Phân bổ chức vụ</h2></div>
-                  {roles.filter((r) => r.roleName !== 'ADMIN').map((r) => {
-                    const cnt = activeUsers.filter((u) => u.roleName?.toUpperCase() === r.roleName?.toUpperCase()).length
-                    const pct = activeUsers.length ? Math.round((cnt / activeUsers.length) * 100) : 0
-                    return (
-                      <div key={r.id} className="sd-role-bar">
-                        <div className="sd-role-bar-head"><strong>{r.roleName}</strong><span>{cnt} người · {pct}%</span></div>
-                        <div className="sd-bar-track"><div className="sd-bar-fill" style={{ width: `${pct}%` }} /></div>
-                      </div>
-                    )
-                  })}
-                </div>
+                <AdminWorkHoursRanking branches={branches} />
               </div>
             )}
 
@@ -524,12 +509,13 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             <div className="sd-modal-body">
               <div className="sd-modal-grid">
                 <div className="sd-field"><label>Họ và tên *</label><input name="fullName" value={form.fullName} onChange={handleFormChange} /></div>
-                <div className="sd-field"><label>Email</label><input name="email" value={form.email || ''} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>{modal === 'add' ? 'Email *' : 'Email'}</label><input name="email" type="email" value={form.email || ''} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>SĐT</label><input name="phoneNumber" value={form.phoneNumber || form.phone || ''} onChange={handleFormChange} /></div>
                 {modal === 'edit' && <div className="sd-field"><label>Ngân hàng</label><input name="bankName" value={form.bankName || ''} onChange={handleFormChange} /></div>}
                 {modal === 'edit' && <div className="sd-field"><label>Số tài khoản</label><input name="bankAccountNumber" value={form.bankAccountNumber || ''} onChange={handleFormChange} /></div>}
                 {modal === 'edit' && <div className="sd-field"><label>Tên tài khoản</label><input name="bankAccountName" value={form.bankAccountName || ''} onChange={handleFormChange} /></div>}
-                <div className="sd-field"><label>{modal === 'add' ? 'Password *' : 'Password mới'}</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder={modal === 'add' ? '••••••' : 'Để trống nếu giữ nguyên'} /></div>
+                {modal === 'edit' && <div className="sd-field"><label>Password mới</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder="Để trống nếu giữ nguyên" /></div>}
+                {modal === 'add' && <p className="sd-form-hint">Hệ thống sẽ tự tạo mật khẩu gồm 6 chữ số và gửi tới email nhân viên.</p>}
                 <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
                 {modal === 'edit' && canManageUsers && (
                   <div className="sd-field">

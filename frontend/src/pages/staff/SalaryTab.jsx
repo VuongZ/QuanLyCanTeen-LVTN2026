@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  createSalaryComplaint,
+  getMySalaryComplaints,
   getSalaryAdjustmentHistory,
   getSalaryByUser,
   getSalaryWorkDetails,
@@ -62,6 +64,13 @@ function getWorkStatusClass(status) {
   return 'not-started';
 }
 
+function getAdjustmentStatus(status) {
+  const normalized = (status || 'PENDING').toUpperCase();
+  if (normalized === 'APPROVED') return { label: 'Đã duyệt', className: 'approved' };
+  if (normalized === 'REJECTED') return { label: 'Từ chối', className: 'rejected' };
+  return { label: 'Chờ Admin', className: 'pending' };
+}
+
 function SalaryMetric({ label, value }) {
   return (
     <div className="sd-salary-metric">
@@ -78,6 +87,10 @@ const [selectedMonth, setSelectedMonth] = useState('');
 
   const [workDetails, setWorkDetails] = useState([]);
   const [adjustmentHistory, setAdjustmentHistory] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [complaintContent, setComplaintContent] = useState('');
+  const [complaintSaving, setComplaintSaving] = useState(false);
+  const [complaintError, setComplaintError] = useState('');
 
   const [salaryLoading, setSalaryLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -95,10 +108,14 @@ const [selectedMonth, setSelectedMonth] = useState('');
       setSalaryError('');
 
       try {
-        const data = await getSalaryByUser(user.id);
+        const [data, complaintData] = await Promise.all([
+          getSalaryByUser(user.id),
+          getMySalaryComplaints(),
+        ]);
         const nextSalaries = Array.isArray(data) ? data : [];
 
         setSalaries(nextSalaries);
+        setComplaints(Array.isArray(complaintData) ? complaintData : []);
 
        if (nextSalaries[0]) {
   setSelectedYear(String(nextSalaries[0].year));
@@ -157,6 +174,33 @@ const selectedSalary = useMemo(() => {
       item.month === Number(selectedMonth),
   ) || null;
 }, [salaries, selectedYear, selectedMonth]);
+
+  const selectedComplaint = useMemo(
+    () => complaints.find((item) => item.salaryId === selectedSalary?.id) || null,
+    [complaints, selectedSalary?.id],
+  );
+
+  async function submitComplaint(event) {
+    event.preventDefault();
+    if (!selectedSalary || !complaintContent.trim()) return;
+
+    setComplaintSaving(true);
+    setComplaintError('');
+    try {
+      const created = await createSalaryComplaint(
+        selectedSalary.id,
+        complaintContent.trim(),
+      );
+      setComplaints((current) => [created, ...current]);
+      setComplaintContent('');
+    } catch (error) {
+      setComplaintError(
+        error.response?.data?.message || 'Không thể gửi khiếu nại lương.',
+      );
+    } finally {
+      setComplaintSaving(false);
+    }
+  }
 
   useEffect(() => {
     async function loadWorkDetails() {
@@ -320,8 +364,8 @@ const selectedSalary = useMemo(() => {
           </p>
         ) : !selectedSalary ? (
           <p className="sd-salary-empty">
-            Chưa có dữ liệu lương. Bảng lương sẽ được tạo
-            sau khi Nhân viên hoàn tất điểm danh ra ca.
+            Chưa có bảng lương đã chốt. Dữ liệu lương sẽ hiển thị
+            sau khi Manager chốt lương cho cơ sở.
           </p>
         ) : workDetails.length === 0 ? (
           <p className="sd-salary-empty">
@@ -338,6 +382,9 @@ const selectedSalary = useMemo(() => {
                   <th>Vào ca</th>
                   <th>Ra ca</th>
                   <th>Số giờ làm</th>
+                  <th>Hệ số lương</th>
+                  <th>Loại ngày</th>
+                  <th>Tổng lương ngày</th>
                   <th>Trạng thái</th>
                 </tr>
               </thead>
@@ -363,6 +410,26 @@ const selectedSalary = useMemo(() => {
                       {formatNumber(item.workedHours)} giờ
                     </td>
 
+                    <td className="sd-salary-coefficient">
+                      {formatNumber(item.salaryCoefficient)}
+                    </td>
+
+                    <td>
+                      <span
+                        className={
+                          `sd-day-type ${
+                            item.isWeekend ? 'weekend' : 'weekday'
+                          }`
+                        }
+                      >
+                        {item.isWeekend ? 'Cuối tuần' : 'Ngày thường'}
+                      </span>
+                    </td>
+
+                    <td className="sd-daily-salary">
+                      {formatMoney(item.totalSalary)}
+                    </td>
+
                     <td>
                       <span
                         className={
@@ -382,6 +449,54 @@ const selectedSalary = useMemo(() => {
         )}
       </div>
 
+      {selectedSalary && (
+        <div className="sd-card sd-salary-complaint-card">
+          <div className="sd-card-header">
+            <div>
+              <p className="sd-eyebrow">Phản hồi bảng lương</p>
+              <h2>Khiếu nại lương tháng {selectedSalary.month}/{selectedSalary.year}</h2>
+            </div>
+          </div>
+
+          {selectedComplaint ? (
+            <div className="sd-complaint-detail">
+              <p><strong>Nội dung đã gửi:</strong> {selectedComplaint.content}</p>
+              <p>
+                <strong>Trạng thái:</strong>{' '}
+                {(selectedComplaint.status || 'PENDING').toUpperCase() === 'RESOLVED'
+                  ? 'Manager đã phản hồi'
+                  : 'Đang chờ Manager xử lý'}
+              </p>
+              {selectedComplaint.managerResponse && (
+                <p className="sd-complaint-response">
+                  <strong>Phản hồi của Manager:</strong> {selectedComplaint.managerResponse}
+                </p>
+              )}
+            </div>
+          ) : (selectedSalary.status || '').toUpperCase() === 'FINALIZED' ? (
+            <form className="sd-complaint-form" onSubmit={submitComplaint}>
+              <div className="sd-field">
+                <label>Nội dung khiếu nại</label>
+                <textarea
+                  maxLength="1000"
+                  onChange={(event) => setComplaintContent(event.target.value)}
+                  placeholder="Mô tả khoản lương, giờ làm, thưởng hoặc phạt cần Manager kiểm tra..."
+                  required
+                  rows="4"
+                  value={complaintContent}
+                />
+              </div>
+              {complaintError && <p className="sd-status sd-status-error">{complaintError}</p>}
+              <button className="sd-btn-primary" disabled={complaintSaving || !complaintContent.trim()} type="submit">
+                {complaintSaving ? 'Đang gửi...' : 'Gửi khiếu nại cho Manager'}
+              </button>
+            </form>
+          ) : (
+            <p className="sd-salary-empty">Kỳ lương này đã được Admin chốt hoặc đã thanh toán nên không còn nhận khiếu nại mới.</p>
+          )}
+        </div>
+      )}
+
       <div className="sd-card sd-work-detail-card">
         <div className="sd-card-header">
           <div>
@@ -399,18 +514,22 @@ const selectedSalary = useMemo(() => {
           <div className="sd-salary-table-wrap">
             <table className="sd-salary-table sd-adjustment-history-table">
               <thead>
-                <tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người tạo</th></tr>
+                <tr><th>Thời gian</th><th>Thưởng</th><th>Phạt</th><th>Lý do</th><th>Người tạo</th><th>Trạng thái</th></tr>
               </thead>
               <tbody>
-                {adjustmentHistory.map((item) => (
+                {adjustmentHistory.map((item) => {
+                  const status = getAdjustmentStatus(item.status);
+                  return (
                   <tr key={item.id}>
                     <td>{new Date(item.createdAt).toLocaleString('vi-VN')}</td>
                     <td>{formatMoney(item.bonusAmount)}</td>
                     <td>{formatMoney(item.penaltyAmount)}</td>
                     <td>{item.reason}</td>
                     <td>{item.createdByName || 'Quản lý'}</td>
+                    <td><span className={`sd-status-pill ${status.className}`}>{status.label}</span></td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

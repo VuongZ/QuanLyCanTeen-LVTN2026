@@ -392,11 +392,6 @@ public class AttendanceService
 
             string.Equals(
                 status,
-                "ADMIN_FINALIZED",
-                StringComparison.OrdinalIgnoreCase) ||
-
-            string.Equals(
-                status,
                 "PAID",
                 StringComparison.OrdinalIgnoreCase);
     }

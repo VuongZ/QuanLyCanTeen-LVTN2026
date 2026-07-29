@@ -6,6 +6,10 @@ namespace LuanVanTotNghiep.Services;
 
 public class SalaryService
 {
+    private const string AdjustmentPending = "PENDING";
+    private const string AdjustmentApproved = "APPROVED";
+    private const string AdjustmentRejected = "REJECTED";
+
     private readonly AppDbContext _context;
 
     public SalaryService(AppDbContext context)
@@ -13,11 +17,22 @@ public class SalaryService
         _context = context;
     }
 
-    public async Task<List<SalaryDto>> GetByUserAsync(int userId)
+    public async Task<List<SalaryDto>> GetByUserAsync(
+        int userId,
+        bool finalizedOnly = false)
     {
-        return await _context.LuongMonthlySalaries
+        var query = _context.LuongMonthlySalaries
             .AsNoTracking()
-            .Where(s => s.UserId == userId)
+            .Where(s => s.UserId == userId);
+
+        if (finalizedOnly)
+        {
+            query = query.Where(s =>
+                (s.Status ?? "").ToUpper() == "FINALIZED"
+                || (s.Status ?? "").ToUpper() == "PAID");
+        }
+
+        return await query
             .OrderByDescending(s => s.Year)
             .ThenByDescending(s => s.Month)
             .Select(s => new SalaryDto
@@ -26,6 +41,7 @@ public class SalaryService
                 UserId = s.UserId,
                 Username = s.User.Email ?? s.User.PhoneNumber,
                 FullName = s.User.FullName,
+                BranchId = s.User.BranchId,
                 BranchName = s.User.Branch != null ? s.User.Branch.Name : null,
                 BankName = s.User.NsUserBankAccounts.Select(b => b.BankName).FirstOrDefault(),
                 BankAccountNumber = s.User.NsUserBankAccounts.Select(b => b.BankAccountNumber).FirstOrDefault(),
@@ -44,11 +60,6 @@ public class SalaryService
                 FinalizedByName = s.FinalizedByUser != null
                     ? s.FinalizedByUser.FullName ?? s.FinalizedByUser.Email ?? s.FinalizedByUser.PhoneNumber
                     : null,
-                AdminFinalizedAt = s.AdminFinalizedAt,
-                AdminFinalizedByUserId = s.AdminFinalizedByUserId,
-                AdminFinalizedByName = s.AdminFinalizedByUser != null
-                    ? s.AdminFinalizedByUser.FullName ?? s.AdminFinalizedByUser.Email ?? s.AdminFinalizedByUser.PhoneNumber
-                    : null,
                 CreatedAt = s.CreatedAt
             })
             .ToListAsync();
@@ -58,9 +69,6 @@ public class SalaryService
     {
         return await _context.LuongMonthlySalaries
             .AsNoTracking()
-            .Where(s => (s.Status ?? "").ToUpper() == "FINALIZED"
-                || (s.Status ?? "").ToUpper() == "ADMIN_FINALIZED"
-                || (s.Status ?? "").ToUpper() == "PAID")
             .Where(s => s.User.Role == null
                 || (s.User.Role.RoleName != "ADMIN" && s.User.Role.RoleName != "MANAGER"))
             .Include(s => s.User)
@@ -76,6 +84,7 @@ public class SalaryService
                 UserId = s.UserId,
                 Username = s.User.Email ?? s.User.PhoneNumber,
                 FullName = s.User.FullName,
+                BranchId = s.User.BranchId,
                 BranchName = s.User.Branch != null ? s.User.Branch.Name : null,
                 BankName = s.User.NsUserBankAccounts.Select(b => b.BankName).FirstOrDefault(),
                 BankAccountNumber = s.User.NsUserBankAccounts.Select(b => b.BankAccountNumber).FirstOrDefault(),
@@ -93,11 +102,6 @@ public class SalaryService
                 FinalizedByUserId = s.FinalizedByUserId,
                 FinalizedByName = s.FinalizedByUser != null
                     ? s.FinalizedByUser.FullName ?? s.FinalizedByUser.Email ?? s.FinalizedByUser.PhoneNumber
-                    : null,
-                AdminFinalizedAt = s.AdminFinalizedAt,
-                AdminFinalizedByUserId = s.AdminFinalizedByUserId,
-                AdminFinalizedByName = s.AdminFinalizedByUser != null
-                    ? s.AdminFinalizedByUser.FullName ?? s.AdminFinalizedByUser.Email ?? s.AdminFinalizedByUser.PhoneNumber
                     : null,
                 CreatedAt = s.CreatedAt
             })
@@ -122,6 +126,7 @@ public class SalaryService
                 UserId = s.UserId,
                 Username = s.User.Email ?? s.User.PhoneNumber,
                 FullName = s.User.FullName,
+                BranchId = s.User.BranchId,
                 BranchName = s.User.Branch != null ? s.User.Branch.Name : null,
                 BankName = s.User.NsUserBankAccounts.Select(b => b.BankName).FirstOrDefault(),
                 BankAccountNumber = s.User.NsUserBankAccounts.Select(b => b.BankAccountNumber).FirstOrDefault(),
@@ -139,11 +144,6 @@ public class SalaryService
                 FinalizedByUserId = s.FinalizedByUserId,
                 FinalizedByName = s.FinalizedByUser != null
                     ? s.FinalizedByUser.FullName ?? s.FinalizedByUser.Email ?? s.FinalizedByUser.PhoneNumber
-                    : null,
-                AdminFinalizedAt = s.AdminFinalizedAt,
-                AdminFinalizedByUserId = s.AdminFinalizedByUserId,
-                AdminFinalizedByName = s.AdminFinalizedByUser != null
-                    ? s.AdminFinalizedByUser.FullName ?? s.AdminFinalizedByUser.Email ?? s.AdminFinalizedByUser.PhoneNumber
                     : null,
                 CreatedAt = s.CreatedAt
             })
@@ -427,7 +427,7 @@ public class SalaryService
         return await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
     }
 
-    public async Task<SalaryRuleAdjustmentDto?> AddManualAdjustmentAsync(
+    public async Task<SalaryAdjustmentHistoryDto?> AddManualAdjustmentAsync(
         int branchId,
         int createdByUserId,
         ManualSalaryAdjustmentDto dto)
@@ -482,31 +482,7 @@ public class SalaryService
             _context.LuongMonthlySalaries.Add(salary);
         }
 
-        var rule = await _context.LuongSalaryRules
-            .AsNoTracking()
-            .Where(r => r.BranchId == branchId)
-            .OrderByDescending(r => r.Id)
-            .FirstOrDefaultAsync();
-        if (rule == null)
-        {
-            salary.TotalBonus = (salary.TotalBonus ?? 0) + dto.BonusAmount;
-            salary.TotalPenalty = (salary.TotalPenalty ?? 0) + dto.PenaltyAmount;
-        }
-        else
-        {
-            var ruleAdjustment = await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
-            var manualTotals = await GetManualAdjustmentTotalsAsync(user.Id, dto.Month, dto.Year);
-            salary.TotalBonus = ruleAdjustment.CalculatedBonus + manualTotals.Bonus + dto.BonusAmount;
-            salary.TotalPenalty = ruleAdjustment.CalculatedPenalty + manualTotals.Penalty + dto.PenaltyAmount;
-        }
-        salary.HourlyWageAtTime = SalaryWagePolicy.GetHourlyWage(
-            user,
-            new DateOnly(dto.Year, dto.Month, DateTime.DaysInMonth(dto.Year, dto.Month)));
-        salary.TotalSalary = (salary.TotalHours * salary.HourlyWageAtTime)
-            + (salary.TotalBonus ?? 0)
-            - (salary.TotalPenalty ?? 0);
-
-        _context.LuongSalaryAdjustmentHistories.Add(new LuongSalaryAdjustmentHistory
+        var request = new LuongSalaryAdjustmentHistory
         {
             Salary = salary,
             UserId = user.Id,
@@ -516,12 +492,14 @@ public class SalaryService
             BonusAmount = dto.BonusAmount,
             PenaltyAmount = dto.PenaltyAmount,
             Reason = reason,
+            Status = AdjustmentPending,
             CreatedAt = DateTime.Now
-        });
+        };
+        _context.LuongSalaryAdjustmentHistories.Add(request);
 
         await _context.SaveChangesAsync();
 
-        return await BuildAdjustmentDtoAsync(user, dto.Month, dto.Year, rule);
+        return await GetAdjustmentByIdAsync(request.Id);
     }
 
     public async Task<List<SalaryAdjustmentHistoryDto>> GetAdjustmentHistoryAsync(
@@ -552,11 +530,184 @@ public class SalaryService
                 BonusAmount = h.BonusAmount,
                 PenaltyAmount = h.PenaltyAmount,
                 Reason = h.Reason,
+                Status = h.Status,
                 CreatedByUserId = h.CreatedByUserId,
                 CreatedByName = h.CreatedByUser.FullName ?? h.CreatedByUser.Email ?? h.CreatedByUser.PhoneNumber,
+                BranchName = h.User.Branch != null ? h.User.Branch.Name : null,
+                ReviewedByUserId = h.ReviewedByUserId,
+                ReviewedByName = h.ReviewedByUser != null
+                    ? h.ReviewedByUser.FullName ?? h.ReviewedByUser.Email ?? h.ReviewedByUser.PhoneNumber
+                    : null,
+                ReviewedAt = h.ReviewedAt,
+                ReviewNote = h.ReviewNote,
                 CreatedAt = h.CreatedAt
             })
             .ToListAsync();
+    }
+
+    public async Task<List<SalaryDto>> FinalizeBranchPeriodAsync(
+        int branchId,
+        int month,
+        int year,
+        int managerUserId)
+    {
+        if (month < 1 || month > 12 || year < 2000 || year > 2100)
+            throw new InvalidOperationException("Kỳ lương không hợp lệ.");
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var salaries = await _context.LuongMonthlySalaries
+            .Include(s => s.User)
+                .ThenInclude(u => u.Branch)
+            .Include(s => s.User)
+                .ThenInclude(u => u.Role)
+            .Include(s => s.User)
+                .ThenInclude(u => u.NsUserBankAccounts)
+            .Include(s => s.FinalizedByUser)
+            .Where(s =>
+                s.User.BranchId == branchId
+                && s.Month == month
+                && s.Year == year
+                && (s.User.Role == null
+                    || (s.User.Role.RoleName != "ADMIN"
+                        && s.User.Role.RoleName != "MANAGER")))
+            .OrderBy(s => s.User.FullName ?? s.User.Email ?? s.User.PhoneNumber)
+            .ToListAsync();
+
+        if (salaries.Count == 0)
+            throw new InvalidOperationException("Không có bảng lương nhân viên trong kỳ đã chọn.");
+
+        var salaryIds = salaries.Select(s => s.Id).ToList();
+        var pendingEmployee = await _context.LuongSalaryAdjustmentHistories
+            .AsNoTracking()
+            .Where(h => salaryIds.Contains(h.SalaryId) && h.Status == AdjustmentPending)
+            .Select(h => h.User.FullName ?? h.User.Email ?? h.User.PhoneNumber)
+            .FirstOrDefaultAsync();
+        if (pendingEmployee != null)
+        {
+            throw new InvalidOperationException(
+                $"Nhân viên {pendingEmployee} còn yêu cầu thưởng/phạt đang chờ Admin duyệt.");
+        }
+
+        var rule = await _context.LuongSalaryRules
+            .AsNoTracking()
+            .Where(r => r.BranchId == branchId)
+            .OrderByDescending(r => r.Id)
+            .FirstOrDefaultAsync();
+
+        foreach (var salary in salaries)
+        {
+            var status = (salary.Status ?? "PENDING").ToUpperInvariant();
+            if (status == "PAID")
+                continue;
+            if (status != "PENDING" && status != "FINALIZED")
+                throw new InvalidOperationException($"Bảng lương của {salary.User.FullName} có trạng thái không hợp lệ.");
+            if (status == "FINALIZED")
+                continue;
+
+            if (rule != null)
+            {
+                var adjustment = await BuildAdjustmentDtoAsync(
+                    salary.User,
+                    month,
+                    year,
+                    rule);
+                await SetSalaryAdjustmentTotalsAsync(salary, adjustment);
+            }
+
+            salary.Status = "FINALIZED";
+            salary.FinalizedAt = DateTime.Now;
+            salary.FinalizedByUserId = managerUserId;
+        }
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return salaries.Select(ToDto).ToList();
+    }
+
+    public async Task<List<SalaryAdjustmentHistoryDto>> GetPendingAdjustmentRequestsAsync()
+    {
+        return await _context.LuongSalaryAdjustmentHistories
+            .AsNoTracking()
+            .Where(h => h.Status == AdjustmentPending)
+            .OrderBy(h => h.CreatedAt)
+            .ThenBy(h => h.Id)
+            .Select(h => new SalaryAdjustmentHistoryDto
+            {
+                Id = h.Id,
+                SalaryId = h.SalaryId,
+                UserId = h.UserId,
+                EmployeeName = h.User.FullName ?? h.User.Email ?? h.User.PhoneNumber,
+                Month = h.Month,
+                Year = h.Year,
+                BonusAmount = h.BonusAmount,
+                PenaltyAmount = h.PenaltyAmount,
+                Reason = h.Reason,
+                Status = h.Status,
+                CreatedByUserId = h.CreatedByUserId,
+                CreatedByName = h.CreatedByUser.FullName ?? h.CreatedByUser.Email ?? h.CreatedByUser.PhoneNumber,
+                BranchName = h.User.Branch != null ? h.User.Branch.Name : null,
+                CreatedAt = h.CreatedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<SalaryAdjustmentHistoryDto?> ReviewAdjustmentAsync(
+        int adjustmentId,
+        int adminUserId,
+        ReviewSalaryAdjustmentDto dto)
+    {
+        var reviewNote = dto.ReviewNote?.Trim();
+        if (reviewNote?.Length > 500)
+            throw new InvalidOperationException("Ghi chú duyệt không được vượt quá 500 ký tự.");
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var adjustment = await _context.LuongSalaryAdjustmentHistories
+            .Include(h => h.Salary)
+            .Include(h => h.User)
+                .ThenInclude(u => u.Role)
+            .FirstOrDefaultAsync(h => h.Id == adjustmentId);
+
+        if (adjustment == null)
+            return null;
+
+        if (!string.Equals(adjustment.Status, AdjustmentPending, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Yêu cầu thưởng/phạt này đã được xử lý.");
+
+        if (IsSalaryLocked(adjustment.Salary.Status))
+            throw new InvalidOperationException("Bảng lương đã chốt hoặc thanh toán, không thể duyệt yêu cầu.");
+
+        adjustment.Status = dto.IsApproved
+            ? AdjustmentApproved
+            : AdjustmentRejected;
+        adjustment.ReviewedByUserId = adminUserId;
+        adjustment.ReviewedAt = DateTime.Now;
+        adjustment.ReviewNote = reviewNote;
+
+        await _context.SaveChangesAsync();
+
+        if (dto.IsApproved)
+        {
+            var rule = await _context.LuongSalaryRules
+                .AsNoTracking()
+                .Where(r => r.BranchId == adjustment.User.BranchId)
+                .OrderByDescending(r => r.Id)
+                .FirstOrDefaultAsync();
+
+            var calculated = await BuildAdjustmentDtoAsync(
+                adjustment.User,
+                adjustment.Month,
+                adjustment.Year,
+                rule);
+
+            await SetSalaryAdjustmentTotalsAsync(adjustment.Salary, calculated);
+            await _context.SaveChangesAsync();
+        }
+
+        await transaction.CommitAsync();
+        return await GetAdjustmentByIdAsync(adjustment.Id);
     }
 
     public async Task<SalaryDto?> FinalizeAsync(int salaryId, int branchId, int managerUserId)
@@ -576,14 +727,16 @@ public class SalaryService
         if (status == "PAID")
             throw new InvalidOperationException("Bảng lương đã thanh toán.");
 
-        if (status == "ADMIN_FINALIZED")
-            throw new InvalidOperationException("Bảng lương đã được admin chốt.");
-
         if (status != "PENDING" && status != "FINALIZED")
             throw new InvalidOperationException("Trạng thái bảng lương không cho phép chốt.");
 
         if (status != "FINALIZED")
         {
+            var hasPendingAdjustment = await _context.LuongSalaryAdjustmentHistories
+                .AnyAsync(h => h.SalaryId == salary.Id && h.Status == AdjustmentPending);
+            if (hasPendingAdjustment)
+                throw new InvalidOperationException("Còn yêu cầu thưởng/phạt đang chờ Admin duyệt.");
+
             var rule = await _context.LuongSalaryRules
                 .AsNoTracking()
                 .Where(r => r.BranchId == salary.User.BranchId)
@@ -607,44 +760,6 @@ public class SalaryService
         return ToDto(salary);
     }
 
-    public async Task<SalaryDto?> AdminFinalizeAsync(int salaryId, int adminUserId)
-    {
-        var salary = await _context.LuongMonthlySalaries
-            .Include(s => s.User)
-            .ThenInclude(u => u.Branch)
-            .Include(s => s.User)
-            .ThenInclude(u => u.NsUserBankAccounts)
-            .Include(s => s.FinalizedByUser)
-            .Include(s => s.AdminFinalizedByUser)
-            .FirstOrDefaultAsync(s => s.Id == salaryId);
-
-        if (salary == null)
-            return null;
-
-        var status = (salary.Status ?? "PENDING").ToUpperInvariant();
-        if (status == "PENDING")
-            throw new InvalidOperationException("Manager phải chốt bảng lương trước khi admin có thể chốt.");
-        if (status == "PAID")
-            throw new InvalidOperationException("Bảng lương đã thanh toán.");
-
-        if (status != "FINALIZED" && status != "ADMIN_FINALIZED")
-            throw new InvalidOperationException("Chỉ có thể chốt bảng lương đã được manager chốt.");
-
-        if (status != "ADMIN_FINALIZED")
-        {
-            salary.Status = "ADMIN_FINALIZED";
-            salary.AdminFinalizedAt = DateTime.Now;
-            salary.AdminFinalizedByUserId = adminUserId;
-            await _context.SaveChangesAsync();
-
-            var adminReference = _context.Entry(salary).Reference(s => s.AdminFinalizedByUser);
-            adminReference.IsLoaded = false;
-            await adminReference.LoadAsync();
-        }
-
-        return ToDto(salary);
-    }
-
     public async Task<SalaryDto?> MarkPaidAsync(int salaryId, int branchId)
     {
         var salary = await _context.LuongMonthlySalaries
@@ -653,14 +768,23 @@ public class SalaryService
             .Include(s => s.User)
             .ThenInclude(u => u.NsUserBankAccounts)
             .Include(s => s.FinalizedByUser)
-            .Include(s => s.AdminFinalizedByUser)
             .FirstOrDefaultAsync(s => s.Id == salaryId && s.User.BranchId == branchId);
 
         if (salary == null)
             return null;
 
-        if (!string.Equals(salary.Status, "ADMIN_FINALIZED", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Admin phải chốt bảng lương trước khi manager xác nhận đã trả.");
+        if (!string.Equals(salary.Status, "FINALIZED", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Manager phải chốt bảng lương trước khi xác nhận đã trả.");
+
+        var hasPendingAdjustment = await _context.LuongSalaryAdjustmentHistories
+            .AnyAsync(h => h.SalaryId == salary.Id && h.Status == AdjustmentPending);
+        if (hasPendingAdjustment)
+            throw new InvalidOperationException("Còn yêu cầu thưởng/phạt đang chờ Admin duyệt.");
+
+        var hasPendingComplaint = await _context.LuongSalaryComplaints
+            .AnyAsync(c => c.SalaryId == salary.Id && c.Status == "PENDING");
+        if (hasPendingComplaint)
+            throw new InvalidOperationException("Nhân viên đang có khiếu nại lương chưa được xử lý.");
 
         salary.Status = "PAID";
         salary.PaidAt = DateTime.Now;
@@ -677,6 +801,7 @@ public class SalaryService
             UserId = s.UserId,
             Username = s.User?.Email ?? s.User?.PhoneNumber,
             FullName = s.User?.FullName,
+            BranchId = s.User?.BranchId,
             BranchName = s.User?.Branch?.Name,
             BankName = s.User?.NsUserBankAccounts.FirstOrDefault()?.BankName,
             BankAccountNumber = s.User?.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
@@ -695,11 +820,6 @@ public class SalaryService
             FinalizedByName = s.FinalizedByUser?.FullName
                 ?? s.FinalizedByUser?.Email
                 ?? s.FinalizedByUser?.PhoneNumber,
-            AdminFinalizedAt = s.AdminFinalizedAt,
-            AdminFinalizedByUserId = s.AdminFinalizedByUserId,
-            AdminFinalizedByName = s.AdminFinalizedByUser?.FullName
-                ?? s.AdminFinalizedByUser?.Email
-                ?? s.AdminFinalizedByUser?.PhoneNumber,
             CreatedAt = s.CreatedAt
         };
     }
@@ -707,7 +827,6 @@ public class SalaryService
     private static bool IsSalaryLocked(string? status)
     {
         return string.Equals(status, "FINALIZED", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(status, "ADMIN_FINALIZED", StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -775,7 +894,11 @@ public class SalaryService
     {
         var totals = await _context.LuongSalaryAdjustmentHistories
             .AsNoTracking()
-            .Where(h => h.UserId == userId && h.Month == month && h.Year == year)
+            .Where(h =>
+                h.UserId == userId
+                && h.Month == month
+                && h.Year == year
+                && h.Status == AdjustmentApproved)
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -787,6 +910,37 @@ public class SalaryService
         return totals == null
             ? (0, 0)
             : (totals.Bonus, totals.Penalty);
+    }
+
+    private async Task<SalaryAdjustmentHistoryDto?> GetAdjustmentByIdAsync(int adjustmentId)
+    {
+        return await _context.LuongSalaryAdjustmentHistories
+            .AsNoTracking()
+            .Where(h => h.Id == adjustmentId)
+            .Select(h => new SalaryAdjustmentHistoryDto
+            {
+                Id = h.Id,
+                SalaryId = h.SalaryId,
+                UserId = h.UserId,
+                EmployeeName = h.User.FullName ?? h.User.Email ?? h.User.PhoneNumber,
+                Month = h.Month,
+                Year = h.Year,
+                BonusAmount = h.BonusAmount,
+                PenaltyAmount = h.PenaltyAmount,
+                Reason = h.Reason,
+                Status = h.Status,
+                CreatedByUserId = h.CreatedByUserId,
+                CreatedByName = h.CreatedByUser.FullName ?? h.CreatedByUser.Email ?? h.CreatedByUser.PhoneNumber,
+                BranchName = h.User.Branch != null ? h.User.Branch.Name : null,
+                ReviewedByUserId = h.ReviewedByUserId,
+                ReviewedByName = h.ReviewedByUser != null
+                    ? h.ReviewedByUser.FullName ?? h.ReviewedByUser.Email ?? h.ReviewedByUser.PhoneNumber
+                    : null,
+                ReviewedAt = h.ReviewedAt,
+                ReviewNote = h.ReviewNote,
+                CreatedAt = h.CreatedAt
+            })
+            .FirstOrDefaultAsync();
     }
 
     private async Task<SalaryRuleAdjustmentDto> BuildAdjustmentDtoAsync(NsUser user, int month, int year, LuongSalaryRule? rule)

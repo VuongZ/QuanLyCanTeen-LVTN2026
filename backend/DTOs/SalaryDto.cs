@@ -6,6 +6,7 @@ public class SalaryDto
     public int UserId { get; set; }
     public string? Username { get; set; }
     public string? FullName { get; set; }
+    public int? BranchId { get; set; }
     public string? BranchName { get; set; }
     public string? BankName { get; set; }
     public string? BankAccountNumber { get; set; }
@@ -22,9 +23,6 @@ public class SalaryDto
     public DateTime? FinalizedAt { get; set; }
     public int? FinalizedByUserId { get; set; }
     public string? FinalizedByName { get; set; }
-    public DateTime? AdminFinalizedAt { get; set; }
-    public int? AdminFinalizedByUserId { get; set; }
-    public string? AdminFinalizedByName { get; set; }
     public DateTime? CreatedAt { get; set; }
 }
 

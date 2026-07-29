@@ -1828,6 +1828,161 @@
   color: #6d28d9;
 }
 
+.sd-status-pill.rejected {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sd-adjustment-approval-card {
+  margin-bottom: 20px;
+}
+
+.sd-adjustment-approval-table {
+  min-width: 1100px;
+}
+
+.sd-adjustment-approval-table td:nth-child(6) {
+  min-width: 220px;
+  white-space: normal;
+}
+
+.sd-salary-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.sd-salary-toolbar-actions .sd-btn-primary,
+.sd-salary-toolbar-actions .sd-btn-ghost {
+  align-items: center;
+  display: inline-flex;
+  font-size: 14px;
+  height: 46px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0 18px;
+  width: auto;
+  white-space: nowrap;
+}
+
+.sd-salary-complaint-card {
+  margin-bottom: 20px;
+}
+
+.sd-salary-complaint-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.sd-complaint-period-filter {
+  flex: 0 0 auto;
+}
+
+.sd-salary-admin-page .sd-users-toolbar {
+  align-items: center;
+}
+
+.sd-salary-admin-page .sd-users-toolbar-left {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.sd-salary-admin-page .sd-search-wrap,
+.sd-salary-admin-page .sd-filter-chips,
+.sd-salary-admin-page .sd-salary-period-filter,
+.sd-salary-admin-page .sd-salary-toolbar-actions {
+  align-items: center;
+  min-height: 46px;
+}
+
+.sd-salary-admin-page .sd-search-wrap .sd-input-search,
+.sd-salary-admin-page .sd-salary-period-filter select {
+  box-sizing: border-box;
+  height: 46px;
+  line-height: 1.2;
+}
+
+.sd-salary-admin-page .sd-filter-chip {
+  align-items: center;
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  line-height: 1;
+  padding-bottom: 0;
+  padding-top: 0;
+}
+
+.sd-salary-admin-page .sd-salary-period-filter label {
+  line-height: 1;
+}
+
+.sd-salary-admin-page .sd-salary-branch-filter select {
+  min-width: 150px;
+}
+
+@media (max-width: 1100px) {
+  .sd-salary-admin-page .sd-users-toolbar,
+  .sd-salary-admin-page .sd-users-toolbar-left {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sd-salary-admin-page .sd-search-wrap,
+  .sd-salary-admin-page .sd-salary-period-filter,
+  .sd-salary-admin-page .sd-salary-toolbar-actions {
+    width: 100%;
+  }
+
+  .sd-salary-admin-page .sd-salary-period-filter select {
+    flex: 1;
+  }
+
+  .sd-salary-admin-page .sd-salary-toolbar-actions .sd-btn-primary,
+  .sd-salary-admin-page .sd-salary-toolbar-actions .sd-btn-ghost {
+    flex: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .sd-salary-complaint-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sd-complaint-period-filter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sd-complaint-period-filter select {
+    width: 100%;
+  }
+}
+
+.sd-salary-complaint-table {
+  min-width: 900px;
+}
+
+.sd-salary-complaint-table td:nth-child(3) {
+  min-width: 280px;
+  white-space: normal;
+}
+
+.sd-form-hint {
+  align-self: center;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .sd-salary-pay-modal {
   max-width: 560px;
 }

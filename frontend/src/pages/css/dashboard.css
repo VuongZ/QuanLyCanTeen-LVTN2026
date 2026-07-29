@@ -372,9 +372,9 @@
 }
 
 .sd-employee-qr-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
   align-items: stretch;
-  justify-content: space-between;
   gap: 18px;
 }
 
@@ -383,16 +383,47 @@
   align-items: flex-start;
   gap: 14px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.sd-employee-qr-info > .sd-info-avatar {
+  flex: 0 0 auto;
+}
+
+.sd-employee-qr-info > div:last-child {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .sd-employee-qr-info h2 {
   margin: 2px 0 10px;
   font-size: 18px;
+  line-height: 1.3;
   color: #1e293b;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .sd-employee-qr-list {
-  min-width: 240px;
+  width: 100%;
+  min-width: 0;
+}
+
+.sd-employee-qr-list .sd-info-row {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sd-employee-qr-list .sd-info-row dt {
+  flex: 0 0 82px;
+}
+
+.sd-employee-qr-list .sd-info-row dd {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .sd-employee-qr-box {
@@ -931,7 +962,7 @@
   }
 
   .sd-employee-qr-card {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sd-employee-qr-info {
@@ -2302,6 +2333,24 @@
   border-color: #fdba74;
 }
 
+.sd-status-pill.pending {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.sd-status-pill.approved {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.sd-status-pill.rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
 .sd-period-message {
   margin-bottom: 16px;
   padding: 12px 16px;
@@ -2406,46 +2455,81 @@
 
 .sd-work-detail-card .sd-salary-table-wrap {
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
 }
 
 .sd-work-detail-table {
   width: 100%;
-  min-width: 0;
+  min-width: 1200px;
   table-layout: fixed;
 }
 
-/* Chia chiều rộng hợp lý cho bảy cột */
+.sd-work-detail-card .sd-salary-table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.sd-work-detail-card .sd-salary-table-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
+.sd-work-detail-card .sd-salary-table-wrap::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
+}
+
+.sd-work-detail-card .sd-salary-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Chia chiều rộng hợp lý cho mười cột */
 .sd-work-detail-table th:nth-child(1),
 .sd-work-detail-table td:nth-child(1) {
-  width: 13%;
+  width: 8%;
 }
 
 .sd-work-detail-table th:nth-child(2),
 .sd-work-detail-table td:nth-child(2) {
-  width: 14%;
+  width: 9%;
 }
 
 .sd-work-detail-table th:nth-child(3),
 .sd-work-detail-table td:nth-child(3) {
-  width: 17%;
+  width: 11%;
 }
 
 .sd-work-detail-table th:nth-child(4),
 .sd-work-detail-table td:nth-child(4),
 .sd-work-detail-table th:nth-child(5),
 .sd-work-detail-table td:nth-child(5) {
-  width: 11%;
+  width: 7%;
 }
 
 .sd-work-detail-table th:nth-child(6),
 .sd-work-detail-table td:nth-child(6) {
-  width: 15%;
+  width: 9%;
 }
 
 .sd-work-detail-table th:nth-child(7),
 .sd-work-detail-table td:nth-child(7) {
-  width: 19%;
+  width: 8%;
+}
+
+.sd-work-detail-table th:nth-child(8),
+.sd-work-detail-table td:nth-child(8) {
+  width: 11%;
+}
+
+.sd-work-detail-table th:nth-child(9),
+.sd-work-detail-table td:nth-child(9) {
+  width: 13%;
+}
+
+.sd-work-detail-table th:nth-child(10),
+.sd-work-detail-table td:nth-child(10) {
+  width: 12%;
 }
 
 .sd-work-detail-table th,
@@ -2463,6 +2547,69 @@
   color: #ea580c !important;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.sd-salary-coefficient,
+.sd-daily-salary {
+  color: #166534 !important;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-salary-complaint-card {
+  width: 100%;
+}
+
+.sd-complaint-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sd-complaint-form .sd-btn-primary {
+  align-self: flex-end;
+  width: auto;
+}
+
+.sd-complaint-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.sd-complaint-detail p {
+  margin: 0;
+}
+
+.sd-complaint-response {
+  padding: 12px 14px;
+  border-left: 4px solid #22c55e;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.sd-day-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-day-type.weekday {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.sd-day-type.weekend {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .sd-work-status {
@@ -2497,13 +2644,8 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .sd-work-detail-card .sd-salary-table-wrap {
-    overflow-x: auto;
-  }
-
   .sd-work-detail-table {
-    min-width: 760px;
-    table-layout: auto;
+    min-width: 1200px;
   }
 }
 
