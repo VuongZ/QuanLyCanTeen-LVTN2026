@@ -1,88 +1,75 @@
-# LuanVanTotNghiep – Hệ thống Quản lý Nhân sự, Ca làm việc, Kho & Lương
+# Luận Văn Tốt Nghiệp – Hệ Thống Quản Lý Nhân Sự Và Vận Hành Căn Tin
 
-Backend API viết bằng **ASP.NET Core 8 (Web API)**, phục vụ cho một hệ thống quản lý chuỗi cửa hàng/chi nhánh, bao gồm quản lý nhân viên & phân quyền, xếp ca làm việc, chấm công, quản lý kho hàng (nhập/xuất/tồn kho), và tính lương. Đây là đồ án/luận văn tốt nghiệp (Graduation Thesis Project).
-
-## Mục lục
-
-- [Tính năng chính](#tính-năng-chính)
-- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
-- [Kiến trúc & cấu trúc thư mục](#kiến-trúc--cấu-trúc-thư-mục)
-- [Yêu cầu hệ thống](#yêu-cầu-hệ-thống)
-- [Cài đặt & chạy dự án](#cài-đặt--chạy-dự-án)
-- [Cấu hình](#cấu-hình)
-- [Danh sách API](#danh-sách-api)
-- [Xác thực & phân quyền](#xác-thực--phân-quyền)
-- [Đóng góp](#đóng-góp)
-- [Giấy phép](#giấy-phép)
+Backend API xây dựng bằng **ASP.NET Core (.NET 8)** phục vụ đồ án/luận văn tốt nghiệp: *"Xây Dựng Hệ Thống Quản Lý Nhân Sự cho Mô Hình Kinh Doanh Căn Tin"*. Hệ thống quản lý toàn bộ nghiệp vụ vận hành một chuỗi căn tin nhiều chi nhánh: nhân sự, ca làm việc, chấm công, kho hàng, tồn quầy, lương và báo cáo kết ca.
 
 ## Tính năng chính
 
-- **Quản lý người dùng & phân quyền (Users & Roles):** đăng ký, đăng nhập JWT, đổi mật khẩu, quên mật khẩu qua OTP gửi email, quản lý vai trò (Role), thông tin tài khoản ngân hàng nhân viên.
-- **Quản lý chi nhánh (Branch):** thêm/sửa/xóa/xem danh sách chi nhánh (`DmBranch`).
-- **Quản lý ca làm việc (Shift):** định nghĩa ca làm việc, cấu hình ca theo từng chi nhánh (`BranchShiftConfig`).
-- **Chu kỳ xếp lịch (Schedule Period):** tạo chu kỳ xếp lịch, đăng ký ca làm việc của nhân viên (`StaffRegistration`), công bố lịch làm việc chính thức (`Publish Schedule`), chấm công (`Attendance`).
-- **Quản lý kho (Inventory/Kho):** quản lý sản phẩm, nhà cung cấp (Supplier), phiếu nhập kho (Import Ticket), phiếu xuất kho (Export Ticket), tồn kho theo chi nhánh (Branch Front Stock), báo cáo đóng ca kho (Shift Closing Report).
-- **Tính lương (Salary):** quy tắc tính lương (Salary Rule), điều chỉnh lương, tính lương hàng tháng cho từng nhân viên (Monthly Salary).
-- **Swagger UI** tích hợp sẵn để test API trực tiếp trong môi trường Development.
+- **Xác thực & phân quyền**: đăng nhập bằng JWT, phân quyền theo vai trò `ADMIN`, `MANAGER`, `STAFF`; quên/đặt lại mật khẩu qua OTP gửi email.
+- **Quản lý chi nhánh** (`Branch`): CRUD danh sách chi nhánh căn tin.
+- **Quản lý ca làm việc** (`Shift`, `BranchShiftConfig`): định nghĩa ca, cấu hình ca theo từng chi nhánh.
+- **Đợt đăng ký ca** (`SchedulePeriod`): tạo đợt đăng ký, tự động khóa đợt quá hạn bằng background worker.
+- **Đăng ký ca & lịch làm chính thức** (`StaffRegistration`, `FinalSchedule`): nhân viên đăng ký ca, quản lý duyệt và xuất lịch làm chính thức.
+- **Chấm công** (`Attendance`): quét chấm công vào/ra; yêu cầu bù chấm công (`CheckoutRequest`) khi nhân viên quên checkout, kèm worker tự động phát hiện.
+- **Quản lý kho** (`Inventory`, `KhoImport`, `KhoExport`): nhập kho, xuất kho, theo dõi tồn kho theo từng chi nhánh; hỗ trợ **OCR hóa đơn** (Tesseract) để tự động nhận diện sản phẩm/số lượng từ ảnh hóa đơn.
+- **Tồn quầy** (`FrontStock`): theo dõi hàng tồn tại quầy bán.
+- **Báo cáo kết ca** (`ShiftClosing`): nhân viên lập báo cáo kết ca, quản lý duyệt/kiểm tra.
+- **Nhà cung cấp** (`Supplier`): quản lý danh sách nhà cung cấp.
+- **Tính lương** (`Salary`): tính lương hàng tháng dựa trên chấm công, quy tắc lương và các điều chỉnh (thưởng/phạt).
+- **Background jobs**: tự động khóa đợt đăng ký ca quá hạn (`SchedulePeriodDeadlineWorker`), tự động xử lý chấm công thiếu checkout (`MissingCheckoutWorker`).
 
 ## Công nghệ sử dụng
 
-| Thành phần        | Công nghệ |
-|--------------------|-----------|
-| Nền tảng           | .NET 8 / ASP.NET Core Web API |
-| ORM                | Entity Framework Core |
-| Cơ sở dữ liệu      | MySQL (qua Pomelo.EntityFrameworkCore.MySql), chạy trên WampServer |
-| Xác thực           | JWT Bearer Authentication |
-| Mã hoá mật khẩu    | BCrypt.Net |
-| Tài liệu API       | Swagger / Swashbuckle |
-| Gửi email          | EmailService (gửi OTP đặt lại mật khẩu) |
-| Kiến trúc          | Controller → Service → Repository |
+| Thành phần | Công nghệ |
+|---|---|
+| Framework | ASP.NET Core (.NET 8), Web API |
+| ORM | Entity Framework Core (Pomelo MySQL provider) |
+| Cơ sở dữ liệu | MySQL (WampServer khi phát triển local) |
+| Xác thực | JWT Bearer Authentication |
+| Mã hóa mật khẩu | BCrypt.Net |
+| OCR hóa đơn | Tesseract (ngôn ngữ `vie+eng`) |
+| Gửi email | SMTP (OTP quên mật khẩu) |
+| API docs | Swagger / Swashbuckle |
+| Kiến trúc | Controller – Service – Repository (theo domain: nhân sự, ca làm, kho, lương...) |
 
-## Kiến trúc & cấu trúc thư mục
-
-Dự án tổ chức theo mô hình 3 lớp: **Controller – Service – Repository**, sử dụng Entity Framework Core làm lớp truy xuất dữ liệu.
+## Cấu trúc thư mục
 
 ```
 LuanVanTotNghiep/
-├── Program.cs                     # Điểm khởi động, cấu hình DI, JWT, DbContext, Swagger
-├── backend/
-│   ├── Controllers/                # Các API Controller
-│   │   ├── BranchController.cs
-│   │   ├── BranchShiftConfigController.cs
-│   │   ├── InventoryController.cs
-│   │   ├── KhoImportController.cs
-│   │   ├── SalaryController.cs
-│   │   ├── SchedulePeriodController.cs
-│   │   ├── ShiftController.cs
-│   │   ├── StaffRegistrationController.cs
-│   │   ├── SupplierController.cs
-│   │   └── UserController.cs
-│   ├── DTOs/                       # Data Transfer Objects cho request/response
-│   ├── Models/
-│   │   └── Entities/                # Entity Framework Core entities & AppDbContext
-│   │       ├── AppDbContext.cs
-│   │       ├── CaAttendance.cs, CaBranchShiftConfig.cs, CaFinalSchedule.cs, ...
-│   │       ├── DmBranch.cs
-│   │       ├── Kho*.cs               # Các entity liên quan tới quản lý kho
-│   │       ├── Luong*.cs             # Các entity liên quan tới lương
-│   │       └── Ns*.cs                # Các entity liên quan tới người dùng/vai trò
-│   ├── Repositories/                # Lớp truy xuất dữ liệu (Repository Pattern)
-│   └── Services/                    # Lớp xử lý nghiệp vụ (Business Logic)
+├── Program.cs                     # Cấu hình JWT, DbContext, DI, CORS, pipeline
+└── backend/
+    ├── Controllers/                # API endpoints (api/[controller])
+    ├── DTOs/                       # Data Transfer Objects
+    ├── Models/
+    │   └── Entities/                # Entity Framework entities + AppDbContext
+    ├── Repositories/               # Tầng truy cập dữ liệu
+    └── Services/                   # Tầng xử lý nghiệp vụ
+        └── BackgroundJobs/          # Các worker chạy nền
 ```
 
-### Quy ước đặt tên bảng/entity
+### Danh sách Controllers (API)
 
-- `Ns*` (Nhân sự): `NsUser`, `NsRole`, `NsUserBankAccount`
-- `Dm*` (Danh mục): `DmBranch`
-- `Ca*` (Ca làm việc): `CaShift`, `CaSchedulePeriod`, `CaBranchShiftConfig`, `CaStaffRegistration`, `CaFinalSchedule`, `CaAttendance`
-- `Kho*` (Kho hàng): `KhoProduct`, `KhoSupplier`, `KhoImportTicket`, `KhoImportDetail`, `KhoExportTicket`, `KhoExportDetail`, `KhoBranchInventory`, `KhoBranchFrontStock`, `KhoShiftClosingReport`, `KhoShiftClosingDetail`
-- `Luong*` (Lương): `LuongSalaryRule`, `LuongMonthlySalary`
+| Controller | Chức năng |
+|---|---|
+| `BranchController` | Quản lý chi nhánh |
+| `BranchShiftConfigController` | Cấu hình ca theo chi nhánh |
+| `CheckoutRequestController` | Yêu cầu bù chấm công |
+| `FrontStockController` | Tồn quầy |
+| `InventoryController` | Tồn kho chi nhánh |
+| `KhoExportController` | Phiếu xuất kho |
+| `KhoImportController` | Phiếu nhập kho (kèm OCR hóa đơn) |
+| `SalaryController` | Tính lương, điều chỉnh lương |
+| `SchedulePeriodController` | Đợt đăng ký ca |
+| `ShiftClosingController` | Báo cáo kết ca |
+| `ShiftController` | Danh mục ca làm việc |
+| `StaffRegistrationController` | Đăng ký ca của nhân viên |
+| `SupplierController` | Nhà cung cấp |
+| `UserController` | Người dùng, xác thực, phân quyền |
 
 ## Yêu cầu hệ thống
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- MySQL Server (dự án đang cấu hình chạy với **WampServer**)
-- IDE: Visual Studio 2022 / VS Code / Rider
+- .NET SDK 8.0 trở lên
+- MySQL Server (hoặc WampServer khi chạy local)
+- Tesseract tessdata (thư mục `tessdata/` với dữ liệu ngôn ngữ `vie` và `eng`) đặt tại thư mục gốc project để dùng chức năng OCR hóa đơn
 
 ## Cài đặt & chạy dự án
 
@@ -92,10 +79,24 @@ LuanVanTotNghiep/
    cd LuanVanTotNghiep
    ```
 
-2. **Cấu hình chuỗi kết nối & JWT** trong `appsettings.json` (hoặc User Secrets), xem mục [Cấu hình](#cấu-hình) bên dưới.
+2. **Cấu hình `appsettings.json`**
+   ```json
+   {
+     "ConnectionStrings": {
+       "DefaultConnection": "Server=localhost;Port=3306;Database=luanvantotnghiep;User=root;Password="
+     },
+     "Jwt": {
+       "Issuer": "your-issuer",
+       "Audience": "your-audience",
+       "Key": "your-secret-key-min-32-chars"
+     }
+   }
+   ```
+   > Có thể dùng `dotnet user-secrets` thay vì lưu trực tiếp thông tin nhạy cảm trong `appsettings.json`.
 
-3. **Khởi tạo/migrate cơ sở dữ liệu** (nếu sử dụng EF Core Migrations)
+3. **Khôi phục package & tạo database**
    ```bash
+   dotnet restore
    dotnet ef database update
    ```
 
@@ -103,67 +104,28 @@ LuanVanTotNghiep/
    ```bash
    dotnet run
    ```
+   Ứng dụng sẽ kiểm tra kết nối MySQL khi khởi động và in log kết quả kết nối ra console.
 
-5. Khi khởi động thành công ở môi trường Development, Swagger UI sẽ tự động hiển thị tại địa chỉ gốc (`/`), có thể dùng để test toàn bộ API.
+5. **Truy cập Swagger UI**
+   Mặc định Swagger UI được cấu hình ở route gốc (`/`) khi chạy ở môi trường Development.
 
-   Ứng dụng cũng in ra console kết quả kiểm tra kết nối tới MySQL (WampServer) ngay khi start.
+## Kết nối Frontend
 
-## Cấu hình
+Backend đã cấu hình CORS policy `AllowReactDev` cho phép frontend React chạy tại:
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
 
-Các giá trị cấu hình bắt buộc trong `appsettings.json` (hoặc User Secrets khi phát triển):
+(phù hợp với Vite dev server mặc định)
 
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=3306;Database=luanvantotnghiep;User=root;Password=;"
-  },
-  "Jwt": {
-    "Issuer": "LuanVanTotNghiep",
-    "Audience": "LuanVanTotNghiep",
-    "Key": "chuỗi-bí-mật-đủ-dài-để-ký-JWT"
-  }
-}
-```
+## Phân quyền (Roles)
 
-> ⚠️ Nếu thiếu bất kỳ giá trị nào trong `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Key`, ứng dụng sẽ ném lỗi `InvalidOperationException` khi khởi động.
-
-Ngoài ra cần cấu hình thêm thông tin gửi email (SMTP) cho `EmailService` để tính năng gửi OTP quên mật khẩu hoạt động.
-
-## Danh sách API
-
-Toàn bộ endpoint theo chuẩn REST, prefix `api/[controller]`:
-
-| Controller | Chức năng chính |
+| Role | Mô tả |
 |---|---|
-| `UserController` | Đăng ký, đăng nhập, đổi mật khẩu, quên mật khẩu (OTP), quản lý danh sách nhân viên/tài khoản ngân hàng |
-| `BranchController` | CRUD chi nhánh |
-| `ShiftController` | CRUD ca làm việc |
-| `BranchShiftConfigController` | Cấu hình ca làm việc theo từng chi nhánh |
-| `SchedulePeriodController` | Tạo/cập nhật chu kỳ xếp lịch, công bố lịch làm việc |
-| `StaffRegistrationController` | Nhân viên đăng ký ca làm việc theo chu kỳ |
-| `SupplierController` | CRUD nhà cung cấp |
-| `InventoryController` | Quản lý tồn kho theo chi nhánh |
-| `KhoImportController` | Tạo/quản lý phiếu nhập kho |
-| `SalaryController` | Quy tắc lương, điều chỉnh lương, tính lương hàng tháng |
+| `ADMIN` | Quản trị toàn hệ thống (nhà cung cấp, người dùng...) |
+| `MANAGER` | Quản lý chi nhánh: duyệt phiếu kho, đợt đăng ký ca, kết ca... |
+| `STAFF` | Nhân viên: đăng ký ca, chấm công, lập báo cáo kết ca |
 
-Chi tiết đầy đủ (tham số, schema request/response) xem trực tiếp trong **Swagger UI** khi chạy ứng dụng ở môi trường Development.
+## Ghi chú
 
-## Xác thực & phân quyền
-
-- Hệ thống dùng **JWT Bearer Token**: người dùng đăng nhập qua `UserController` để nhận token, sau đó đính kèm header `Authorization: Bearer <token>` cho các request cần xác thực.
-- Mật khẩu được băm bằng **BCrypt** trước khi lưu vào database.
-- Vai trò người dùng được quản lý qua entity `NsRole`, cho phép phân quyền truy cập theo vai trò (admin, quản lý chi nhánh, nhân viên, ...).
-- Middleware được cấu hình đúng thứ tự bắt buộc: `UseAuthentication()` trước `UseAuthorization()`.
-
-## Đóng góp
-
-Đây là dự án luận văn tốt nghiệp cá nhân. Nếu muốn đóng góp hoặc phát triển thêm:
-
-1. Fork repository
-2. Tạo nhánh mới (`git checkout -b feature/ten-tinh-nang`)
-3. Commit thay đổi (`git commit -m "Add: mô tả thay đổi"`)
-4. Push nhánh và tạo Pull Request
-
-## Giấy phép
-
-Dự án phục vụ mục đích học tập/luận văn tốt nghiệp. Vui lòng liên hệ tác giả trước khi sử dụng cho mục đích thương mại.
+- Các worker nền (`SchedulePeriodDeadlineWorker`, `MissingCheckoutWorker`) chạy định kỳ để tự động hóa việc khóa đợt đăng ký quá hạn và xử lý chấm công thiếu checkout.
+- Chức năng OCR hóa đơn dùng để hỗ trợ nhập nhanh phiếu nhập kho từ ảnh hóa đơn giấy, cần cấu hình đúng thư mục `tessdata`.
