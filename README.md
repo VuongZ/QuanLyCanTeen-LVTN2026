@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # LuanVanTotNghiep – Hệ Thống Quản Lý Nhân Sự & Vận Hành Căn Tin
+=======
+# Luận Văn Tốt Nghiệp – Hệ Thống Quản Lý Nhân Sự Và Vận Hành Căn Tin
+>>>>>>> b07933981b061a8d8ac483d240ea07f64671a93a
 
 Backend API xây dựng bằng **ASP.NET Core (.NET 8)** phục vụ đồ án/luận văn tốt nghiệp: *"Xây Dựng Hệ Thống Quản Lý Nhân Sự cho Mô Hình Kinh Doanh Căn Tin"*. Hệ thống quản lý toàn bộ nghiệp vụ vận hành một chuỗi căn tin nhiều chi nhánh: nhân sự, ca làm việc, chấm công, kho hàng, tồn quầy, lương và báo cáo kết ca.
 
