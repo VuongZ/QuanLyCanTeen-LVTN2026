@@ -6,9 +6,14 @@ namespace LuanVanTotNghiep.Services;
 
 public class StaffRegistrationService
 {
+    private const string RegisteredStatus = "REGISTERED";
+    private const string WaitlistStatus = "WAITLIST";
+    private const string CancelledStatus = "CANCELLED";
+
     private readonly StaffRegistrationRepo _repo;
 
-    public StaffRegistrationService(StaffRegistrationRepo repo)
+    public StaffRegistrationService(
+        StaffRegistrationRepo repo)
     {
         _repo = repo;
     }
@@ -27,26 +32,36 @@ public class StaffRegistrationService
         }
     }
 
-    private static DateOnly GetVietnamToday()
+    private static DateTime GetVietnamNow()
     {
-        var vietnamTimeZone = GetVietnamTimeZone();
-
-        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(
+        return TimeZoneInfo.ConvertTimeFromUtc(
             DateTime.UtcNow,
-            vietnamTimeZone);
-
-        return DateOnly.FromDateTime(vietnamNow);
+            GetVietnamTimeZone());
     }
 
-    // Nhân viên đăng ký ca theo nguyên tắc ai đăng ký trước được nhận trước.
+    private static DateOnly GetVietnamToday()
+    {
+        return DateOnly.FromDateTime(
+            GetVietnamNow());
+    }
+
+    /// <summary>
+    /// Nhân viên đăng ký ca theo thứ tự đăng ký.
+    ///
+    /// Còn chỗ:
+    ///     REGISTERED
+    ///
+    /// Hết chỗ:
+    ///     WAITLIST
+    /// </summary>
     public async Task<CaStaffRegistration> RegisterAsync(
         RegisterShiftDto dto)
     {
         await using var transaction =
             await _repo.BeginSerializableTransactionAsync();
 
-        // 1. Kiểm tra đợt đăng ký.
-        var period = await _repo.GetPeriodByIdAsync(dto.PeriodId);
+        var period =
+            await _repo.GetPeriodByIdAsync(dto.PeriodId);
 
         if (period == null)
         {
@@ -78,8 +93,8 @@ public class StaffRegistrationService
                 "Ngày đăng ký không nằm trong thời gian của đợt này.");
         }
 
-        // 2. Kiểm tra Nhân viên.
-        var user = await _repo.GetUserByIdAsync(dto.UserId);
+        var user =
+            await _repo.GetUserByIdAsync(dto.UserId);
 
         if (user == null)
         {
@@ -93,8 +108,8 @@ public class StaffRegistrationService
                 "Bạn chỉ được đăng ký ca làm tại chi nhánh của mình.");
         }
 
-        // 3. Kiểm tra ca làm.
-        var shift = await _repo.GetShiftByIdAsync(dto.ShiftId);
+        var shift =
+            await _repo.GetShiftByIdAsync(dto.ShiftId);
 
         if (shift == null)
         {
@@ -108,14 +123,16 @@ public class StaffRegistrationService
                 "Ca làm không thuộc chi nhánh của đợt đăng ký.");
         }
 
-        // 4. Kiểm tra ca có hoạt động trong ngày đã chọn.
-        var targetDay = dto.WorkDate.DayOfWeek.ToString();
+        var targetDay =
+            dto.WorkDate.DayOfWeek.ToString();
 
-        var config = await _repo.GetShiftConfigAsync(
-            dto.ShiftId,
-            targetDay);
+        var config =
+            await _repo.GetShiftConfigAsync(
+                dto.ShiftId,
+                targetDay);
 
-        if (config == null || config.MaxStaff <= 0)
+        if (config == null ||
+            config.MaxStaff.GetValueOrDefault() <= 0)
         {
             string[] vietnameseDays =
             {
@@ -129,27 +146,20 @@ public class StaffRegistrationService
             };
 
             var vietnameseDayName =
-                vietnameseDays[(int)dto.WorkDate.DayOfWeek];
+                vietnameseDays[
+                    (int)dto.WorkDate.DayOfWeek];
 
             throw new InvalidOperationException(
                 $"Ca làm này không mở vào {vietnameseDayName}.");
         }
 
-        var cancelledStatuses = new[]
-        {
-            "CANCELLED",
-            "REJECTED",
-            "Từ Chối"
-        };
-
-        // 5. Kiểm tra đăng ký trùng.
         var isDuplicate =
-            await _repo.HasActiveRegistrationAsync(
-                dto.PeriodId,
-                dto.UserId,
-                dto.ShiftId,
-                dto.WorkDate,
-                cancelledStatuses);
+            await _repo
+                .HasNonCancelledRegistrationAsync(
+                    dto.PeriodId,
+                    dto.UserId,
+                    dto.ShiftId,
+                    dto.WorkDate);
 
         if (isDuplicate)
         {
@@ -157,10 +167,13 @@ public class StaffRegistrationService
                 "Bạn đã đăng ký ca này vào ngày này rồi.");
         }
 
-        // 6. Kiểm tra số lượng Nhân viên.
-        // Manager chiếm một vị trí trong tổng số người của ca.
-        var maxStaff = config.MaxStaff.GetValueOrDefault();
-        var staffSlot = Math.Max(maxStaff - 1, 0);
+        // Manager được hệ thống tự thêm khi công bố lịch,
+        // nên chiếm một vị trí trong MaxStaff.
+        var maxStaff =
+            config.MaxStaff.GetValueOrDefault();
+
+        var staffSlot =
+            Math.Max(maxStaff - 1, 0);
 
         if (staffSlot <= 0)
         {
@@ -169,37 +182,37 @@ public class StaffRegistrationService
                 "Nhân viên không thể đăng ký.");
         }
 
+        // Chỉ đếm REGISTERED.
+        // WAITLIST không chiếm vị trí chính thức.
         var registeredCount =
-            await _repo.CountActiveRegistrationsAsync(
+            await _repo.CountRegisteredAsync(
                 dto.PeriodId,
                 dto.ShiftId,
-                dto.WorkDate,
-                cancelledStatuses);
+                dto.WorkDate);
 
-        if (registeredCount >= staffSlot)
-        {
-            throw new InvalidOperationException(
-                "Ca đã đủ số lượng Nhân viên, " +
-                "bạn không thể đăng ký vào ca này.");
-        }
+        var assignedStatus =
+            registeredCount < staffSlot
+                ? RegisteredStatus
+                : WaitlistStatus;
 
-        // 7. Lưu đăng ký.
-        var registration = new CaStaffRegistration
-        {
-            UserId = dto.UserId,
-            PeriodId = dto.PeriodId,
-            ShiftId = dto.ShiftId,
-            WorkDate = dto.WorkDate,
-            Status = "REGISTERED"
-        };
+        var registration =
+            new CaStaffRegistration
+            {
+                UserId = dto.UserId,
+                PeriodId = dto.PeriodId,
+                ShiftId = dto.ShiftId,
+                WorkDate = dto.WorkDate,
+                Status = assignedStatus,
+                RegisteredAt = GetVietnamNow()
+            };
 
         await _repo.Add(registration);
+
         await transaction.CommitAsync();
 
         return registration;
     }
 
-    // Nhân viên xem các ca đã đăng ký trong một đợt.
     public async Task<IEnumerable<CaStaffRegistration>>
         GetMyScheduleAsync(
             int userId,
@@ -210,135 +223,199 @@ public class StaffRegistrationService
             periodId);
     }
 
-    // Manager xem danh sách đăng ký của một đợt.
     public async Task<IEnumerable<CaStaffRegistration>>
         GetRegistrationsByPeriodAsync(int periodId)
     {
-        return await _repo.GetRegistrationsByPeriodAsync(
-            periodId);
+        return await _repo
+            .GetRegistrationsByPeriodAsync(periodId);
     }
 
-    // Cập nhật trạng thái đăng ký khi lịch chưa công bố.
-   public async Task UpdateStatusAsync(
-    int registrationId,
-    string newStatus)
-{
-    var registration =
-        await _repo.GetbyId(registrationId);
-
-    if (registration == null)
+    /// <summary>
+    /// Endpoint cập nhật trạng thái cũ chỉ được dùng
+    /// để hủy phiếu trước khi lịch được công bố.
+    ///
+    /// Không cho phép đổi trực tiếp WAITLIST thành REGISTERED,
+    /// vì việc đó sẽ phá nguyên tắc đăng ký trước được nhận trước.
+    /// </summary>
+    public async Task UpdateStatusAsync(
+        int registrationId,
+        string newStatus)
     {
-        throw new KeyNotFoundException(
-            "Không tìm thấy phiếu đăng ký này.");
+        if (string.IsNullOrWhiteSpace(newStatus))
+        {
+            throw new ArgumentException(
+                "Trạng thái đăng ký không được để trống.");
+        }
+
+        var normalizedStatus =
+            newStatus.Trim().ToUpperInvariant();
+
+        if (normalizedStatus != CancelledStatus)
+        {
+            throw new ArgumentException(
+                "Không được chuyển thủ công giữa " +
+                "REGISTERED và WAITLIST. " +
+                "Hệ thống tự quyết định theo thứ tự đăng ký.");
+        }
+
+        await using var transaction =
+            await _repo.BeginSerializableTransactionAsync();
+
+        var registration =
+            await _repo.GetbyId(registrationId);
+
+        if (registration == null)
+        {
+            throw new KeyNotFoundException(
+                "Không tìm thấy phiếu đăng ký này.");
+        }
+
+        if (registration.PeriodId is not int periodId)
+        {
+            throw new InvalidOperationException(
+                "Phiếu đăng ký không thuộc đợt đăng ký hợp lệ.");
+        }
+
+        var period =
+            await _repo.GetPeriodByIdAsync(periodId);
+
+        if (period == null)
+        {
+            throw new KeyNotFoundException(
+                "Không tìm thấy đợt đăng ký.");
+        }
+
+        if (string.Equals(
+                period.Status,
+                "PUBLISHED",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Lịch đã được công bố nên không thể thay đổi đăng ký.");
+        }
+
+        await CancelAndPromoteAsync(registration);
+
+        await transaction.CommitAsync();
     }
 
-    if (registration.PeriodId is not int periodId)
+    /// <summary>
+    /// Nhân viên tự hủy REGISTERED hoặc WAITLIST
+    /// trong thời gian đợt còn mở.
+    ///
+    /// Khi hủy một REGISTERED, người WAITLIST sớm nhất
+    /// được tự động chuyển thành REGISTERED.
+    /// </summary>
+    public async Task<CaStaffRegistration?>
+        CancelRegistrationAsync(
+            int id,
+            int userId)
     {
-        throw new InvalidOperationException(
-            "Phiếu đăng ký không thuộc đợt đăng ký hợp lệ.");
+        await using var transaction =
+            await _repo.BeginSerializableTransactionAsync();
+
+        var registration =
+            await _repo.GetbyId(id);
+
+        if (registration == null)
+        {
+            throw new KeyNotFoundException(
+                "Không tìm thấy phiếu đăng ký này.");
+        }
+
+        if (registration.UserId != userId)
+        {
+            throw new InvalidOperationException(
+                "Bạn không có quyền hủy ca của người khác.");
+        }
+
+        if (registration.PeriodId is not int periodId)
+        {
+            throw new InvalidOperationException(
+                "Phiếu đăng ký không thuộc đợt đăng ký hợp lệ.");
+        }
+
+        var period =
+            await _repo.GetPeriodByIdAsync(periodId);
+
+        if (period == null)
+        {
+            throw new KeyNotFoundException(
+                "Không tìm thấy đợt đăng ký.");
+        }
+
+        if (!string.Equals(
+                period.Status,
+                "OPEN",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Đợt đăng ký đã khóa hoặc đã công bố, " +
+                "không thể hủy ca.");
+        }
+
+        var today = GetVietnamToday();
+
+        if (today >= period.StartDate)
+        {
+            throw new InvalidOperationException(
+                "Đợt đăng ký đã hết hạn, không thể hủy ca.");
+        }
+
+        var promotedRegistration =
+            await CancelAndPromoteAsync(registration);
+
+        await transaction.CommitAsync();
+
+        return promotedRegistration;
     }
 
-    var period =
-        await _repo.GetPeriodByIdAsync(periodId);
-
-    if (period == null)
+    /// <summary>
+    /// Hủy một phiếu và đưa người chờ đầu tiên lên
+    /// khi phiếu bị hủy đang giữ vị trí chính thức.
+    /// </summary>
+    private async Task<CaStaffRegistration?>
+        CancelAndPromoteAsync(
+            CaStaffRegistration registration)
     {
-        throw new KeyNotFoundException(
-            "Không tìm thấy đợt đăng ký.");
+        var currentStatus =
+            registration.Status.Trim().ToUpperInvariant();
+
+        if (currentStatus != RegisteredStatus &&
+            currentStatus != WaitlistStatus)
+        {
+            throw new InvalidOperationException(
+                "Ca đăng ký này không thể hủy.");
+        }
+
+        var shouldPromoteWaitlist =
+            currentStatus == RegisteredStatus;
+
+        registration.Status = CancelledStatus;
+
+        await _repo.Update(registration);
+
+        if (!shouldPromoteWaitlist ||
+            registration.PeriodId is not int periodId)
+        {
+            return null;
+        }
+
+        var oldestWaitlist =
+            await _repo.GetOldestWaitlistAsync(
+                periodId,
+                registration.ShiftId,
+                registration.WorkDate);
+
+        if (oldestWaitlist == null)
+        {
+            return null;
+        }
+
+        oldestWaitlist.Status = RegisteredStatus;
+
+        await _repo.Update(oldestWaitlist);
+
+        return oldestWaitlist;
     }
-
-    if (string.Equals(
-            period.Status,
-            "PUBLISHED",
-            StringComparison.OrdinalIgnoreCase))
-    {
-        throw new InvalidOperationException(
-            "Lịch đã được công bố nên không thể thay đổi đăng ký.");
-    }
-
-    if (string.IsNullOrWhiteSpace(newStatus))
-    {
-        throw new ArgumentException(
-            "Trạng thái đăng ký không được để trống.");
-    }
-
-    var normalizedStatus =
-        newStatus.Trim().ToUpperInvariant();
-
-    if (normalizedStatus != "REGISTERED" &&
-        normalizedStatus != "CANCELLED")
-    {
-        throw new ArgumentException(
-            "Trạng thái đăng ký không hợp lệ.");
-    }
-
-    registration.Status = normalizedStatus;
-
-    await _repo.Update(registration);
-}
-
-    // Nhân viên hủy ca khi đợt còn mở và chưa đến hạn.
-    public async Task CancelRegistrationAsync(
-    int id,
-    int userId)
-{
-    var registration = await _repo.GetbyId(id);
-
-    if (registration == null)
-    {
-        throw new KeyNotFoundException(
-            "Không tìm thấy phiếu đăng ký này.");
-    }
-
-    if (registration.UserId != userId)
-    {
-        throw new InvalidOperationException(
-            "Bạn không có quyền hủy ca của người khác.");
-    }
-
-    if (registration.PeriodId is not int periodId)
-    {
-        throw new InvalidOperationException(
-            "Phiếu đăng ký không thuộc đợt đăng ký hợp lệ.");
-    }
-
-    var period =
-        await _repo.GetPeriodByIdAsync(periodId);
-
-    if (period == null)
-    {
-        throw new KeyNotFoundException(
-            "Không tìm thấy đợt đăng ký.");
-    }
-
-    if (!string.Equals(
-            period.Status,
-            "OPEN",
-            StringComparison.OrdinalIgnoreCase))
-    {
-        throw new InvalidOperationException(
-            "Đợt đăng ký đã khóa hoặc đã công bố, " +
-            "không thể hủy ca.");
-    }
-
-    var today = GetVietnamToday();
-
-    if (today >= period.StartDate)
-    {
-        throw new InvalidOperationException(
-            "Đợt đăng ký đã hết hạn, không thể hủy ca.");
-    }
-
-    if (!string.Equals(
-            registration.Status,
-            "REGISTERED",
-            StringComparison.OrdinalIgnoreCase))
-    {
-        throw new InvalidOperationException(
-            "Ca đăng ký này không thể hủy.");
-    }
-
-    registration.Status = "CANCELLED";
-    await _repo.Update(registration);
-}
 }

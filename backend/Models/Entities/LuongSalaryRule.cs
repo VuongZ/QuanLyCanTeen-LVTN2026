@@ -19,5 +19,13 @@ public partial class LuongSalaryRule
 
     public float? WeekendMultiplier { get; set; }
 
+    // Hệ số áp dụng cho nhân viên được gọi đến
+    // hỗ trợ thay ca khẩn cấp, ví dụ 1.50.
+    public decimal EmergencyReplacementMultiplier
+    {
+        get;
+        set;
+    }
+
     public virtual DmBranch Branch { get; set; } = null!;
 }

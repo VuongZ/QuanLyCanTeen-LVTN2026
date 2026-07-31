@@ -1,0 +1,668 @@
+/* =========================================================
+   PHẦN 1 — STAFF: ĐĂNG KÝ CA VÀ LỊCH CHÍNH THỨC
+   ========================================================= */
+.schedule-tabs--staff .sd-shift-cell-v {
+  flex: 1; /* Tự động bung rộng chia đều */
+  height: 50px; /* Tăng chiều cao lên chút để dễ bấm */
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #ea580c;
+  font-weight: 700;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.schedule-tabs--staff .sd-shift-cell-v.selected {
+ 
+  color:  #ea580c;
+  border-color: #ea580c;
+  box-shadow: 0 4px 10px rgba(234,88,12,0.3);
+}
+
+.schedule-tabs--staff .sd-shift-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schedule-tabs--staff .sd-board-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.schedule-tabs--staff .sd-schedule-board {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.schedule-tabs--staff .sd-schedule-board th,
+.schedule-tabs--staff .sd-schedule-board td {
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  vertical-align: top;
+}
+
+.schedule-tabs--staff .sd-schedule-board th {
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+}
+
+.schedule-tabs--staff .sd-board-date-col {
+  width: 90px;
+  background: #f8fafc;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.schedule-tabs--staff .sd-board-date-col strong {
+  display: block;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.schedule-tabs--staff .sd-board-date-col small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.schedule-tabs--staff .sd-reg-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.schedule-tabs--staff .sd-reg-card:last-child {
+  margin-bottom: 0;
+}
+
+.schedule-tabs--staff .sd-reg-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.schedule-tabs--staff .sd-shift-cell-slots {
+  min-height: 92px;
+  height: auto;
+  padding: 8px;
+  align-items: stretch;
+  justify-content: flex-start;
+  font-size: 13px;
+  color: #1e293b;
+  background: #ffffff;
+}
+
+.schedule-tabs--staff .sd-shift-cell-slots.selected {
+  background: #fff7ed;
+  border-color: #ea580c;
+  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.16);
+}
+
+.schedule-tabs--staff .sd-shift-cell-slots.full,
+.schedule-tabs--staff .sd-shift-cell-slots.disabled {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+.schedule-tabs--staff .sd-slot-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-tabs--staff .sd-slot-person,
+.schedule-tabs--staff .sd-slot-empty {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.schedule-tabs--staff .sd-slot-manager {
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-weight: 700;
+}
+
+.schedule-tabs--staff .sd-slot-staff {
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-weight: 700;
+}
+
+.schedule-tabs--staff .sd-slot-me {
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.schedule-tabs--staff .sd-slot-empty {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #94a3b8;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.schedule-tabs--staff .sd-slot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-tabs--staff .sd-slot-role,
+.schedule-tabs--staff .sd-slot-pending {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.schedule-tabs--staff .sd-slot-pending {
+  color: #ea580c;
+}
+
+.schedule-tabs--staff .sd-slot-full-text {
+  margin-top: 2px;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedule-tabs--staff .sd-registration-board {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedule-tabs--staff .sd-registration-board th {
+  background: #f8fafc;
+  text-align: center;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.schedule-tabs--staff .sd-registration-cell {
+  min-width: 170px;
+  vertical-align: top;
+  background: #fff;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v {
+  width: 100%;
+  min-height: 92px;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 8px;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v:hover {
+  background: #fff7ed;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v.selected {
+  background: #fff7ed;
+  border: none;
+  box-shadow: none;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v.disabled {
+  background: #f8fafc !important;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-slot-list {
+  width: 100%;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-slot-person,
+.schedule-tabs--staff .sd-registration-cell .sd-slot-empty {
+  min-height: 30px;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v.selected {
+  background: #fff7ed;
+  outline: 2px solid #f97316;
+  outline-offset: -2px;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v.pending-cancel {
+  background: #fef2f2;
+  outline: 2px dashed #ef4444;
+  outline-offset: -2px;
+}
+
+.schedule-tabs--staff .sd-registration-cell .sd-shift-cell-v.pending-cancel:hover {
+  background: #fee2e2;
+}
+
+.schedule-tabs--staff .sd-slot-saved {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #bfdbfe;
+  color: #1e40af;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.schedule-tabs--staff .sd-slot-cancel-pending {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px dashed #f87171;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #b91c1c;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.schedule-tabs--staff .sd-slot-cancel-pending small {
+  color: #dc2626;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.schedule-tabs--staff .sd-period-message {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.schedule-tabs--staff .sd-period-message strong {
+  font-weight: 800;
+}
+
+.schedule-tabs--staff .sd-period-message--locked {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.schedule-tabs--staff .sd-period-message--overdue {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+
+.schedule-tabs--staff .sd-period-message--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.schedule-tabs--staff .sd-shift-cell-v.disabled,
+.schedule-tabs--staff .sd-shift-cell-v:disabled {
+  cursor: not-allowed !important;
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+  opacity: 0.86;
+}
+
+.schedule-tabs--staff .sd-shift-cell-v.disabled:hover,
+.schedule-tabs--staff .sd-shift-cell-v:disabled:hover {
+  background: #f8fafc !important;
+  transform: none;
+}
+
+/* =========================================================
+   PHẦN 2 — MANAGER: QUẢN LÝ ĐỢT VÀ XỬ LÝ THAY CA
+   ========================================================= */
+.schedule-tabs--manager .sd-board-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.schedule-tabs--manager .sd-schedule-board {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px; /* Chống co rúm trên mobile, cho phép vuốt ngang */
+}
+
+.schedule-tabs--manager .sd-schedule-board th,
+.schedule-tabs--manager .sd-schedule-board td {
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  vertical-align: top;
+}
+
+.schedule-tabs--manager .sd-schedule-board th {
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+}
+
+.schedule-tabs--manager .sd-board-date-col {
+  width: 90px;
+  background: #f8fafc;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.schedule-tabs--manager .sd-board-date-col strong {
+  display: block;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.schedule-tabs--manager .sd-board-date-col small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.schedule-tabs--manager .sd-publish-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.schedule-tabs--manager .sd-period-message {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.schedule-tabs--manager .sd-period-message strong {
+  font-weight: 800;
+}
+
+.schedule-tabs--manager .sd-period-message--locked {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.schedule-tabs--manager .sd-period-message--overdue {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+
+.schedule-tabs--manager .sd-period-message--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+/*
+ * Các slot dưới đây trước đây ManagerPeriodTab vô tình nhận từ
+ * DashboardCSS của Staff. Đưa bản scoped vào đây để loại phụ thuộc chéo.
+ */
+.schedule-tabs--manager .sd-slot-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-tabs--manager .sd-slot-person,
+.schedule-tabs--manager .sd-slot-empty {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.schedule-tabs--manager .sd-slot-manager {
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-weight: 700;
+}
+
+.schedule-tabs--manager .sd-slot-staff {
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-weight: 700;
+}
+
+.schedule-tabs--manager .sd-slot-empty {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  color: #94a3b8;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.schedule-tabs--manager .sd-slot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-tabs--manager .sd-slot-role,
+.schedule-tabs--manager .sd-slot-pending {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.schedule-tabs--manager .sd-slot-full-text {
+  margin-top: 2px;
+  text-align: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedule-tabs--manager .sd-schedule-cell {
+  vertical-align: top;
+  min-width: 170px;
+}
+
+.schedule-tabs--manager .sd-schedule-cell.is-full {
+  background: #f8fafc;
+}
+
+.schedule-tabs--manager .sd-schedule-closed {
+  text-align: center;
+  padding: 18px 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedule-tabs--manager .sd-registration-cell .sd-slot-list {
+  width: 100%;
+}
+
+.schedule-tabs--manager .sd-registration-cell .sd-slot-person,
+.schedule-tabs--manager .sd-registration-cell .sd-slot-empty {
+  min-height: 30px;
+}
+
+/* =========================================================
+   PHẦN 3 — ADMIN: XEM LỊCH LÀM CỦA CÁC CƠ SỞ
+   ---------------------------------------------------------
+   AdminSystemScheduleTab vẫn dùng các class sd-board-* và
+   sd-schedule-board. Phần này phải có root schedule-tabs--admin
+   để CSS chỉ tác động đến tab "Lịch các cơ sở" của Admin.
+   ========================================================= */
+.schedule-tabs--admin .sd-board-wrap {
+  width: 100%;
+  overflow-x: auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.schedule-tabs--admin .sd-schedule-board {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.schedule-tabs--admin .sd-schedule-board th,
+.schedule-tabs--admin .sd-schedule-board td {
+  border: 1px solid #e2e8f0;
+  padding: 10px;
+  vertical-align: top;
+}
+
+.schedule-tabs--admin .sd-schedule-board th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.schedule-tabs--admin .sd-schedule-board tbody tr:hover {
+  background: #f8fafc;
+}
+
+.schedule-tabs--admin .sd-board-date-col {
+  width: 90px;
+  min-width: 90px;
+  background: #f8fafc;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.schedule-tabs--admin .sd-board-date-col strong {
+  display: block;
+  color: #1e293b;
+  font-size: 13px;
+}
+
+.schedule-tabs--admin .sd-board-date-col small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+/* Thẻ Manager trong từng ô ngày/ca. */
+.schedule-tabs--admin .sd-reg-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.schedule-tabs--admin .sd-reg-card:last-child {
+  margin-bottom: 0;
+}
+
+.schedule-tabs--admin .sd-reg-name {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Thẻ Staff trong từng ô ngày/ca.
+   Component đang dùng class sd-reg-cardapproved. */
+.schedule-tabs--admin .sd-reg-cardapproved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.schedule-tabs--admin .sd-reg-cardapproved:last-child {
+  margin-bottom: 0;
+}
+
+/* Mỗi cột ca có độ rộng tối thiểu để tên không bị ép sát. */
+.schedule-tabs--admin .sd-schedule-board th:not(:first-child),
+.schedule-tabs--admin .sd-schedule-board td:not(:first-child) {
+  min-width: 170px;
+}
+
+@media (max-width: 768px) {
+  .schedule-tabs--admin .sd-schedule-board {
+    min-width: 680px;
+  }
+
+  .schedule-tabs--admin .sd-schedule-board th,
+  .schedule-tabs--admin .sd-schedule-board td {
+    padding: 8px;
+  }
+}

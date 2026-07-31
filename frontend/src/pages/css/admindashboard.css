@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap");
 
 /* =========================================
    1. BASE STYLES & LAYOUT
@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  font-family: 'Be Vietnam Pro', sans-serif;
+  font-family: "Be Vietnam Pro", sans-serif;
   background: #f0f2f5;
   color: #1a1a2e;
   padding-bottom: 70px;
@@ -1344,52 +1344,19 @@
 /* =========================================
    12. BẢNG LỊCH DUYỆT CA (SCHEDULE BOARD)
    ========================================= */
-.sd-board-wrap {
-  overflow-x: auto;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  border: 1px solid #e2e8f0;
-}
 
-.sd-schedule-board {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 700px; /* Chống co rúm trên mobile, cho phép vuốt ngang */
-}
 
-.sd-schedule-board th, 
-.sd-schedule-board td {
-  border: 1px solid #e2e8f0;
-  padding: 10px;
-  vertical-align: top;
-}
 
-.sd-schedule-board th {
-  background: #f8fafc;
-  font-size: 13px;
-  font-weight: 700;
-  color: #475569;
-  text-align: center;
-}
 
-.sd-board-date-col {
-  width: 90px;
-  background: #f8fafc;
-  text-align: center;
-  vertical-align: middle !important;
-}
 
-.sd-board-date-col strong {
-  display: block;
-  font-size: 13px;
-  color: #1e293b;
-}
 
-.sd-board-date-col small {
-  font-size: 11px;
-  color: #64748b;
-}
+
+
+
+
+
+
+
 
 /* Thẻ tên nhân viên bên trong ô lịch */
 .sd-reg-card {
@@ -1452,17 +1419,7 @@
 .sd-reg-btn-undo { background: #94a3b8; color: #fff; } /* Nút hoàn tác về chờ duyệt */
 
 /* Banner báo trạng thái chốt lịch */
-.sd-publish-banner {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1e3a8a;
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+
 
 /* =========================================
    13. DROPDOWN ĐỔI NHÂN VIÊN DỰ BỊ
@@ -4745,36 +4702,15 @@
   border-color: #fdba74;
 }
 
-.sd-period-message {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border: 1px solid;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.55;
-}
 
-.sd-period-message strong {
-  font-weight: 800;
-}
 
-.sd-period-message--locked {
-  background: #f8fafc;
-  color: #475569;
-  border-color: #cbd5e1;
-}
 
-.sd-period-message--overdue {
-  background: #fff7ed;
-  color: #9a3412;
-  border-color: #fdba74;
-}
 
-.sd-period-message--error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border-color: #fecaca;
-}
+
+
+
+
+
 
 .sd-action-btn:disabled {
   cursor: not-allowed;
@@ -4795,9 +4731,7 @@
     text-align: center;
   }
 
-  .sd-period-message {
-    padding: 10px 12px;
-  }
+  
 }
 
 .sd-shift-cell-v.disabled,

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
+
+// CSS riêng cho ba tab lịch: Staff, Manager và Admin.
+import '../css/ScheduleTabs.css'
 import { getAllPeriods } from '../../api/PeriodApi'
 import { getAllShifts } from '../../api/ShiftApi'
 
+// Admin đọc lịch chính thức qua API lịch.
 import {
   getFinalScheduleByPeriod
-} from '../../api/StaffRegistrationApi'
+} from '../../api/FinalScheduleApi'
 
 import {
   getScheduleUserName,
@@ -304,7 +308,7 @@ export function AdminSystemScheduleTab({ branches }) {
 
   return (
     <div
-      className="sd-card"
+      className="sd-card schedule-tabs schedule-tabs--admin"
       style={{
         padding: '20px 0'
       }}

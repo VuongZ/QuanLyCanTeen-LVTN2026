@@ -7,14 +7,27 @@ import {
   deletePeriod
 } from '../../api/PeriodApi'
 
-import {
-  getRegistrationsByPeriod,
-  getFinalScheduleByPeriod,
-  publishSchedule
-} from '../../api/StaffRegistrationApi'
-
+// Danh sách ca làm dùng để tạo các cột của bảng lịch.
 import { getAllShifts } from '../../api/ShiftApi'
 
+// Phiếu đăng ký ca.
+import {
+  getRegistrationsByPeriod
+} from '../../api/StaffRegistrationApi'
+
+// Lịch chính thức và nghiệp vụ thay ca.
+import {
+  getFinalScheduleByPeriod,
+  publishSchedule,
+  markApprovedLeave,
+  markAbsent,
+  getReplacementCandidates,
+  assignEmergencyReplacement
+} from '../../api/FinalScheduleApi'
+
+
+// CSS riêng của hai tab lịch/đợt, không còn đặt trong CSS dashboard lớn.
+import '../css/ScheduleTabs.css'
 // Ánh xạ chỉ số getDay() sang tên thứ tiếng Việt.
 const DAY_NAMES = [
   'Chủ nhật',
@@ -269,7 +282,7 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   }
 
   return (
-    <div className="sd-users-page">
+    <div className="sd-users-page schedule-tabs schedule-tabs--manager">
       <div className="sd-users-toolbar">
         <div className="sd-users-toolbar-left">
           <div className="sd-search-wrap">
@@ -490,98 +503,134 @@ function PeriodReviewScreen({ period, onBack, user }) {
   const [dates, setDates] = useState([])
   const [loading, setLoading] = useState(true)
   const [reviewError, setReviewError] = useState('')
+
   const [currentStatus, setCurrentStatus] = useState(
-    (period?.status || 'OPEN').toUpperCase()
+    String(period?.status || 'OPEN').toUpperCase()
   )
 
-  // Đồng bộ state currentStatus khi dữ liệu period thay đổi.
+  // ========================================================================
+  // STATE CỦA NGHIỆP VỤ THAY NHÂN VIÊN
+  // ========================================================================
+
+  // Tăng biến này để useEffect tải lại bảng sau mỗi thao tác thành công.
+  const [boardReloadKey, setBoardReloadKey] = useState(0)
+
+  // replacementModal có dạng:
+  // {
+  //   row: dòng lịch của Staff đang nghỉ/vắng,
+  //   step: 'absence' | 'candidates'
+  // }
+  const [replacementModal, setReplacementModal] = useState(null)
+  const [absenceReason, setAbsenceReason] = useState('')
+  const [replacementCandidates, setReplacementCandidates] = useState([])
+  const [selectedRegistrationId, setSelectedRegistrationId] = useState('')
+  const [replacementLoading, setReplacementLoading] = useState(false)
+  const [replacementError, setReplacementError] = useState('')
+
+  // Đồng bộ trạng thái khi period bên ngoài thay đổi.
   useEffect(() => {
     setCurrentStatus(
       String(period?.status || 'OPEN').toUpperCase()
     )
   }, [period?.status])
 
-  // Tải dữ liệu để tạo bảng lịch.
-  // Nếu đã PUBLISHED thì lấy lịch chính thức;
-  // nếu chưa PUBLISHED thì lấy danh sách đăng ký.
+  // ========================================================================
+  // TẢI BẢNG ĐĂNG KÝ HOẶC LỊCH CHÍNH THỨC
+  // ========================================================================
   useEffect(() => {
+    let isMounted = true
+
     async function loadBoardData() {
       setLoading(true)
+      setReviewError('')
 
       try {
         const isPublishedPeriod =
-          String(currentStatus || period.status || '').toUpperCase() === 'PUBLISHED'
+          String(
+            currentStatus || period.status || ''
+          ).toUpperCase() === 'PUBLISHED'
 
-        // Chọn API phù hợp theo trạng thái của đợt.
         const schedulePromise = isPublishedPeriod
-  ? getFinalScheduleByPeriod(period.id)
-  : getRegistrationsByPeriod(period.id)
+          ? getFinalScheduleByPeriod(period.id)
+          : getRegistrationsByPeriod(period.id)
 
-        // Hai API độc lập nên gọi song song bằng Promise.all.
         const [scheduleRows, shiftRows] = await Promise.all([
           schedulePromise,
           getAllShifts()
         ])
 
-        // Chỉ giữ các ca thuộc đúng chi nhánh của đợt.
-        const branchShifts = (shiftRows || []).filter(
-          (shift) =>
-            String(shift.branchId) === String(period.branchId)
-        )
+        if (!isMounted) return
+
+        const branchShifts = (shiftRows || []).filter((shift) => {
+          return String(shift.branchId) === String(period.branchId)
+        })
 
         setRegistrations(
           Array.isArray(scheduleRows)
             ? scheduleRows
             : []
         )
-
         setShifts(branchShifts)
 
-        // Tạo mảng ngày từ startDate đến endDate.
-        const dArray = []
-        let curr = new Date(period.startDate)
-        const end = new Date(period.endDate)
+        const dateArray = []
+        let currentDate = new Date(period.startDate)
+        const endDate = new Date(period.endDate)
 
-        // while chạy đến khi curr vượt quá ngày kết thúc.
-        while (curr <= end) {
-          // Lưu bản sao ngày hiện tại vào mảng.
-          dArray.push(new Date(curr))
-          // Chuyển sang ngày kế tiếp.
-          curr.setDate(curr.getDate() + 1)
+        while (currentDate <= endDate) {
+          dateArray.push(new Date(currentDate))
+          currentDate.setDate(currentDate.getDate() + 1)
         }
 
-        setDates(dArray)
+        setDates(dateArray)
       } catch (error) {
-        console.error(error)
-        setReviewError(
-          getApiErrorMessage(
-            error,
-            'Không thể tải dữ liệu đăng ký ca.'
+        console.error('Lỗi tải bảng lịch:', error)
+
+        if (isMounted) {
+          setReviewError(
+            getApiErrorMessage(
+              error,
+              'Không thể tải dữ liệu đăng ký ca.'
+            )
           )
-        )
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     loadBoardData()
+
+    return () => {
+      isMounted = false
+    }
   }, [
     period.id,
     period.branchId,
     period.startDate,
     period.endDate,
-    currentStatus
+    currentStatus,
+    boardReloadKey
   ])
 
   function toDateString(dateObj) {
     const offset = dateObj.getTimezoneOffset()
-    const d = new Date(dateObj.getTime() - offset * 60 * 1000)
+    const normalizedDate = new Date(
+      dateObj.getTime() - offset * 60 * 1000
+    )
 
-    return d.toISOString().split('T')[0]
+    return normalizedDate.toISOString().split('T')[0]
   }
 
-  function isActiveRegistration(reg) {
-    const status = String(reg.status || '').toUpperCase()
+  function normalizeStatus(value) {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+  }
+
+  function isActiveRegistration(row) {
+    const status = normalizeStatus(row?.status)
 
     return ![
       'CANCELLED',
@@ -596,118 +645,395 @@ function PeriodReviewScreen({ period, onBack, user }) {
       .replace(/[\u0300-\u036f]/g, '')
       .toUpperCase()
 
-    return roleName.includes('MANAGER') || roleName.includes('QUAN LY')
+    return (
+      roleName.includes('MANAGER') ||
+      roleName.includes('QUAN LY')
+    )
+  }
+
+  // REGISTERED mới chiếm slot trước khi công bố.
+  function isOfficialRegistrationStatus(status) {
+    const normalized = normalizeStatus(status)
+
+    return [
+      'REGISTERED',
+      'APPROVED',
+      'ĐÃ DUYỆT',
+      'CHỜ DUYỆT'
+    ].includes(normalized)
   }
 
   function getRegistrationStatusLabel(status) {
-    if (
-      status === 'REGISTERED' ||
-      status === 'Chờ Duyệt' ||
-      status === 'Đã Duyệt' ||
-      status === 'APPROVED'
-    ) {
-      return 'Đã đăng ký'
+    const normalized = normalizeStatus(status)
+
+    if (isOfficialRegistrationStatus(normalized)) {
+      return 'Đã đăng ký chính thức'
     }
 
-    if (status === 'CANCELLED') {
+    if (normalized === 'WAITLIST') {
+      return 'Danh sách chờ'
+    }
+
+    if (normalized === 'REPLACEMENT_SELECTED') {
+      return 'Đã được chọn thay'
+    }
+
+    if (
+      normalized === 'CANCELLED' ||
+      normalized === 'REJECTED'
+    ) {
       return 'Đã hủy'
     }
 
-    return status || 'Đã đăng ký'
+    return status || 'Không rõ trạng thái'
   }
 
-  // Loại những đăng ký đã hủy hoặc bị từ chối.
-  const activeRegistrations =
-    registrations.filter(isActiveRegistration)
+  // Nhãn trạng thái sau khi lịch đã công bố.
+  function getPublishedScheduleLabel(row, managerRow) {
+    if (managerRow) return 'Quản lý'
 
-  // Ma trận dùng để đưa đúng người vào đúng ô:
-  // boardMatrix[ngày][shiftId] = danh sách đăng ký/lịch chính thức.
+    const status = normalizeStatus(row?.status)
+    const assignmentType = normalizeStatus(row?.assignmentType)
+
+    if (assignmentType === 'EMERGENCY_REPLACEMENT') {
+      return 'Thay ca khẩn cấp'
+    }
+
+    if (status === 'LEAVE_APPROVED') {
+      return 'Nghỉ có phép'
+    }
+
+    if (status === 'ABSENT') {
+      return 'Vắng không phép'
+    }
+
+    return 'Lịch chính thức'
+  }
+
+  // Màu của từng loại lịch.
+  function getScheduleRowStyle(row, managerRow, isPublished) {
+    if (managerRow) return {}
+
+    const status = normalizeStatus(row?.status)
+    const assignmentType = normalizeStatus(row?.assignmentType)
+
+    if (!isPublished && status === 'WAITLIST') {
+      return {
+        background: '#faf5ff',
+        borderColor: '#c4b5fd',
+        color: '#6d28d9'
+      }
+    }
+
+    if (assignmentType === 'EMERGENCY_REPLACEMENT') {
+      return {
+        background: '#dcfce7',
+        borderColor: '#86efac',
+        color: '#166534'
+      }
+    }
+
+    if (status === 'LEAVE_APPROVED') {
+      return {
+        background: '#fef3c7',
+        borderColor: '#fcd34d',
+        color: '#92400e'
+      }
+    }
+
+    if (status === 'ABSENT') {
+      return {
+        background: '#fee2e2',
+        borderColor: '#fca5a5',
+        color: '#991b1b'
+      }
+    }
+
+    return {}
+  }
+
+  // Loại phiếu hủy/từ chối khỏi ma trận.
+  const activeRegistrations = registrations.filter(
+    isActiveRegistration
+  )
+
+  // boardMatrix[ngày][shiftId] = các dòng của đúng ngày và ca.
   const boardMatrix = {}
 
-  // Vòng ngoài duyệt từng ngày.
   dates.forEach((dateObj) => {
-    const dStr = toDateString(dateObj)
+    const dateString = toDateString(dateObj)
+    boardMatrix[dateString] = {}
 
-    boardMatrix[dStr] = {}
-
-    // Với mỗi ngày, vòng trong duyệt từng ca.
     shifts.forEach((shift) => {
-      boardMatrix[dStr][shift.id] = activeRegistrations.filter((registration) => {
-        return (
-          registration.workDate?.slice(0, 10) === dStr &&
-          registration.shiftId === shift.id
-        )
-      })
+      boardMatrix[dateString][shift.id] =
+        activeRegistrations.filter((row) => {
+          return (
+            row.workDate?.slice(0, 10) === dateString &&
+            Number(row.shiftId) === Number(shift.id)
+          )
+        })
     })
   })
 
-  const handleLockPeriod = async () => {
-  if (!window.confirm('Bạn có chắc muốn khóa đăng ký đợt này?')) {
-    return
-  }
+  // ========================================================================
+  // QUẢN LÝ TRẠNG THÁI ĐỢT ĐĂNG KÝ
+  // ========================================================================
+  async function handleLockPeriod() {
+    if (!window.confirm('Bạn có chắc muốn khóa đăng ký đợt này?')) {
+      return
+    }
 
-  try {
-    await updatePeriodStatus(period.id, 'CLOSED')
-
-    alert('Đã khóa đăng ký thành công!')
-    setCurrentStatus('CLOSED')
-  } catch (error) {
-    alert(
-      getApiErrorMessage(
-        error,
-        'Không thể khóa đợt đăng ký.'
+    try {
+      await updatePeriodStatus(period.id, 'CLOSED')
+      alert('Đã khóa đăng ký thành công!')
+      setCurrentStatus('CLOSED')
+    } catch (error) {
+      alert(
+        getApiErrorMessage(
+          error,
+          'Không thể khóa đợt đăng ký.'
+        )
       )
-    )
-  }
-}
-
- const handleReopenPeriod = async () => {
-  if (hasPeriodStarted(period.startDate)) {
-    alert(
-      'Không thể mở lại đợt đăng ký khi đã đến ngày bắt đầu lịch làm.'
-    )
-    return
+    }
   }
 
-  if (!window.confirm('Bạn muốn mở lại đợt đăng ký này?')) {
-    return
-  }
-
-  try {
-    await updatePeriodStatus(period.id, 'OPEN')
-
-    alert('Đã mở lại đợt đăng ký!')
-    setCurrentStatus('OPEN')
-  } catch (error) {
-    alert(
-      getApiErrorMessage(
-        error,
-        'Không thể mở lại đợt đăng ký.'
+  async function handleReopenPeriod() {
+    if (hasPeriodStarted(period.startDate)) {
+      alert(
+        'Không thể mở lại đợt đăng ký khi đã đến ngày bắt đầu lịch làm.'
       )
-    )
-  }
-}
+      return
+    }
 
- const handlePublish = async () => {
-  if (!window.confirm('Bạn có chắc chắn muốn công bố lịch làm?')) {
-    return
-  }
+    if (!window.confirm('Bạn muốn mở lại đợt đăng ký này?')) {
+      return
+    }
 
-  try {
-    await publishSchedule(period.id)
-
-    alert('Đã công bố lịch làm việc thành công!')
-    setCurrentStatus('PUBLISHED')
-    await onBack()
-  } catch (error) {
-    alert(
-      getApiErrorMessage(
-        error,
-        'Không thể công bố lịch.'
+    try {
+      await updatePeriodStatus(period.id, 'OPEN')
+      alert('Đã mở lại đợt đăng ký!')
+      setCurrentStatus('OPEN')
+    } catch (error) {
+      alert(
+        getApiErrorMessage(
+          error,
+          'Không thể mở lại đợt đăng ký.'
+        )
       )
-    )
+    }
   }
-}
+
+  async function handlePublish() {
+    if (!window.confirm('Bạn có chắc chắn muốn công bố lịch làm?')) {
+      return
+    }
+
+    try {
+      await publishSchedule(period.id)
+      alert('Đã công bố lịch làm việc thành công!')
+      setCurrentStatus('PUBLISHED')
+      await onBack()
+    } catch (error) {
+      alert(
+        getApiErrorMessage(
+          error,
+          'Không thể công bố lịch.'
+        )
+      )
+    }
+  }
+
+  // ========================================================================
+  // NGHIỆP VỤ NGHỈ/VẮNG VÀ CHỌN NGƯỜI THAY
+  // ========================================================================
+  function closeReplacementModal() {
+    setReplacementModal(null)
+    setAbsenceReason('')
+    setReplacementCandidates([])
+    setSelectedRegistrationId('')
+    setReplacementError('')
+    setReplacementLoading(false)
+  }
+
+  async function loadCandidates(row) {
+    setReplacementLoading(true)
+    setReplacementError('')
+    setSelectedRegistrationId('')
+
+    try {
+      const data = await getReplacementCandidates(row.id)
+
+      setReplacementCandidates(
+        Array.isArray(data)
+          ? data
+          : []
+      )
+
+      setReplacementModal({
+        row,
+        step: 'candidates'
+      })
+    } catch (error) {
+      setReplacementError(
+        getApiErrorMessage(
+          error,
+          'Không thể tải danh sách nhân viên dự phòng.'
+        )
+      )
+    } finally {
+      setReplacementLoading(false)
+    }
+  }
+
+  async function openReplacementFlow(row) {
+    const status = normalizeStatus(row?.status)
+    const assignmentType = normalizeStatus(row?.assignmentType)
+
+    // Không mở xử lý trên chính dòng người thay.
+    if (assignmentType === 'EMERGENCY_REPLACEMENT') {
+      return
+    }
+
+    setAbsenceReason('')
+    setReplacementCandidates([])
+    setSelectedRegistrationId('')
+    setReplacementError('')
+
+    // Lịch đã được đánh dấu nghỉ/vắng thì chuyển thẳng tới WAITLIST.
+    if (
+      status === 'LEAVE_APPROVED' ||
+      status === 'ABSENT'
+    ) {
+      setReplacementModal({
+        row,
+        step: 'candidates'
+      })
+
+      await loadCandidates(row)
+      return
+    }
+
+    // Lịch bình thường sẽ mở bước nhập lý do trước.
+    if (status === 'PUBLISHED') {
+      setReplacementModal({
+        row,
+        step: 'absence'
+      })
+    }
+  }
+
+  async function handleMarkAbsence(targetStatus) {
+    const row = replacementModal?.row
+    const reason = absenceReason.trim()
+
+    if (!row) return
+
+    if (reason.length < 3) {
+      setReplacementError(
+        'Vui lòng nhập lý do từ 3 ký tự trở lên.'
+      )
+      return
+    }
+
+    setReplacementLoading(true)
+    setReplacementError('')
+
+    try {
+      if (targetStatus === 'LEAVE_APPROVED') {
+        await markApprovedLeave(row.id, reason)
+      } else {
+        await markAbsent(row.id, reason)
+      }
+
+      const updatedRow = {
+        ...row,
+        status: targetStatus,
+        absenceReason: reason
+      }
+
+      // Chuyển modal sang bước chọn người thay ngay sau khi ghi nhận thành công.
+      setReplacementModal({
+        row: updatedRow,
+        step: 'candidates'
+      })
+      setSelectedRegistrationId('')
+      setBoardReloadKey((value) => value + 1)
+
+      try {
+        const candidates = await getReplacementCandidates(row.id)
+
+        setReplacementCandidates(
+          Array.isArray(candidates)
+            ? candidates
+            : []
+        )
+      } catch (candidateError) {
+        setReplacementCandidates([])
+        setReplacementError(
+          getApiErrorMessage(
+            candidateError,
+            'Đã ghi nhận nghỉ/vắng nhưng chưa tải được danh sách dự phòng.'
+          )
+        )
+      }
+    } catch (error) {
+      setReplacementError(
+        getApiErrorMessage(
+          error,
+          targetStatus === 'ABSENT'
+            ? 'Không thể ghi nhận vắng không phép.'
+            : 'Không thể ghi nhận nghỉ có phép.'
+        )
+      )
+    } finally {
+      setReplacementLoading(false)
+    }
+  }
+
+  async function handleAssignReplacement() {
+    const row = replacementModal?.row
+    const registrationId = Number(selectedRegistrationId)
+
+    if (!row) return
+
+    if (!registrationId) {
+      setReplacementError(
+        'Vui lòng chọn một nhân viên dự phòng.'
+      )
+      return
+    }
+
+    if (
+      !window.confirm(
+        'Xác nhận nhân viên này đã đồng ý đến thay ca?'
+      )
+    ) {
+      return
+    }
+
+    setReplacementLoading(true)
+    setReplacementError('')
+
+    try {
+      await assignEmergencyReplacement(
+        row.id,
+        registrationId
+      )
+
+      alert('Đã điều động nhân viên thay ca thành công!')
+      closeReplacementModal()
+      setBoardReloadKey((value) => value + 1)
+    } catch (error) {
+      setReplacementError(
+        getApiErrorMessage(
+          error,
+          'Không thể điều động nhân viên thay ca.'
+        )
+      )
+    } finally {
+      setReplacementLoading(false)
+    }
+  }
 
   const isOpen = currentStatus === 'OPEN'
   const isClosed = [
@@ -722,7 +1048,7 @@ function PeriodReviewScreen({ period, onBack, user }) {
   const canReopen = isClosed && !isOverdue
 
   return (
-    <div className="sd-users-page">
+    <div className="sd-users-page schedule-tabs schedule-tabs--manager">
       <button
         className="sd-btn-back"
         onClick={onBack}
@@ -747,7 +1073,8 @@ function PeriodReviewScreen({ period, onBack, user }) {
               fontSize: 18
             }}
           >
-            Lịch đăng ký: Từ {formatDate(period.startDate)} đến {formatDate(period.endDate)}
+            Lịch đăng ký: Từ {formatDate(period.startDate)} đến{' '}
+            {formatDate(period.endDate)}
           </h2>
 
           <p
@@ -758,7 +1085,6 @@ function PeriodReviewScreen({ period, onBack, user }) {
             }}
           >
             Trạng thái hiện tại:{' '}
-
             <strong style={{ color: '#ea580c' }}>
               {isPublished
                 ? 'Đã công bố'
@@ -814,41 +1140,43 @@ function PeriodReviewScreen({ period, onBack, user }) {
           )}
 
           {isClosed && (
-  <button
-    className="sd-btn-primary"
-    style={{
-      width: 'auto',
-      marginTop: 0,
-      background: '#ea580c',
-      cursor: 'pointer'
-    }}
-    onClick={handlePublish}
-  >
-    Công bố lịch
-  </button>
-)}
+            <button
+              className="sd-btn-primary"
+              style={{
+                width: 'auto',
+                marginTop: 0,
+                background: '#ea580c',
+                cursor: 'pointer'
+              }}
+              onClick={handlePublish}
+            >
+              Công bố lịch
+            </button>
+          )}
 
-{isPublished && (
-  <span
-    style={{
-      padding: '8px 16px',
-      background: '#e0e7ff',
-      color: '#1d4ed8',
-      border: '1px solid #bfdbfe',
-      borderRadius: '6px',
-      fontWeight: '600'
-    }}
-  >
-    Đã công bố lịch
-  </span>
-)}
+          {isPublished && (
+            <span
+              style={{
+                padding: '8px 16px',
+                background: '#e0e7ff',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                fontWeight: '600'
+              }}
+            >
+              Đã công bố lịch
+            </span>
+          )}
         </div>
       </div>
 
       {isOverdue && !isPublished && (
         <div className="sd-period-message sd-period-message--overdue">
-          <strong>Lịch làm đã đến ngày bắt đầu nhưng chưa được công bố.</strong>
-          {' '}Đợt đăng ký không thể mở lại; Quản lý cần kiểm tra và công bố lịch.
+          <strong>
+            Lịch làm đã đến ngày bắt đầu nhưng chưa được công bố.
+          </strong>{' '}
+          Đợt đăng ký không thể mở lại; Quản lý cần kiểm tra và công bố lịch.
         </div>
       )}
 
@@ -865,25 +1193,20 @@ function PeriodReviewScreen({ period, onBack, user }) {
           <table className="sd-schedule-board">
             <thead>
               <tr>
-                <th style={{ width: 90 }}>
-                  NGÀY
-                </th>
+                <th style={{ width: 90 }}>NGÀY</th>
 
-                {/* shifts.map trong thead:
-                    mỗi ca tạo một cột tiêu đề <th>. */}
                 {shifts.map((shift) => (
                   <th key={shift.id}>
                     {shift.shiftName}
-
                     <br />
-
                     <span
                       style={{
                         fontWeight: 500,
                         fontSize: 11
                       }}
                     >
-                      {shift.startTime?.slice(0, 5)} - {shift.endTime?.slice(0, 5)}
+                      {shift.startTime?.slice(0, 5)} -{' '}
+                      {shift.endTime?.slice(0, 5)}
                     </span>
                   </th>
                 ))}
@@ -891,43 +1214,55 @@ function PeriodReviewScreen({ period, onBack, user }) {
             </thead>
 
             <tbody>
-              {/* dates.map:
-                  mỗi ngày tạo một hàng <tr>. */}
               {dates.map((dateObj) => {
-                const dStr = toDateString(dateObj)
+                const dateString = toDateString(dateObj)
                 const dayOfWeek = DAY_NAMES[dateObj.getDay()]
 
                 return (
-                  <tr key={dStr}>
+                  <tr key={dateString}>
                     <td className="sd-board-date-col">
-                      <strong>
-                        {dayOfWeek}
-                      </strong>
-
+                      <strong>{dayOfWeek}</strong>
                       <small>
                         {dateObj.getDate()}/{dateObj.getMonth() + 1}
                       </small>
                     </td>
 
-                    {/* shifts.map nằm trong dates.map:
-                        mỗi ca tạo một ô <td> trên hàng ngày hiện tại. */}
                     {shifts.map((shift) => {
-                      const cellRegs = boardMatrix[dStr][shift.id] || []
+                      const cellRows =
+                        boardMatrix[dateString][shift.id] || []
+
                       const max = Number(shift.maxStaff || 0)
 
-                      // Trước công bố: danh sách chỉ gồm Staff đăng ký, Manager được hiển thị riêng.
-                      // Sau công bố: cellRegs lấy trực tiếp từ ca_final_schedule và đã gồm cả Manager.
+                      // Sau công bố:
+                      // - PUBLISHED mới là người đang thực sự chiếm vị trí.
+                      // - LEAVE_APPROVED và ABSENT vẫn hiển thị nhưng không chiếm vị trí.
+                      //
+                      // Trước công bố:
+                      // - REGISTERED chiếm vị trí.
+                      // - WAITLIST không chiếm vị trí.
                       const occupiedCount = isPublished
-                        ? cellRegs.length
-                        : cellRegs.length + (max > 0 ? 1 : 0)
+                        ? cellRows.filter((row) => {
+                            return normalizeStatus(row.status) === 'PUBLISHED'
+                          }).length
+                        : cellRows.filter((row) => {
+                            return isOfficialRegistrationStatus(row.status)
+                          }).length + (max > 0 ? 1 : 0)
 
-                      const remainingSlots = Math.max(max - occupiedCount, 0)
-                      const isFull = max > 0 && remainingSlots === 0
+                      const remainingSlots = Math.max(
+                        max - occupiedCount,
+                        0
+                      )
+
+                      const isFull =
+                        max > 0 &&
+                        remainingSlots === 0
 
                       return (
                         <td
                           key={shift.id}
-                          className={`sd-schedule-cell ${isFull ? 'is-full' : ''}`}
+                          className={`sd-schedule-cell ${
+                            isFull ? 'is-full' : ''
+                          }`}
                         >
                           {max <= 0 ? (
                             <div className="sd-schedule-closed">
@@ -935,10 +1270,13 @@ function PeriodReviewScreen({ period, onBack, user }) {
                             </div>
                           ) : (
                             <div className="sd-slot-list">
+                              {/* Trước công bố, Manager chưa có dòng ca_final_schedule nên hiển thị tạm. */}
                               {!isPublished && (
                                 <div className="sd-slot-person sd-slot-manager">
                                   <span className="sd-slot-name">
-                                    {user.fullName || user.username || 'Quản lý'}
+                                    {user.fullName ||
+                                      user.username ||
+                                      'Quản lý'}
                                   </span>
 
                                   <span className="sd-slot-role">
@@ -947,10 +1285,39 @@ function PeriodReviewScreen({ period, onBack, user }) {
                                 </div>
                               )}
 
-                              {/* cellRegs.map:
-                                  hiển thị từng Manager hoặc Staff trong ô. */}
-                              {cellRegs.map((row) => {
-                                const managerRow = isPublished && isManagerRow(row)
+                              {cellRows.map((row) => {
+                                const managerRow =
+                                  isPublished && isManagerRow(row)
+
+                                const rowStatus = normalizeStatus(row.status)
+                                const assignmentType = normalizeStatus(
+                                  row.assignmentType
+                                )
+
+                                const hasReplacement = registrations.some(
+                                  (candidateRow) => {
+                                    return Number(
+                                      candidateRow.replacesScheduleId
+                                    ) === Number(row.id)
+                                  }
+                                )
+
+                                const canHandleReplacement =
+                                  isPublished &&
+                                  !managerRow &&
+                                  !hasReplacement &&
+                                  assignmentType !== 'EMERGENCY_REPLACEMENT' &&
+                                  [
+                                    'PUBLISHED',
+                                    'LEAVE_APPROVED',
+                                    'ABSENT'
+                                  ].includes(rowStatus)
+
+                                const rowStyle = getScheduleRowStyle(
+                                  row,
+                                  managerRow,
+                                  isPublished
+                                )
 
                                 return (
                                   <div
@@ -960,36 +1327,101 @@ function PeriodReviewScreen({ period, onBack, user }) {
                                         ? 'sd-slot-manager'
                                         : 'sd-slot-staff'
                                     }`}
+                                    style={{
+                                      ...rowStyle,
+                                      alignItems: 'flex-start',
+                                      gap: 8
+                                    }}
                                   >
-                                    <span className="sd-slot-name">
-                                      {row.user?.fullName || row.user?.email || 'Nhân viên'}
-                                    </span>
+                                    <div
+                                      style={{
+                                        display: 'grid',
+                                        gap: 3,
+                                        minWidth: 0,
+                                        flex: 1
+                                      }}
+                                    >
+                                      <span className="sd-slot-name">
+                                        {row.user?.fullName ||
+                                          row.user?.email ||
+                                          'Nhân viên'}
+                                      </span>
 
-                                    <span className="sd-slot-role">
-                                      {isPublished
-                                        ? managerRow
-                                          ? 'Quản lý'
-                                          : 'Lịch chính thức'
-                                        : getRegistrationStatusLabel(row.status)}
-                                    </span>
+                                      <span className="sd-slot-role">
+                                        {isPublished
+                                          ? getPublishedScheduleLabel(
+                                              row,
+                                              managerRow
+                                            )
+                                          : getRegistrationStatusLabel(
+                                              row.status
+                                            )}
+                                      </span>
+
+                                      {row.absenceReason && (
+                                        <small
+                                          title={row.absenceReason}
+                                          style={{
+                                            fontSize: 10,
+                                            opacity: 0.85
+                                          }}
+                                        >
+                                          Lý do: {row.absenceReason}
+                                        </small>
+                                      )}
+                                    </div>
+
+                                    {canHandleReplacement && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openReplacementFlow(row)
+                                        }
+                                        style={{
+                                          border: '1px solid #cbd5e1',
+                                          background: '#ffffff',
+                                          borderRadius: 6,
+                                          padding: '4px 7px',
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        {rowStatus === 'PUBLISHED'
+                                          ? 'Xử lý'
+                                          : 'Chọn người thay'}
+                                      </button>
+                                    )}
+
+                                    {isPublished &&
+                                      !managerRow &&
+                                      hasReplacement && (
+                                        <span
+                                          style={{
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            color: '#166534',
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                        >
+                                          Đã có người thay
+                                        </span>
+                                      )}
                                   </div>
                                 )
                               })}
 
-                              {/* Tạo số dòng “Còn trống”
-                                  tương ứng với số slot chưa có người. */}
                               {Array.from({
                                 length: remainingSlots
                               }).map((_, index) => (
                                 <div
-                                  key={`empty-${dStr}-${shift.id}-${index}`}
+                                  key={`empty-${dateString}-${shift.id}-${index}`}
                                   className="sd-slot-empty"
                                 >
                                   Còn trống
                                 </div>
                               ))}
-
-
 
                               {isFull && (
                                 <div className="sd-slot-full-text">
@@ -1006,6 +1438,291 @@ function PeriodReviewScreen({ period, onBack, user }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ================================================================
+          MODAL XỬ LÝ NGHỈ/VẮNG VÀ CHỌN NGƯỜI THAY
+          ================================================================ */}
+      {replacementModal && (
+        <div
+          className="sd-overlay"
+          onClick={closeReplacementModal}
+        >
+          <div
+            className="sd-modal"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(680px, 94vw)'
+            }}
+          >
+            <div className="sd-modal-header">
+              <h2>Xử lý nhân viên nghỉ/vắng</h2>
+
+              <button
+                type="button"
+                onClick={closeReplacementModal}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="sd-modal-body">
+              <div
+                style={{
+                  padding: 12,
+                  marginBottom: 16,
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 10,
+                  background: '#f8fafc'
+                }}
+              >
+                <strong>
+                  {replacementModal.row?.user?.fullName ||
+                    replacementModal.row?.user?.email ||
+                    'Nhân viên'}
+                </strong>
+
+                <div
+                  style={{
+                    marginTop: 5,
+                    fontSize: 13,
+                    color: '#64748b'
+                  }}
+                >
+                  Ngày làm:{' '}
+                  {formatDate(replacementModal.row?.workDate)}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 13,
+                    color: '#64748b'
+                  }}
+                >
+                  Ca:{' '}
+                  {replacementModal.row?.shift?.shiftName ||
+                    'Chưa có thông tin ca'}
+                </div>
+              </div>
+
+              {replacementModal.step === 'absence' && (
+                <>
+                  <div className="sd-field">
+                    <label>Lý do nghỉ hoặc vắng *</label>
+
+                    <textarea
+                      value={absenceReason}
+                      onChange={(event) =>
+                        setAbsenceReason(event.target.value)
+                      }
+                      rows={4}
+                      maxLength={500}
+                      placeholder="Nhập lý do Manager đã xác minh..."
+                      style={{
+                        width: '100%',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                      marginTop: 16
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={replacementLoading}
+                      onClick={() =>
+                        handleMarkAbsence('LEAVE_APPROVED')
+                      }
+                      style={{
+                        padding: '9px 14px',
+                        border: '1px solid #fcd34d',
+                        background: '#fef3c7',
+                        color: '#92400e',
+                        borderRadius: 7,
+                        fontWeight: 700,
+                        cursor: replacementLoading
+                          ? 'not-allowed'
+                          : 'pointer'
+                      }}
+                    >
+                      Ghi nhận nghỉ có phép
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={replacementLoading}
+                      onClick={() =>
+                        handleMarkAbsence('ABSENT')
+                      }
+                      style={{
+                        padding: '9px 14px',
+                        border: '1px solid #fca5a5',
+                        background: '#fee2e2',
+                        color: '#991b1b',
+                        borderRadius: 7,
+                        fontWeight: 700,
+                        cursor: replacementLoading
+                          ? 'not-allowed'
+                          : 'pointer'
+                      }}
+                    >
+                      Ghi nhận vắng không phép
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {replacementModal.step === 'candidates' && (
+                <>
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      fontSize: 14,
+                      color: '#475569'
+                    }}
+                  >
+                    Chọn nhân viên trong danh sách chờ sau khi đã gọi điện
+                    và nhận được xác nhận.
+                  </div>
+
+                  {replacementLoading ? (
+                    <p>Đang tải danh sách dự phòng...</p>
+                  ) : replacementCandidates.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 8,
+                        background: '#f8fafc',
+                        color: '#64748b',
+                        textAlign: 'center'
+                      }}
+                    >
+                      Không có nhân viên phù hợp trong danh sách chờ.
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gap: 10
+                      }}
+                    >
+                      {replacementCandidates.map((candidate) => (
+                        <label
+                          key={candidate.registrationId}
+                          style={{
+                            display: 'flex',
+                            gap: 10,
+                            alignItems: 'flex-start',
+                            padding: 12,
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 9,
+                            cursor: 'pointer',
+                            background:
+                              String(selectedRegistrationId) ===
+                              String(candidate.registrationId)
+                                ? '#eff6ff'
+                                : '#ffffff'
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="replacementCandidate"
+                            value={candidate.registrationId}
+                            checked={
+                              String(selectedRegistrationId) ===
+                              String(candidate.registrationId)
+                            }
+                            onChange={(event) =>
+                              setSelectedRegistrationId(
+                                event.target.value
+                              )
+                            }
+                          />
+
+                          <div
+                            style={{
+                              display: 'grid',
+                              gap: 4
+                            }}
+                          >
+                            <strong>
+                              #{candidate.queuePosition}{' '}
+                              {candidate.fullName || 'Nhân viên'}
+                            </strong>
+
+                            <span
+                              style={{
+                                fontSize: 13,
+                                color: '#475569'
+                              }}
+                            >
+                              Điện thoại:{' '}
+                              {candidate.phoneNumber ? (
+                                <a href={`tel:${candidate.phoneNumber}`}>
+                                  {candidate.phoneNumber}
+                                </a>
+                              ) : (
+                                'Chưa có'
+                              )}
+                            </span>
+
+                            <span
+                              style={{
+                                fontSize: 13,
+                                color: '#475569'
+                              }}
+                            >
+                              Email: {candidate.email || 'Chưa có'}
+                            </span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {replacementError && (
+                <p className="sd-status sd-status-error">
+                  {replacementError}
+                </p>
+              )}
+            </div>
+
+            <div className="sd-modal-footer">
+              <button
+                type="button"
+                className="sd-btn-ghost"
+                onClick={closeReplacementModal}
+              >
+                Đóng
+              </button>
+
+              {replacementModal.step === 'candidates' && (
+                <button
+                  type="button"
+                  className="sd-btn-primary"
+                  disabled={
+                    replacementLoading ||
+                    !selectedRegistrationId
+                  }
+                  onClick={handleAssignReplacement}
+                >
+                  {replacementLoading
+                    ? 'Đang xử lý...'
+                    : 'Xác nhận chọn người thay'}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
