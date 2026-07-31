@@ -15,7 +15,16 @@ import {
 
 import { getAllShifts } from '../../api/ShiftApi'
 
-const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
+// Ánh xạ chỉ số getDay() sang tên thứ tiếng Việt.
+const DAY_NAMES = [
+  'Chủ nhật',
+  'Thứ 2',
+  'Thứ 3',
+  'Thứ 4',
+  'Thứ 5',
+  'Thứ 6',
+  'Thứ 7'
+]
 
 function getApiErrorMessage(error, fallbackMessage) {
   const responseData = error?.response?.data
@@ -80,6 +89,8 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   const [reviewingPeriodId, setReviewingPeriodId] = useState(null)
   const [form, setForm] = useState({ startDate: '', endDate: '', status: 'OPEN' })
 
+  // Tải danh sách đợt ngay khi component mở
+  // và tự tải lại sau mỗi 10 giây.
   useEffect(() => {
     loadPeriods()
 
@@ -88,6 +99,7 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
     return () => window.clearInterval(intervalId)
   }, [user.branchId])
 
+  // Lấy toàn bộ đợt đăng ký từ Backend.
   async function loadPeriods() {
     try {
       const data = await getAllPeriods()
@@ -97,6 +109,8 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
     }
   }
 
+  // Khi chọn ngày bắt đầu,
+  // tự động tính ngày kết thúc = ngày bắt đầu + 6 ngày.
   function handleStartDateChange(e) {
     const selectedDateStr = e.target.value
 
@@ -123,6 +137,8 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
     1
   )
 
+  // Lọc các đợt thuộc đúng chi nhánh và khớp nội dung tìm kiếm.
+  // Sau đó sắp xếp tuần mới nhất lên trước.
   const filteredPeriods = periods
     .filter((p) => {
       const matchBranch = String(p.branchId) === String(user.branchId)
@@ -258,7 +274,12 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
         <div className="sd-users-toolbar-left">
           <div className="sd-search-wrap">
             <span className="sd-search-icon">⌕</span>
-            <input className="sd-input-search" placeholder="Tìm theo ngày..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input
+              className="sd-input-search"
+              placeholder="Tìm theo ngày..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
             {search && <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>}
           </div>
         </div>
@@ -286,9 +307,19 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
           <tbody>
             {filteredPeriods.length === 0 && (
               <tr><td colSpan={3} className="sd-td-empty">
-                <div className="sd-empty-state"><span className="sd-empty-icon">📅</span><p>Chưa có đợt đăng ký lịch làm nào</p></div>
+                <div className="sd-empty-state">
+                  <span className="sd-empty-icon">
+                    📅
+                  </span>
+
+                  <p>
+                    Chưa có đợt đăng ký lịch làm nào
+                  </p>
+                </div>
               </td></tr>
             )}
+            {/* filteredPeriods.map:
+                mỗi đợt đăng ký tạo ra một hàng <tr>. */}
             {filteredPeriods.map((period) => {
               const status = String(period.status || '').toUpperCase()
               const isOpen = status === 'OPEN'
@@ -380,7 +411,17 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
       {(modal === 'add' || modal === 'edit') && (
         <div className="sd-overlay" onClick={() => setModal(null)}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sd-modal-header"><h2>{modal === 'add' ? 'Mở đợt đăng ký mới' : 'Chỉnh sửa'}</h2><button onClick={() => setModal(null)}>✕</button></div>
+            <div className="sd-modal-header">
+              <h2>
+                {modal === 'add'
+                  ? 'Mở đợt đăng ký mới'
+                  : 'Chỉnh sửa'}
+              </h2>
+
+              <button onClick={() => setModal(null)}>
+                ✕
+              </button>
+            </div>
             <div className="sd-modal-body">
               <div className="sd-modal-grid">
                 <div className="sd-field">
@@ -416,7 +457,15 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
       {modal === 'delete' && (
         <div className="sd-overlay" onClick={() => setModal(null)}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sd-modal-header"><h2>Xác nhận xoá đợt</h2><button onClick={() => setModal(null)}>✕</button></div>
+            <div className="sd-modal-header">
+              <h2>
+                Xác nhận xoá đợt
+              </h2>
+
+              <button onClick={() => setModal(null)}>
+                ✕
+              </button>
+            </div>
             <div className="sd-modal-body">
               <p>Bạn có chắc chắn muốn xoá đợt từ <strong>{formatDate(selectedPeriod?.startDate)}</strong>?</p>
               {error && <p className="sd-status sd-status-error">{error}</p>}
@@ -432,6 +481,9 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
   )
 }
 
+// ==========================================================
+// MÀN HÌNH XEM VÀ DUYỆT LỊCH CỦA MỘT ĐỢT
+// ==========================================================
 function PeriodReviewScreen({ period, onBack, user }) {
   const [registrations, setRegistrations] = useState([])
   const [shifts, setShifts] = useState([])
@@ -442,12 +494,16 @@ function PeriodReviewScreen({ period, onBack, user }) {
     (period?.status || 'OPEN').toUpperCase()
   )
 
+  // Đồng bộ state currentStatus khi dữ liệu period thay đổi.
   useEffect(() => {
     setCurrentStatus(
       String(period?.status || 'OPEN').toUpperCase()
     )
   }, [period?.status])
 
+  // Tải dữ liệu để tạo bảng lịch.
+  // Nếu đã PUBLISHED thì lấy lịch chính thức;
+  // nếu chưa PUBLISHED thì lấy danh sách đăng ký.
   useEffect(() => {
     async function loadBoardData() {
       setLoading(true)
@@ -456,32 +512,41 @@ function PeriodReviewScreen({ period, onBack, user }) {
         const isPublishedPeriod =
           String(currentStatus || period.status || '').toUpperCase() === 'PUBLISHED'
 
+        // Chọn API phù hợp theo trạng thái của đợt.
         const schedulePromise = isPublishedPeriod
   ? getFinalScheduleByPeriod(period.id)
   : getRegistrationsByPeriod(period.id)
 
-const [scheduleRows, shiftRows] = await Promise.all([
-  schedulePromise,
-  getAllShifts()
-])
+        // Hai API độc lập nên gọi song song bằng Promise.all.
+        const [scheduleRows, shiftRows] = await Promise.all([
+          schedulePromise,
+          getAllShifts()
+        ])
 
-const branchShifts = (shiftRows || []).filter(
-  (shift) =>
-    String(shift.branchId) === String(period.branchId)
-)
+        // Chỉ giữ các ca thuộc đúng chi nhánh của đợt.
+        const branchShifts = (shiftRows || []).filter(
+          (shift) =>
+            String(shift.branchId) === String(period.branchId)
+        )
 
-setRegistrations(
-  Array.isArray(scheduleRows) ? scheduleRows : []
-)
+        setRegistrations(
+          Array.isArray(scheduleRows)
+            ? scheduleRows
+            : []
+        )
 
-setShifts(branchShifts)
+        setShifts(branchShifts)
 
+        // Tạo mảng ngày từ startDate đến endDate.
         const dArray = []
         let curr = new Date(period.startDate)
         const end = new Date(period.endDate)
 
+        // while chạy đến khi curr vượt quá ngày kết thúc.
         while (curr <= end) {
+          // Lưu bản sao ngày hiện tại vào mảng.
           dArray.push(new Date(curr))
+          // Chuyển sang ngày kế tiếp.
           curr.setDate(curr.getDate() + 1)
         }
 
@@ -551,20 +616,26 @@ setShifts(branchShifts)
     return status || 'Đã đăng ký'
   }
 
-  const activeRegistrations = registrations.filter(isActiveRegistration)
+  // Loại những đăng ký đã hủy hoặc bị từ chối.
+  const activeRegistrations =
+    registrations.filter(isActiveRegistration)
 
+  // Ma trận dùng để đưa đúng người vào đúng ô:
+  // boardMatrix[ngày][shiftId] = danh sách đăng ký/lịch chính thức.
   const boardMatrix = {}
 
-  dates.forEach((dObj) => {
-    const dStr = toDateString(dObj)
+  // Vòng ngoài duyệt từng ngày.
+  dates.forEach((dateObj) => {
+    const dStr = toDateString(dateObj)
 
     boardMatrix[dStr] = {}
 
-    shifts.forEach((s) => {
-      boardMatrix[dStr][s.id] = activeRegistrations.filter((r) => {
+    // Với mỗi ngày, vòng trong duyệt từng ca.
+    shifts.forEach((shift) => {
+      boardMatrix[dStr][shift.id] = activeRegistrations.filter((registration) => {
         return (
-          r.workDate?.slice(0, 10) === dStr &&
-          r.shiftId === s.id
+          registration.workDate?.slice(0, 10) === dStr &&
+          registration.shiftId === shift.id
         )
       })
     })
@@ -798,9 +869,11 @@ setShifts(branchShifts)
                   NGÀY
                 </th>
 
-                {shifts.map((s) => (
-                  <th key={s.id}>
-                    {s.shiftName}
+                {/* shifts.map trong thead:
+                    mỗi ca tạo một cột tiêu đề <th>. */}
+                {shifts.map((shift) => (
+                  <th key={shift.id}>
+                    {shift.shiftName}
 
                     <br />
 
@@ -810,7 +883,7 @@ setShifts(branchShifts)
                         fontSize: 11
                       }}
                     >
-                      {s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}
+                      {shift.startTime?.slice(0, 5)} - {shift.endTime?.slice(0, 5)}
                     </span>
                   </th>
                 ))}
@@ -818,6 +891,8 @@ setShifts(branchShifts)
             </thead>
 
             <tbody>
+              {/* dates.map:
+                  mỗi ngày tạo một hàng <tr>. */}
               {dates.map((dateObj) => {
                 const dStr = toDateString(dateObj)
                 const dayOfWeek = DAY_NAMES[dateObj.getDay()]
@@ -834,6 +909,8 @@ setShifts(branchShifts)
                       </small>
                     </td>
 
+                    {/* shifts.map nằm trong dates.map:
+                        mỗi ca tạo một ô <td> trên hàng ngày hiện tại. */}
                     {shifts.map((shift) => {
                       const cellRegs = boardMatrix[dStr][shift.id] || []
                       const max = Number(shift.maxStaff || 0)
@@ -870,6 +947,8 @@ setShifts(branchShifts)
                                 </div>
                               )}
 
+                              {/* cellRegs.map:
+                                  hiển thị từng Manager hoặc Staff trong ô. */}
                               {cellRegs.map((row) => {
                                 const managerRow = isPublished && isManagerRow(row)
 
@@ -897,7 +976,11 @@ setShifts(branchShifts)
                                 )
                               })}
 
-                              {Array.from({ length: remainingSlots }).map((_, index) => (
+                              {/* Tạo số dòng “Còn trống”
+                                  tương ứng với số slot chưa có người. */}
+                              {Array.from({
+                                length: remainingSlots
+                              }).map((_, index) => (
                                 <div
                                   key={`empty-${dStr}-${shift.id}-${index}`}
                                   className="sd-slot-empty"

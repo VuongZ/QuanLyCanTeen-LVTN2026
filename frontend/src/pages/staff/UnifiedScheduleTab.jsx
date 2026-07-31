@@ -10,7 +10,17 @@ import {
   isManagerScheduleRow
 } from '../../utils/scheduleRoleUtils';
 
-const DAY_NAMES = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+// Mảng ánh xạ kết quả getDay() sang tên thứ bằng tiếng Việt.
+// getDay(): 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7.
+const DAY_NAMES = [
+  'Chủ nhật',
+  'Thứ 2',
+  'Thứ 3',
+  'Thứ 4',
+  'Thứ 5',
+  'Thứ 6',
+  'Thứ 7',
+];
 
 function getApiErrorMessage(error, fallbackMessage) {
   const responseData = error?.response?.data;
@@ -73,6 +83,8 @@ export function UnifiedScheduleTab({ user }) {
   const [loading, setLoading] = useState(true)
   const [periodError, setPeriodError] = useState('')
 
+  // useEffect này tải danh sách các tuần của đúng chi nhánh Staff.
+  // Sau đó chọn tuần phù hợp nhất để hiển thị mặc định.
   useEffect(() => {
     let isMounted = true
 
@@ -82,6 +94,9 @@ export function UnifiedScheduleTab({ user }) {
 
         const today = getVietnamDateString()
 
+        // Lọc các đợt thuộc đúng chi nhánh,
+        // chỉ giữ những trạng thái còn cần hiển thị,
+        // rồi sắp xếp tuần hiện tại và tuần gần nhất lên trước.
         const branchPeriods = (allPeriods || [])
           .filter((period) => {
             return String(period.branchId) === String(user.branchId)
@@ -150,6 +165,12 @@ export function UnifiedScheduleTab({ user }) {
         setPeriods(branchPeriods)
         setPeriodError('')
 
+        // Chọn tuần mặc định theo thứ tự ưu tiên:
+        // 1. Giữ nguyên tuần đang chọn nếu nó vẫn tồn tại.
+        // 2. Tuần đang diễn ra.
+        // 3. Tuần đang mở đăng ký.
+        // 4. Tuần đã công bố.
+        // 5. Phần tử đầu tiên.
         setSelectedPeriodId((currentId) => {
           const currentStillExists = branchPeriods.some(
             (period) => String(period.id) === String(currentId)
@@ -430,6 +451,9 @@ export function UnifiedScheduleTab({ user }) {
 // ==========================================
 // 2A. CHẾ ĐỘ: XEM LỊCH ĐÃ CHỐT
 // ==========================================
+// ==========================================================
+// MÀN HÌNH LỊCH CHÍNH THỨC
+// ==========================================================
 function PublishedScheduleView({ period, user }) {
   const [registrations, setRegistrations] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -437,6 +461,8 @@ function PublishedScheduleView({ period, user }) {
   const [dates, setDates] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Khi period hoặc chi nhánh thay đổi,
+  // tải lịch chính thức, danh sách ca và cấu hình ca.
   useEffect(() => {
     async function loadBoard() {
       setLoading(true);
@@ -470,11 +496,17 @@ function PublishedScheduleView({ period, user }) {
           })
         );
 
+        // Tạo mảng ngày từ startDate đến endDate.
+        // Ví dụ: Thứ 2 -> Thứ 3 -> ... -> Chủ nhật.
+        // Tạo danh sách tất cả ngày trong tuần.
         const dArray = [];
         let curr = new Date(period.startDate);
         const end = new Date(period.endDate);
+        // while tiếp tục chạy khi ngày hiện tại chưa vượt ngày kết thúc.
         while (curr <= end) {
+          // Phải new Date(curr) để lưu một bản sao của ngày hiện tại.
           dArray.push(new Date(curr));
+          // Tăng curr thêm 1 ngày để vòng lặp chuyển sang ngày kế tiếp.
           curr.setDate(curr.getDate() + 1);
         }
         setDates(dArray);
@@ -483,12 +515,16 @@ function PublishedScheduleView({ period, user }) {
     loadBoard();
   }, [period.id, user.branchId]);
 
+  // Chuyển Date thành chuỗi yyyy-MM-dd.
+  // Chuỗi này được dùng làm khóa của boardMatrix.
   function toDateString(dateObj) {
     const offset = dateObj.getTimezoneOffset();
     const d = new Date(dateObj.getTime() - (offset * 60 * 1000));
     return d.toISOString().split('T')[0];
   }
 
+  // Kiểm tra một ca có được cấu hình hoạt động
+  // vào đúng thứ của dateObj hay không.
   function isShiftOpenOnDate(shiftId, dateObj) {
     const dayName = dateObj.toLocaleDateString(
       'en-US',
@@ -506,13 +542,20 @@ function PublishedScheduleView({ period, user }) {
     return Number(config?.maxStaff ?? 0) > 0;
   }
 
-  // Tạo ma trận lịch chính thức theo ngày và ca.
+  // Tạo ma trận lịch chính thức theo cấu trúc:
+  // boardMatrix[ngày][shiftId] = danh sách người làm.
+  //
+  // Ví dụ:
+  // boardMatrix['2026-08-03'][1]
+  // là danh sách người làm ngày 03/08 ở ca có id = 1.
   const boardMatrix = {};
 
+  // Vòng lặp ngoài đi qua từng ngày.
   dates.forEach((dateObj) => {
     const dateString = toDateString(dateObj);
     boardMatrix[dateString] = {};
 
+    // Với mỗi ngày, vòng lặp trong đi qua từng ca.
     shifts.forEach((shift) => {
       boardMatrix[dateString][shift.id] = registrations.filter((row) => {
         return (
@@ -536,15 +579,20 @@ function PublishedScheduleView({ period, user }) {
           <thead>
             <tr>
               <th style={{ width: 90 }}>NGÀY</th>
-              {shifts.map(s => (
-                <th key={s.id}>
-                  {s.shiftName}<br />
-                  <span style={{ fontWeight: 500, fontSize: 11 }}>{s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}</span>
+              {/* shifts.map ở phần thead:
+                  mỗi ca tạo ra một cột tiêu đề <th>. */}
+              {shifts.map((shift) => (
+                <th key={shift.id}>
+                  {shift.shiftName}
+                  <br />
+                  <span style={{ fontWeight: 500, fontSize: 11 }}>{shift.startTime?.slice(0, 5)} - {shift.endTime?.slice(0, 5)}</span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
+            {/* dates.map:
+                mỗi ngày tạo ra một hàng <tr> trong phần tbody. */}
             {dates.map((dateObj) => {
               const dStr = toDateString(dateObj);
               const dayOfWeek = DAY_NAMES[dateObj.getDay()];
@@ -557,6 +605,8 @@ function PublishedScheduleView({ period, user }) {
                     <small>{shortDate}</small>
                   </td>
 
+                  {/* shifts.map nằm bên trong dates.map:
+                      mỗi ca tạo ra một ô <td> trên hàng của ngày hiện tại. */}
                   {shifts.map((shift) => {
                     const cellRows = boardMatrix[dStr][shift.id] || [];
                     const isShiftOpen = isShiftOpenOnDate(
@@ -608,6 +658,8 @@ function PublishedScheduleView({ period, user }) {
                             </div>
 
                             {/* Danh sách bên dưới chỉ còn Staff */}
+                            {/* staffRows.map:
+                                mỗi Staff tạo ra một thẻ tên trong ô ca. */}
                             {staffRows.map((row) => {
                               const staffName = getScheduleUserName(row);
                               const isMe =
@@ -663,6 +715,9 @@ function PublishedScheduleView({ period, user }) {
 // ==========================================
 // 2B. CHẾ ĐỘ: ĐĂNG KÝ CA LÀM
 // ==========================================
+// ==========================================================
+// MÀN HÌNH STAFF ĐĂNG KÝ CA
+// ==========================================================
 function RegistrationView({ period, user }) {
   const [shifts, setShifts] = useState([]);
   const [shiftConfigs, setShiftConfigs] = useState([]);
@@ -693,6 +748,8 @@ function RegistrationView({ period, user }) {
     !isPublished &&
     isDeadlineReached
 
+  // Tải ca, cấu hình ca, toàn bộ đăng ký trong tuần
+  // và các đăng ký của riêng Staff hiện tại.
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -718,6 +775,7 @@ function RegistrationView({ period, user }) {
         setDates(dArray);
 
         const regRes = await axios.get(`/api/StaffRegistration/my-schedule/${user.id}/${period.id}`);
+        // Chỉ giữ những đăng ký còn hiệu lực của Staff.
         const myRegs = (regRes.data || []).filter(
           (registration) => !isRejectedStatus(registration.status)
         );
@@ -725,11 +783,17 @@ function RegistrationView({ period, user }) {
         const dbMap = {};
         const initRegs = {};
 
-        myRegs.forEach(r => {
-          const dStr = r.workDate.slice(0, 10);
+        // Chuyển danh sách từ API thành dạng ma trận:
+        // dbMap[ngày][shiftId] = bản ghi đã lưu trong CSDL.
+        // initRegs[ngày][shiftId] = true nếu ô đang được chọn.
+        myRegs.forEach((registration) => {
+          const dStr = registration.workDate.slice(0, 10);
           if (!dbMap[dStr]) { dbMap[dStr] = {}; initRegs[dStr] = {}; }
-          dbMap[dStr][r.shiftId] = { id: r.id, status: r.status };
-          initRegs[dStr][r.shiftId] = true;
+          dbMap[dStr][registration.shiftId] = {
+            id: registration.id,
+            status: registration.status,
+          };
+          initRegs[dStr][registration.shiftId] = true;
         });
 
         setDbRegistrations(dbMap);
@@ -749,6 +813,8 @@ function RegistrationView({ period, user }) {
     loadData();
   }, [period.id, user.id, user.branchId]);
 
+  // Khi đợt bị khóa, đưa giao diện trở về đúng dữ liệu đã lưu.
+  // Staff chỉ được xem, không được giữ thay đổi tạm chưa lưu.
   useEffect(() => {
     if (!isLocked) return;
 
@@ -775,6 +841,7 @@ function RegistrationView({ period, user }) {
     return d.toISOString().split('T')[0];
   }
 
+  // Lấy tổng số người tối đa của một ca vào một ngày cụ thể.
   function getTotalMaxStaffForShiftDate(shiftId, dateObj) {
     const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' })
 
@@ -790,6 +857,7 @@ function RegistrationView({ period, user }) {
     return Number(config?.maxStaff ?? shift?.maxStaff ?? 0)
   }
 
+  // Manager chiếm 1 slot nên số slot Staff = tổng tối đa - 1.
   function getStaffSlotForShiftDate(shiftId, dateObj) {
     const totalMaxStaff = getTotalMaxStaffForShiftDate(shiftId, dateObj)
 
@@ -822,6 +890,9 @@ function RegistrationView({ period, user }) {
     return getRegisteredCount(dateStr, shiftId) >= staffSlot
   }
 
+  // Xử lý khi Staff bấm vào một ô ngày - ca.
+  // Hàm này chỉ thay đổi state trên giao diện;
+  // dữ liệu thật chỉ đổi khi bấm nút lưu.
   function toggle(dateStr, shiftId, dateObj) {
     const dbItem = dbRegistrations[dateStr]?.[shiftId]
 
@@ -844,6 +915,9 @@ function RegistrationView({ period, user }) {
     });
   }
 
+  // So sánh trạng thái hiện tại trên giao diện với dữ liệu CSDL.
+  // adds: các ca mới được chọn.
+  // deletes: các đăng ký đã lưu nhưng vừa bị bỏ chọn.
   function getChanges() {
     const adds = [];
     const deletes = [];
@@ -898,11 +972,14 @@ function RegistrationView({ period, user }) {
 
     try {
       // Xóa/hủy ca trước nếu có
+      // for...of chạy lần lượt từng yêu cầu hủy.
       for (const regId of deletes) {
         await axios.delete(`/api/StaffRegistration/${regId}/user/${user.id}`)
       }
 
       // Đăng ký ca lần lượt, không gửi nhiều request cùng lúc
+      // for...of chạy lần lượt từng yêu cầu đăng ký mới.
+      // Không dùng Promise.all để tránh gửi nhiều request cùng lúc.
       for (const payload of adds) {
         await axios.post('/api/StaffRegistration', payload)
       }
@@ -958,6 +1035,7 @@ function RegistrationView({ period, user }) {
     }
   }
 
+  // Khôi phục các ô về đúng trạng thái đang lưu trong CSDL.
   function handleReset() {
     const resetRegs = {};
     Object.keys(dbRegistrations).forEach(d => {
@@ -1007,7 +1085,17 @@ function RegistrationView({ period, user }) {
       )}
 
       {capacityMessage && (
-        <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '10px 14px', borderRadius: 8, margin: '-4px 0 16px', border: '1px solid #fecaca', fontWeight: 700 }}>
+        <div
+          style={{
+            background: '#fef2f2',
+            color: '#b91c1c',
+            padding: '10px 14px',
+            borderRadius: 8,
+            margin: '-4px 0 16px',
+            border: '1px solid #fecaca',
+            fontWeight: 700,
+          }}
+        >
           {capacityMessage}
         </div>
       )}
@@ -1021,12 +1109,14 @@ function RegistrationView({ period, user }) {
               <tr>
                 <th style={{ width: 90 }}>NGÀY</th>
 
-                {shifts.map((s) => (
-                  <th key={s.id}>
-                    {s.shiftName}
+                {/* shifts.map ở thead:
+                    mỗi ca tạo một cột tiêu đề. */}
+                {shifts.map((shift) => (
+                  <th key={shift.id}>
+                    {shift.shiftName}
                     <br />
                     <span style={{ fontWeight: 500, fontSize: 11 }}>
-                      {s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)}
+                      {shift.startTime?.slice(0, 5)} - {shift.endTime?.slice(0, 5)}
                     </span>
                   </th>
                 ))}
@@ -1034,6 +1124,8 @@ function RegistrationView({ period, user }) {
             </thead>
 
             <tbody>
+              {/* dates.map:
+                  mỗi ngày tạo một hàng trong bảng đăng ký. */}
               {dates.map((dateObj) => {
                 const dateStr = toDateString(dateObj);
                 const dayOfWeek = DAY_NAMES[dateObj.getDay()];
@@ -1046,6 +1138,8 @@ function RegistrationView({ period, user }) {
                       <small>{shortDate}</small>
                     </td>
 
+                    {/* shifts.map bên trong dates.map:
+                        mỗi ca tạo một ô đăng ký cho ngày hiện tại. */}
                     {shifts.map((shift) => {
                       const isOn = registered[dateStr]?.[shift.id] || false;
                       const dbItem = dbRegistrations[dateStr]?.[shift.id];
@@ -1144,6 +1238,7 @@ function RegistrationView({ period, user }) {
                                 </div>
                               )}
 
+                              {/* Hiển thị từng Staff đang chiếm slot trong ô. */}
                               {displayStaffList.map((staff) => (
                                 <div
                                   key={staff.id}
@@ -1172,7 +1267,10 @@ function RegistrationView({ period, user }) {
                                 </div>
                               )}
 
-                              {Array.from({ length: emptySlotCount }).map((_, index) => (
+                              {/* Tạo các dòng “Còn trống” theo số slot còn lại. */}
+                              {Array.from({
+                                length: emptySlotCount,
+                              }).map((_, index) => (
                                 <div
                                   key={`empty-${dateStr}-${shift.id}-${index}`}
                                   className="sd-slot-empty"
@@ -1206,7 +1304,14 @@ function RegistrationView({ period, user }) {
       )}
 
       <div className="sd-shift-actions">
-        <button className="sd-btn-ghost" onClick={handleReset} type="button" disabled={totalChanges === 0}>Hoàn tác thay đổi</button>
+        <button
+          className="sd-btn-ghost"
+          onClick={handleReset}
+          type="button"
+          disabled={totalChanges === 0}
+        >
+          Hoàn tác thay đổi
+        </button>
         <button
           className="sd-btn-primary"
           disabled={saving || totalChanges === 0 || isLocked}
