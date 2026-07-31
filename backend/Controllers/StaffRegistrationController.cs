@@ -2,6 +2,7 @@ using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace LuanVanTotNghiep.Controllers;
 
@@ -103,12 +104,24 @@ public class StaffRegistrationController : ControllerBase
 
     // Manager quét QR điểm danh vào hoặc ra ca
     [HttpPost("scan-attendance")]
-    [Authorize(Roles = "MANAGER")]
     public async Task<IActionResult> ScanAttendance(
         [FromBody] ScanAttendanceDto dto)
     {
         try
         {
+            var actorIdValue =
+                User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(actorIdValue, out var actorId) ||
+                actorId <= 0)
+            {
+                return Unauthorized(new
+                {
+                    message = "Không xác định được người thao tác."
+                });
+            }
+
+            // Không tin ManagerId do client gửi lên.
+            dto.ManagerId = actorId;
             var result = await _attendanceService
                 .ScanAttendanceAsync(dto);
 

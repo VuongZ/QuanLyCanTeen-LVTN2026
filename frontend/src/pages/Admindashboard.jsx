@@ -21,6 +21,7 @@ import { ManagerExportTab } from './manager/ManagerExportTab';
 import { FrontStockTab } from './shared/FrontStockTab';
 import { ShiftClosingManagementTab } from './shared/ShiftClosingManagementTab';
 import { CheckoutRequestTab } from './shared/CheckoutRequestTab';
+import { ShiftDelegationTab } from './shared/ShiftDelegationTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -36,6 +37,28 @@ function normalizeText(value = '') {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
 }
 
+function formatEmploymentType(value) {
+  return value === 'FULL_TIME' ? 'Full-time' : 'Part-time'
+}
+
+function calculateAutomaticSalaryCoefficient(hireDate, employmentType) {
+  const start = hireDate ? new Date(`${hireDate.slice(0, 10)}T00:00:00`) : null
+  const today = new Date()
+
+  if (employmentType === 'FULL_TIME') {
+    if (!start || today < start) return 1.2
+    let completedYears = today.getFullYear() - start.getFullYear()
+    const anniversary = new Date(start)
+    anniversary.setFullYear(start.getFullYear() + completedYears)
+    if (today < anniversary) completedYears -= 1
+    return 1.2 + Math.max(0, completedYears) * 0.3
+  }
+
+  if (!start || today < new Date(start.getFullYear(), start.getMonth() + 6, start.getDate())) return 1
+  if (today < new Date(start.getFullYear(), start.getMonth() + 12, start.getDate())) return 1.2
+  return 1.5
+}
+
 function InfoRow({ label, value }) {
   return <div className="sd-info-row"><dt>{label}</dt><dd>{value}</dd></div>
 }
@@ -46,7 +69,7 @@ function SortIcon({ active, direction }) {
 }
 
 const EMPTY_FORM = {
-  email: '', fullName: '', phoneNumber: '', bankName: '', bankAccountNumber: '', bankAccountName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '', salaryCoefficient: 1,
+  email: '', fullName: '', phoneNumber: '', bankName: '', bankAccountNumber: '', bankAccountName: '', password: '', branchId: '', branchName: '', roleId: '', roleName: '', hireDate: '', employmentType: 'PART_TIME', salaryCoefficient: 1, salaryCoefficientIsManual: false,
 }
 
 const ROLE_COLORS = {
@@ -137,12 +160,22 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   function closeModal() { setModal(null); setModalUser(null) }
 
   function handleFormChange(e) {
-    const { name, value } = e.target
+    const { checked, name, type, value } = e.target
     setForm((f) => {
-      const next = { ...f, [name]: value }
+      const next = { ...f, [name]: type === 'checkbox' ? checked : value }
       if (name === 'branchId') { const b = branches.find((b) => String(b.id) === value); next.branchName = b?.name || b?.branchName || '' }
       if (name === 'roleId') { const r = roles.find((r) => String(r.id) === value); next.roleName = r?.roleName || '' }
       if (name === 'salaryCoefficient') next.salaryCoefficientIsManual = true
+      if (name === 'employmentType') {
+        next.salaryCoefficientIsManual = false
+        next.salaryCoefficient = calculateAutomaticSalaryCoefficient(next.hireDate, value)
+      }
+      if (name === 'hireDate' && !next.salaryCoefficientIsManual) {
+        next.salaryCoefficient = calculateAutomaticSalaryCoefficient(value, next.employmentType)
+      }
+      if (name === 'salaryCoefficientIsManual' && !checked) {
+        next.salaryCoefficient = calculateAutomaticSalaryCoefficient(next.hireDate, next.employmentType)
+      }
       return next
     })
   }
@@ -212,6 +245,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
       case 'forgotCheckout': return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' }
+      case 'shiftDelegation': return { eyebrow: 'Phân quyền', title: 'Ủy quyền trưởng ca' }
       case 'salaryRules': return isAdmin
         ? { eyebrow: 'Lương', title: 'Salary rule theo cơ sở' }
         : { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
@@ -253,6 +287,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca toàn cục' });
     NAV_ITEMS.push({ id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' })
+    NAV_ITEMS.push({ id: 'shiftDelegation', icon: '🛡', label: 'Ủy quyền ca' })
   }
   if (isManager) {
     NAV_ITEMS.push({ id: 'periods', icon: '📅', label: 'Đợt đăng ký' })
@@ -266,6 +301,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy cơ sở' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca' });
     NAV_ITEMS.push({ id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' })
+    NAV_ITEMS.push({ id: 'shiftDelegation', icon: '🛡', label: 'Ủy quyền ca' })
   }
   NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
 
@@ -374,6 +410,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('phoneNumber')}>SĐT <SortIcon active={sortCol === 'phoneNumber'} direction={sortDir} /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('bankName')}>Ngân hàng <SortIcon active={sortCol === 'bankName'} direction={sortDir} /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('roleName')}>Chức vụ <SortIcon active={sortCol === 'roleName'} direction={sortDir} /></th>
+                            <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('employmentType')}>Loại nhân viên <SortIcon active={sortCol === 'employmentType'} direction={sortDir} /></th>
                             <th className="sd-th sd-th-sortable sd-td-info-col" onClick={() => toggleSort('branchName')}>Chi nhánh <SortIcon active={sortCol === 'branchName'} direction={sortDir} /></th>
                             <th className="sd-th sd-th-sortable sd-hide-mobile" onClick={() => toggleSort('hireDate')}>Ngày vào làm <SortIcon active={sortCol === 'hireDate'} direction={sortDir} /></th>
                             {canManageUsers && employmentStatus === 'DELETED' && <th className="sd-th sd-th-action">Thao tác</th>}
@@ -381,7 +418,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                         </thead>
                         <tbody>
                           {(deletedUsersLoading || deletedUsersError || displayed.length === 0) && (
-                            <tr><td colSpan={canManageUsers && employmentStatus === 'DELETED' ? 9 : 8} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">●</span><p>{deletedUsersLoading ? 'Đang tải danh sách...' : deletedUsersError || (employmentStatus === 'DELETED' ? 'Không có nhân viên đã xóa' : 'Không tìm thấy nhân sự')}</p></div></td></tr>
+                            <tr><td colSpan={canManageUsers && employmentStatus === 'DELETED' ? 10 : 9} className="sd-td-empty"><div className="sd-empty-state"><span className="sd-empty-icon">●</span><p>{deletedUsersLoading ? 'Đang tải danh sách...' : deletedUsersError || (employmentStatus === 'DELETED' ? 'Không có nhân viên đã xóa' : 'Không tìm thấy nhân sự')}</p></div></td></tr>
                           )}
                           {!deletedUsersLoading && !deletedUsersError && displayed.map((u, idx) => {
                             const roleColor = ROLE_COLORS[u.roleName?.toUpperCase()] || { bg: '#f1f5f9', color: '#475569' }
@@ -393,6 +430,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                                 <td className="sd-td sd-hide-mobile"><span className="sd-td-phone">{getPhone(u) || '—'}</span></td>
                                 <td className="sd-td sd-hide-mobile"><span>{u.bankName || u.bankAccountNumber || '—'}</span></td>
                                 <td className="sd-td sd-hide-mobile"><span className="sd-role-pill" style={{ background: roleColor.bg, color: roleColor.color }}>{u.roleName || '—'}</span></td>
+                                <td className="sd-td sd-hide-mobile"><span>{formatEmploymentType(u.employmentType)}</span></td>
                                 <td className="sd-td sd-td-info-col"><span className="sd-td-branch">{u.branchName || <em className="sd-muted">Chưa gán</em>}</span></td>
                                 <td className="sd-td sd-hide-mobile"><span className="sd-td-date">{formatDate(u.hireDate)}</span></td>
                                 {canManageUsers && employmentStatus === 'DELETED' && (
@@ -428,6 +466,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                           <InfoRow label="Số tài khoản" value={selectedUser.bankAccountNumber || 'Chưa có'} />
                           <InfoRow label="Tên tài khoản" value={selectedUser.bankAccountName || 'Chưa có'} />
                           <InfoRow label="Chi nhánh" value={selectedUser.branchName || 'Chưa gán'} />
+                          <InfoRow label="Loại nhân viên" value={formatEmploymentType(selectedUser.employmentType)} />
                           <InfoRow label="Ngày vào làm" value={formatDate(selectedUser.hireDate)} />
                           <InfoRow
                             label="Hệ số lương"
@@ -473,6 +512,14 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'forgotCheckout' && (isAdmin || isManager) && (
               <CheckoutRequestTab canReview />
             )}
+            {activeTab === 'shiftDelegation' && (isAdmin || isManager) && (
+              <ShiftDelegationTab
+                branches={branches}
+                isManagement
+                user={user}
+                users={activeUsers}
+              />
+            )}
 
             {/* TÀI KHOẢN VÀ BẢO MẬT */}
             {activeTab === 'account' && (
@@ -490,6 +537,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                     <InfoRow label="Số tài khoản" value={user.bankAccountNumber || 'Chưa có'} />
                     <InfoRow label="Tên tài khoản" value={user.bankAccountName || 'Chưa có'} />
                     <InfoRow label="Chi nhánh" value={branch?.name || user.branchName || 'Chưa có'} />
+                    <InfoRow label="Loại nhân viên" value={formatEmploymentType(user.employmentType)} />
                     <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
                   </dl>
                   <div className="sd-card-header"><p className="sd-eyebrow">Bảo mật</p><h2>Đổi mật khẩu</h2></div>
@@ -517,10 +565,21 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                 {modal === 'edit' && <div className="sd-field"><label>Password mới</label><input type="password" name="password" value={form.password || ''} onChange={handleFormChange} placeholder="Để trống nếu giữ nguyên" /></div>}
                 {modal === 'add' && <p className="sd-form-hint">Hệ thống sẽ tự tạo mật khẩu gồm 6 chữ số và gửi tới email nhân viên.</p>}
                 <div className="sd-field"><label>Ngày vào làm</label><input type="date" name="hireDate" value={form.hireDate?.slice(0, 10) || ''} onChange={handleFormChange} /></div>
+                <div className="sd-field">
+                  <label>Loại nhân viên</label>
+                  <select name="employmentType" value={form.employmentType || 'PART_TIME'} onChange={handleFormChange}>
+                    <option value="PART_TIME">Part-time</option>
+                    <option value="FULL_TIME">Full-time</option>
+                  </select>
+                </div>
                 {modal === 'edit' && canManageUsers && (
                   <div className="sd-field">
                     <label>Hệ số lương</label>
-                    <input type="number" name="salaryCoefficient" min="0.01" max="999.99" step="0.01" value={form.salaryCoefficient ?? 1} onChange={handleFormChange} />
+                    <input disabled={!form.salaryCoefficientIsManual} type="number" name="salaryCoefficient" min="0.01" max="999.99" step="0.01" value={form.salaryCoefficient ?? 1} onChange={handleFormChange} />
+                    <label className="sd-checkbox-label">
+                      <input checked={Boolean(form.salaryCoefficientIsManual)} name="salaryCoefficientIsManual" onChange={handleFormChange} type="checkbox" />
+                      Điều chỉnh hệ số thủ công
+                    </label>
                   </div>
                 )}
                 <div className="sd-field">

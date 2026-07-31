@@ -13,15 +13,18 @@ namespace LuanVanTotNghiep.Services
 
 
         private readonly ShiftClosingRepo _shiftClosingRepo;
+        private readonly ShiftDelegationService _shiftDelegationService;
 
 /// <summary>
 /// Nhận ShiftClosingRepo thông qua
 /// Dependency Injection.
 /// </summary>
 public ShiftClosingService(
-    ShiftClosingRepo shiftClosingRepo)
+    ShiftClosingRepo shiftClosingRepo,
+    ShiftDelegationService shiftDelegationService)
 {
     _shiftClosingRepo = shiftClosingRepo;
+    _shiftDelegationService = shiftDelegationService;
 }
 
         /// <summary>
@@ -607,7 +610,7 @@ public async Task<int>
 
     // Transaction bảo đảm toàn bộ báo cáo
     // và chi tiết được lưu đồng nhất.
-    return await _shiftClosingRepo
+    var reportId = await _shiftClosingRepo
         .ExecuteInTransactionAsync(
             async () =>
             {
@@ -821,6 +824,16 @@ public async Task<int>
                 return report.Id;
             }
         );
+
+    await _shiftDelegationService.LogActiveActionAsync(
+        staffId,
+        branchId,
+        schedule.ShiftId,
+        scheduleDate.Value,
+        "SHIFT_CLOSING_REPORT_SUBMITTED",
+        $"Đã lập báo cáo kết ca #{reportId}.");
+
+    return reportId;
 }
 
        /// <summary>

@@ -30,6 +30,10 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<CaShift> CaShifts { get; set; }
 
+    public virtual DbSet<CaShiftDelegation> CaShiftDelegations { get; set; }
+
+    public virtual DbSet<CaShiftDelegationAudit> CaShiftDelegationAudits { get; set; }
+
     public virtual DbSet<CaStaffRegistration> CaStaffRegistrations { get; set; }
 
     public virtual DbSet<DmBranch> DmBranches { get; set; }
@@ -228,6 +232,46 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.CaFinalSchedules)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_final_user");
+        });
+
+        modelBuilder.Entity<CaShiftDelegation>(entity =>
+        {
+            entity.ToTable("ca_shift_delegation").UseCollation("utf8mb4_unicode_ci");
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasIndex(e => new { e.BranchId, e.ShiftId, e.WorkDate }, "idx_delegation_shift_date");
+            entity.HasIndex(e => e.DelegateUserId, "idx_delegation_delegate");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.BranchId).HasColumnName("branch_id");
+            entity.Property(e => e.ShiftId).HasColumnName("shift_id");
+            entity.Property(e => e.WorkDate).HasColumnName("work_date");
+            entity.Property(e => e.DelegatedByUserId).HasColumnName("delegated_by_user_id");
+            entity.Property(e => e.DelegateUserId).HasColumnName("delegate_user_id");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("PENDING").HasColumnName("status");
+            entity.Property(e => e.StartsAtUtc).HasColumnType("datetime").HasColumnName("starts_at_utc");
+            entity.Property(e => e.EndsAtUtc).HasColumnType("datetime").HasColumnName("ends_at_utc");
+            entity.Property(e => e.RequestedAtUtc).HasColumnType("datetime").HasColumnName("requested_at_utc");
+            entity.Property(e => e.RespondedAtUtc).HasColumnType("datetime").HasColumnName("responded_at_utc");
+            entity.Property(e => e.RevokedAtUtc).HasColumnType("datetime").HasColumnName("revoked_at_utc");
+            entity.HasOne(e => e.Branch).WithMany().HasForeignKey(e => e.BranchId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Shift).WithMany().HasForeignKey(e => e.ShiftId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.DelegatedByUser).WithMany().HasForeignKey(e => e.DelegatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.DelegateUser).WithMany().HasForeignKey(e => e.DelegateUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CaShiftDelegationAudit>(entity =>
+        {
+            entity.ToTable("ca_shift_delegation_audit").UseCollation("utf8mb4_unicode_ci");
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.HasIndex(e => e.DelegationId, "idx_delegation_audit");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.DelegationId).HasColumnName("delegation_id");
+            entity.Property(e => e.ActorUserId).HasColumnName("actor_user_id");
+            entity.Property(e => e.ActionType).HasMaxLength(50).HasColumnName("action_type");
+            entity.Property(e => e.Details).HasMaxLength(1000).HasColumnName("details");
+            entity.Property(e => e.OccurredAtUtc).HasColumnType("datetime").HasColumnName("occurred_at_utc");
+            entity.HasOne(e => e.Delegation).WithMany(d => d.Audits).HasForeignKey(e => e.DelegationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.ActorUser).WithMany().HasForeignKey(e => e.ActorUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<CaSchedulePeriod>(entity =>
@@ -991,6 +1035,10 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.HireDate)
                 .HasDefaultValueSql("curdate()")
                 .HasColumnName("hire_date");
+            entity.Property(e => e.EmploymentType)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'PART_TIME'")
+                .HasColumnName("employment_type");
             entity.Property(e => e.SalaryCoefficient)
                 .HasPrecision(5, 2)
                 .HasDefaultValueSql("'1.00'")

@@ -9,10 +9,14 @@ namespace LuanVanTotNghiep.Services;
 public class AttendanceService
 {
     private readonly AttendanceRepo _repo;
+    private readonly ShiftDelegationService _shiftDelegationService;
 
-    public AttendanceService(AttendanceRepo repo)
+    public AttendanceService(
+        AttendanceRepo repo,
+        ShiftDelegationService shiftDelegationService)
     {
         _repo = repo;
+        _shiftDelegationService = shiftDelegationService;
     }
 
     private static string NormalizeText(string? value)
@@ -113,13 +117,6 @@ public class AttendanceService
         var managerRole = NormalizeText(
             manager.Role?.RoleName);
 
-        if (!managerRole.Contains("MANAGER") &&
-            !managerRole.Contains("QUAN LY"))
-        {
-            throw new InvalidOperationException(
-                "Chỉ Manager mới được quét QR điểm danh.");
-        }
-
         if (manager.BranchId is not int managerBranchId)
         {
             throw new InvalidOperationException(
@@ -160,6 +157,21 @@ public class AttendanceService
         {
             throw new InvalidOperationException(
                 "Ca làm không thuộc cơ sở của Manager.");
+        }
+
+        var isManager =
+            managerRole.Contains("MANAGER") ||
+            managerRole.Contains("QUAN LY");
+        var hasTemporaryPermission =
+            await _shiftDelegationService.HasActivePermissionAsync(
+                manager.Id,
+                managerBranchId,
+                dto.ShiftId,
+                dto.WorkDate);
+        if (!isManager && !hasTemporaryPermission)
+        {
+            throw new InvalidOperationException(
+                "Bạn không có quyền trưởng ca trong thời gian của ca này.");
         }
 
         // 4. Kiểm tra lịch làm chính thức.
@@ -238,7 +250,13 @@ public class AttendanceService
                 attendance.CheckInTime = scanTime;
             }
 
-            attendance.Status = "Đang Trong Ca Làm";
+            attendance.Status =
+                string.Equals(
+                    attendance.Status,
+                    "Đi muộn",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "Đi muộn - Đang Trong Ca Làm"
+                    : "Đang Trong Ca Làm";
         }
         else
         {
@@ -346,6 +364,19 @@ public class AttendanceService
 
         // 9. Lưu toàn bộ thay đổi.
         await _repo.SaveChangesAsync();
+
+        if (hasTemporaryPermission)
+        {
+            await _shiftDelegationService.LogActiveActionAsync(
+                manager.Id,
+                managerBranchId,
+                dto.ShiftId,
+                dto.WorkDate,
+                action == "CHECKIN"
+                    ? "EMPLOYEE_CHECKED_IN"
+                    : "EMPLOYEE_CHECKED_OUT",
+                $"{employee.FullName} - {action}.");
+        }
 
         return new
         {

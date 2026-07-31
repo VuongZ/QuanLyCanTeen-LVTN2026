@@ -109,6 +109,7 @@ function ProfileInfoCard({ branch, user }) {
         <InfoRow label="Số tài khoản" value={user.bankAccountNumber || 'Chưa có'} />
         <InfoRow label="Tên tài khoản" value={user.bankAccountName || 'Chưa có'} />
         <InfoRow label="Chi nhánh" value={branch?.name || user.branchName || 'Chưa có'} />
+        <InfoRow label="Loại nhân viên" value={user.employmentType === 'FULL_TIME' ? 'Full-time' : 'Part-time'} />
         <InfoRow label="Ngày vào làm" value={formatDate(user.hireDate)} />
       </dl>
     </div>

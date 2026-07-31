@@ -17,6 +17,7 @@ public class UserDto
     public int? RoleId { get; set; }
     public string? RoleName { get; set; }     // tên role cho tiện
     public DateOnly? HireDate { get; set; }
+    public string EmploymentType { get; set; } = "PART_TIME";
     public decimal SalaryCoefficient { get; set; }
     public bool SalaryCoefficientIsManual { get; set; }
 }

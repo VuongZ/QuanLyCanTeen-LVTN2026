@@ -63,9 +63,11 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             BranchId = dto.BranchId,
             RoleId = dto.RoleId,
             HireDate = dto.HireDate,
+            EmploymentType = SalaryWagePolicy.NormalizeEmploymentType(dto.EmploymentType),
             SalaryCoefficient = SalaryWagePolicy.GetSalaryCoefficient(
                 dto.HireDate,
-                DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
+                DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)),
+                dto.EmploymentType),
             SalaryCoefficientIsManual = false
         };
 
@@ -107,6 +109,8 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             us1.BranchId = user.BranchId;
             us1.RoleId = user.RoleId;
             us1.HireDate = user.HireDate;
+            us1.EmploymentType =
+                SalaryWagePolicy.NormalizeEmploymentType(user.EmploymentType);
             if (user.SalaryCoefficientIsManual)
             {
                 if (user.SalaryCoefficient <= 0 || user.SalaryCoefficient > 999.99m)
@@ -119,7 +123,8 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             {
                 us1.SalaryCoefficient = SalaryWagePolicy.GetSalaryCoefficient(
                     user.HireDate,
-                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)));
+                    DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)),
+                    us1.EmploymentType);
                 us1.SalaryCoefficientIsManual = false;
             }
             await userRepo.Update(us1);

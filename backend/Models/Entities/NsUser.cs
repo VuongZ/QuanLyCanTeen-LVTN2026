@@ -21,6 +21,8 @@ public partial class NsUser
 
     public DateOnly? HireDate { get; set; }
 
+    public string EmploymentType { get; set; } = "PART_TIME";
+
     public decimal SalaryCoefficient { get; set; }
 
     public bool SalaryCoefficientIsManual { get; set; }

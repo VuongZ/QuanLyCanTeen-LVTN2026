@@ -44,7 +44,7 @@ function InfoRow({ label, value }) {
   return <div className="sd-info-row"><dt>{label}</dt><dd>{value}</dd></div>
 }
 
-export function ManagerQrAttendanceTab({ user }) {
+export function ManagerQrAttendanceTab({ delegatedShiftId, user }) {
   const [shifts, setShifts] = useState([])
   const [shiftId, setShiftId] = useState('')
   const [scanAction, setScanAction] = useState('CHECKIN')
@@ -59,11 +59,13 @@ export function ManagerQrAttendanceTab({ user }) {
 
   useEffect(() => {
     getAllShifts().then((data) => {
-      const branchShifts = (Array.isArray(data) ? data : []).filter((s) => String(s.branchId) === String(user.branchId))
+      const branchShifts = (Array.isArray(data) ? data : []).filter((s) =>
+        String(s.branchId) === String(user.branchId) &&
+        (!delegatedShiftId || Number(s.id) === Number(delegatedShiftId)))
       setShifts(branchShifts)
       setShiftId((current) => current || branchShifts[0]?.id?.toString() || '')
     }).catch(() => setShifts([]))
-  }, [user.branchId])
+  }, [delegatedShiftId, user.branchId])
 
   useEffect(() => {
     if (!notification) return undefined
@@ -156,7 +158,7 @@ export function ManagerQrAttendanceTab({ user }) {
         <div className="sd-modal-grid">
           <div className="sd-field">
             <label>Ca làm</label>
-            <select value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
+            <select disabled={Boolean(delegatedShiftId)} value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
               <option value="">-- Chọn ca --</option>
               {shifts.map((s) => <option key={s.id} value={s.id}>{s.shiftName} ({s.startTime?.slice(0, 5)} - {s.endTime?.slice(0, 5)})</option>)}
             </select>

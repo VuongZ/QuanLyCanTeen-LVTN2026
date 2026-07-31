@@ -46,6 +46,7 @@ namespace LuanVanTotNghiep.Controllers
                     RoleId = u.RoleId,
                     RoleName = u.Role?.RoleName,
                     HireDate = u.HireDate,
+                    EmploymentType = SalaryWagePolicy.NormalizeEmploymentType(u.EmploymentType),
                     SalaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
                         u,
                         DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
@@ -148,6 +149,7 @@ namespace LuanVanTotNghiep.Controllers
                 branchId = user.BranchId,
                 branchName = user.Branch?.Name,
                 hireDate = user.HireDate,
+                employmentType = SalaryWagePolicy.NormalizeEmploymentType(user.EmploymentType),
                 salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
                     user,
                     DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
@@ -254,6 +256,7 @@ namespace LuanVanTotNghiep.Controllers
                     RoleId = u.RoleId,
                     RoleName = u.Role?.RoleName,
                     HireDate = u.HireDate,
+                    EmploymentType = SalaryWagePolicy.NormalizeEmploymentType(u.EmploymentType),
                     SalaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
                         u,
                         DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
@@ -367,6 +370,7 @@ namespace LuanVanTotNghiep.Controllers
                         branchId = user.BranchId,
                         branchName = user.Branch != null ? user.Branch.Name : "Chưa có",
                         hireDate = user.HireDate,
+                        employmentType = SalaryWagePolicy.NormalizeEmploymentType(user.EmploymentType),
                         salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
                      user,
                      DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),
@@ -426,6 +430,7 @@ namespace LuanVanTotNghiep.Controllers
                 branchId = user.BranchId,
                 branchName = user.Branch?.Name,
                 hireDate = user.HireDate,
+                employmentType = SalaryWagePolicy.NormalizeEmploymentType(user.EmploymentType),
                 salaryCoefficient = SalaryWagePolicy.GetEffectiveSalaryCoefficient(
                     user,
                     DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7))),

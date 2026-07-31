@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './css/dashboard.css';
 import { InventoryTab } from './shared/InventoryTab';
 import { UnifiedScheduleTab } from './staff/UnifiedScheduleTab';
@@ -6,6 +6,8 @@ import { ProfileTab } from './staff/ProfileTab';
 import { SalaryTab } from './staff/SalaryTab';
 import { ShiftClosingReportTab } from './shared/ShiftClosingReportTab';
 import { CheckoutRequestTab } from './shared/CheckoutRequestTab';
+import { ShiftDelegationTab } from './shared/ShiftDelegationTab';
+import { getShiftDelegations } from '../api/ShiftDelegationApi';
 
 function getInitials(name = '') {
   return name
@@ -17,11 +19,35 @@ function getInitials(name = '') {
     .toUpperCase();
 }
 
-export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
+export function StaffDashboard({ branches, onLogout, onUserUpdated, user, users }) {
   const [activeTab, setActiveTab] = useState('schedule');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [pendingDelegationCount, setPendingDelegationCount] = useState(0);
 
   const branch = branches?.find((b) => b.id === user.branchId);
+
+  useEffect(() => {
+    let mounted = true;
+    async function refreshDelegationNotifications() {
+      try {
+        const items = await getShiftDelegations();
+        if (mounted) {
+          setPendingDelegationCount((Array.isArray(items) ? items : []).filter(
+            (item) => item.delegateUserId === user.id && item.status === 'PENDING',
+          ).length);
+        }
+      } catch {
+        if (mounted) setPendingDelegationCount(0);
+      }
+    }
+
+    refreshDelegationNotifications();
+    const timer = window.setInterval(refreshDelegationNotifications, 60000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [activeTab, user.id]);
 
   const getHeaderInfo = () => {
     switch (activeTab) {
@@ -37,6 +63,8 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
         return { eyebrow: 'Báo cáo cuối ca', title: 'Báo cáo kết ca' };
       case 'forgotCheckout':
         return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' };
+      case 'shiftDelegation':
+        return { eyebrow: 'Phân quyền', title: 'Ủy quyền trưởng ca' };
       default:
         return { eyebrow: '', title: '' };
     }
@@ -50,6 +78,13 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
     { id: 'salary', icon: '💰', label: 'Giờ làm & lương' },
     { id: 'shiftClosing', icon: '📋', label: 'Báo cáo kết ca' },
     { id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' },
+    {
+      id: 'shiftDelegation',
+      icon: '🛡',
+      label: pendingDelegationCount > 0
+        ? `Ủy quyền ca (${pendingDelegationCount})`
+        : 'Ủy quyền ca',
+    },
     { id: 'profile', icon: '👤', label: 'Tài khoản' },
   ];
 
@@ -149,6 +184,14 @@ export function StaffDashboard({ branches, onLogout, onUserUpdated, user }) {
             {activeTab === 'shiftClosing' && <ShiftClosingReportTab />}
 
             {activeTab === 'forgotCheckout' && <CheckoutRequestTab />}
+
+            {activeTab === 'shiftDelegation' && (
+              <ShiftDelegationTab
+                branches={branches}
+                user={user}
+                users={users}
+              />
+            )}
           </div>
         </main>
       </div>
