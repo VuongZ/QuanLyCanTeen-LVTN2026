@@ -1,0 +1,41 @@
+.sa-page { display: grid; gap: 20px; }
+.sa-intro, .sa-toolbar, .sa-request-head, .sa-review-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sa-intro h2, .sa-list-section h3 { margin: 2px 0 6px; }
+.sa-intro p { margin: 0; color: #64748b; }
+.sa-refresh, .sa-submit, .sa-review-actions button { border: 0; border-radius: 10px; cursor: pointer; font-weight: 700; padding: 10px 16px; }
+.sa-refresh { background: #e2e8f0; color: #334155; }
+.sa-create, .sa-list-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; }
+.sa-toolbar { justify-content: flex-start; margin-bottom: 16px; }
+.sa-toolbar label { color: #475569; display: grid; font-size: 13px; font-weight: 700; gap: 6px; }
+.sa-toolbar input, .sa-table input[type='time'], .sa-review-actions input { border: 1px solid #cbd5e1; border-radius: 9px; min-height: 40px; padding: 8px 10px; }
+.sa-reason { flex: 1; }
+.sa-table-wrap { overflow-x: auto; }
+.sa-table td { vertical-align: middle; }
+.sa-table input[type='checkbox'] { height: 18px; width: 18px; }
+.sa-subline { color: #64748b; display: block; font-size: 12px; margin-top: 3px; }
+.sa-rejected-hint, .sa-reject-note { color: #b91c1c; }
+.sa-submit { background: #2563eb; color: #fff; margin-top: 16px; }
+.sa-list { display: grid; gap: 12px; }
+.sa-request-card { border: 1px solid #e2e8f0; border-radius: 13px; padding: 16px; }
+.sa-request-head strong, .sa-request-head span { display: block; }
+.sa-request-head > div > span, .sa-meta { color: #64748b; font-size: 13px; margin-top: 4px; }
+.sa-status { border-radius: 999px; font-size: 12px; font-weight: 800; padding: 6px 10px; }
+.sa-status--pending { background: #fef3c7; color: #92400e; }
+.sa-status--approved { background: #dcfce7; color: #166534; }
+.sa-status--rejected { background: #fee2e2; color: #991b1b; }
+.sa-request-info { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0; }
+.sa-request-info span { background: #f8fafc; border-radius: 9px; color: #64748b; display: grid; font-size: 12px; gap: 3px; padding: 10px; }
+.sa-request-info strong { color: #0f172a; font-size: 14px; }
+.sa-review-actions { border-top: 1px solid #e2e8f0; justify-content: flex-start; margin-top: 12px; padding-top: 12px; }
+.sa-review-actions input { flex: 1; }
+.sa-approve { background: #16a34a; color: #fff; }
+.sa-reject { background: #dc2626; color: #fff; }
+.sa-message { border-radius: 10px; margin: 0; padding: 11px 14px; }
+.sa-message--success { background: #dcfce7; color: #166534; }
+.sa-message--error, .sa-error { background: #fee2e2; color: #991b1b; }
+.sa-error { border-radius: 8px; padding: 8px 10px; }
+.sa-empty { color: #64748b; text-align: center; }
+@media (max-width: 760px) {
+  .sa-intro, .sa-toolbar, .sa-review-actions { align-items: stretch; flex-direction: column; }
+  .sa-request-info { grid-template-columns: 1fr; }
+}

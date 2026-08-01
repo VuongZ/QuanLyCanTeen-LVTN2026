@@ -22,6 +22,7 @@ import { FrontStockTab } from './shared/FrontStockTab';
 import { ShiftClosingManagementTab } from './shared/ShiftClosingManagementTab';
 import { CheckoutRequestTab } from './shared/CheckoutRequestTab';
 import { ShiftDelegationTab } from './shared/ShiftDelegationTab';
+import { SupplementalAttendanceTab } from './shared/SupplementalAttendanceTab';
 
 // --- CÁC HÀM TIỆN ÍCH DÙNG CHUNG TRONG LAYOUT ---
 function getInitials(name = '') {
@@ -244,6 +245,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'branches': return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
       case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
+      case 'supplementalAttendance': return { eyebrow: 'Chấm công', title: isAdmin ? 'Duyệt chấm công bổ sung' : 'Chấm công bổ sung' }
       case 'forgotCheckout': return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' }
       case 'shiftDelegation': return { eyebrow: 'Phân quyền', title: 'Ủy quyền trưởng ca' }
       case 'salaryRules': return isAdmin
@@ -287,6 +289,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca toàn cục' });
     NAV_ITEMS.push({ id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' })
+    NAV_ITEMS.push({ id: 'supplementalAttendance', icon: '✓', label: 'Duyệt công bổ sung' })
     NAV_ITEMS.push({ id: 'shiftDelegation', icon: '🛡', label: 'Ủy quyền ca' })
   }
   if (isManager) {
@@ -301,6 +304,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy cơ sở' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca' });
     NAV_ITEMS.push({ id: 'forgotCheckout', icon: '⏱', label: 'Quên checkout' })
+    NAV_ITEMS.push({ id: 'supplementalAttendance', icon: '✓', label: 'Chấm công bổ sung' })
     NAV_ITEMS.push({ id: 'shiftDelegation', icon: '🛡', label: 'Ủy quyền ca' })
   }
   NAV_ITEMS.push({ id: 'account', icon: '👤', label: 'Tài khoản' })
@@ -495,6 +499,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'branches' && isAdmin && <AdminBranchTab branches={branches} setBranches={setBranches} />}
             {activeTab === 'periods' && isManager && <ManagerPeriodTab user={user} isManager={isManager} branches={branches} />}
             {activeTab === 'scanQr' && isManager && <ManagerQrAttendanceTab user={user} />}
+            {activeTab === 'supplementalAttendance' && (isAdmin || isManager) && <SupplementalAttendanceTab isAdmin={isAdmin} />}
             {activeTab === 'salaryRules' && (isAdmin || isManager) && (
               <ManagerSalaryRuleTab user={user} isAdmin={isAdmin} branches={branches} />
             )}

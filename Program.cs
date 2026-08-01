@@ -1,4 +1,5 @@
 ﻿using LuanVanTotNghiep.backend.Models.Entities;
+using LuanVanTotNghiep.backend;
 using LuanVanTotNghiep.Repositories;
 using LuanVanTotNghiep.Services;
 using LuanVanTotNghiep.Services.BackgroundJobs;
@@ -125,6 +126,8 @@ builder.Services.AddScoped<FinalScheduleService>();
 // Điểm danh
 builder.Services.AddScoped<AttendanceRepo>();
 builder.Services.AddScoped<AttendanceService>();
+builder.Services.AddScoped<ShiftDelegationService>();
+builder.Services.AddScoped<SupplementalAttendanceService>();
 
 // Nhà cung cấp
 builder.Services.AddScoped<SupplierRepo>();
@@ -153,6 +156,7 @@ builder.Services.AddScoped<CheckoutRequestService>();
 
 // Lương
 builder.Services.AddScoped<SalaryService>();
+builder.Services.AddScoped<SalaryComplaintService>();
 
 // OCR hóa đơn
 builder.Services.AddScoped<InvoiceOcrService>();
@@ -195,6 +199,8 @@ using (var scope = app.Services.CreateScope())
 
         if (context.Database.CanConnect())
         {
+            await SupplementalAttendanceSchemaInitializer.InitializeAsync(context);
+
             Console.WriteLine(
                 "==================================================");
             Console.WriteLine(

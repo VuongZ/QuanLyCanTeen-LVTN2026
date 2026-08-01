@@ -39,6 +39,10 @@ public partial class NsUser
 
     public virtual ICollection<CaFinalSchedule> CaFinalSchedules { get; set; } = new List<CaFinalSchedule>();
 
+    public virtual ICollection<CaSupplementalAttendanceRequest> SupplementalAttendanceRequests { get; set; } = new List<CaSupplementalAttendanceRequest>();
+
+    public virtual ICollection<CaSupplementalAttendanceRequest> ReviewedSupplementalAttendanceRequests { get; set; } = new List<CaSupplementalAttendanceRequest>();
+
     public virtual ICollection<CaStaffRegistration> CaStaffRegistrations { get; set; } = new List<CaStaffRegistration>();
 
     public virtual ICollection<KhoExportTicket> KhoExportTickets { get; set; } = new List<KhoExportTicket>();

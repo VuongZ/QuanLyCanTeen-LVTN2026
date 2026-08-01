@@ -22,6 +22,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<CaCheckoutRequestHistory> CaCheckoutRequestHistories { get; set; }
 
+    public virtual DbSet<CaSupplementalAttendanceRequest> CaSupplementalAttendanceRequests { get; set; }
+
     public virtual DbSet<CaBranchShiftConfig> CaBranchShiftConfigs { get; set; }
 
     public virtual DbSet<CaFinalSchedule> CaFinalSchedules { get; set; }
@@ -232,6 +234,39 @@ public partial class AppDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.CaFinalSchedules)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_final_user");
+        });
+
+        modelBuilder.Entity<CaSupplementalAttendanceRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("ca_supplemental_attendance_request").UseCollation("utf8mb4_unicode_ci");
+            entity.HasIndex(e => e.ScheduleId, "uq_supplemental_schedule").IsUnique();
+            entity.HasIndex(e => new { e.Status, e.UpdatedAt }, "idx_supplemental_status");
+            entity.HasIndex(e => e.RequestedByManagerId, "idx_supplemental_manager");
+            entity.HasIndex(e => e.ReviewedByAdminId, "idx_supplemental_admin");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ScheduleId).HasColumnName("schedule_id");
+            entity.Property(e => e.RequestedByManagerId).HasColumnName("requested_by_manager_id");
+            entity.Property(e => e.ProposedCheckInTime).HasColumnType("datetime").HasColumnName("proposed_check_in_time");
+            entity.Property(e => e.ProposedCheckOutTime).HasColumnType("datetime").HasColumnName("proposed_check_out_time");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("PENDING").HasColumnName("status");
+            entity.Property(e => e.ReviewedByAdminId).HasColumnName("reviewed_by_admin_id");
+            entity.Property(e => e.RejectReason).HasMaxLength(500).HasColumnName("reject_reason");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime").HasColumnName("updated_at");
+            entity.Property(e => e.ReviewedAt).HasColumnType("datetime").HasColumnName("reviewed_at");
+
+            entity.HasOne(e => e.Schedule).WithMany(s => s.SupplementalAttendanceRequests)
+                .HasForeignKey(e => e.ScheduleId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_supplemental_schedule");
+            entity.HasOne(e => e.RequestedByManager).WithMany(u => u.SupplementalAttendanceRequests)
+                .HasForeignKey(e => e.RequestedByManagerId).OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_supplemental_manager");
+            entity.HasOne(e => e.ReviewedByAdmin).WithMany(u => u.ReviewedSupplementalAttendanceRequests)
+                .HasForeignKey(e => e.ReviewedByAdminId).OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_supplemental_admin");
         });
 
         modelBuilder.Entity<CaShiftDelegation>(entity =>
