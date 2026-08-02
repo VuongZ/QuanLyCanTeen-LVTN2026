@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap");
 
 /* =========================================
    1. BASE STYLES & LAYOUT
@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  font-family: 'Be Vietnam Pro', sans-serif;
+  font-family: "Be Vietnam Pro", sans-serif;
   background: #f0f2f5;
   color: #1a1a2e;
   padding-bottom: 70px; /* Chừa chỗ cho Bottom Nav nếu dùng */
@@ -787,34 +787,11 @@
 }
 
 /* Nút chọn Ca (Hình vuông/Chữ nhật) */
-.sd-shift-cell-v {
-  flex: 1; /* Tự động bung rộng chia đều */
-  height: 50px; /* Tăng chiều cao lên chút để dễ bấm */
-  border-radius: 8px;
-  border: 1.5px solid #e2e8f0;
-  background: #fff;
-  color: #ea580c;
-  font-weight: 700;
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-}
 
-.sd-shift-cell-v.selected {
- 
-  color:  #ea580c;
-  border-color: #ea580c;
-  box-shadow: 0 4px 10px rgba(234,88,12,0.3);
-}
 
-.sd-shift-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+
+
+
 /* =========================================
    8. TỐI ƯU MÀN HÌNH MÁY TÍNH (DESKTOP)
    ========================================= */
@@ -1039,92 +1016,33 @@
   }
 
   /* --- KHỐI NÚT LƯU BÊN DƯỚI --- */
-  .sd-shift-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-top: 16px;
-  }
   
-  .sd-shift-actions button {
-    width: 100% !important;
-    padding: 14px !important;
-    font-size: 15px !important;
-  }
+  
+  
 }
 
 /* =========================================
    11. BẢNG LỊCH CHÍNH THỨC (SCHEDULE BOARD)
    ========================================= */
-.sd-board-wrap {
-  overflow-x: auto;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  border: 1px solid #e2e8f0;
-}
 
-.sd-schedule-board {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 700px;
-}
 
-.sd-schedule-board th, 
-.sd-schedule-board td {
-  border: 1px solid #e2e8f0;
-  padding: 10px;
-  vertical-align: top;
-}
 
-.sd-schedule-board th {
-  background: #f8fafc;
-  font-size: 13px;
-  font-weight: 700;
-  color: #475569;
-  text-align: center;
-}
 
-.sd-board-date-col {
-  width: 90px;
-  background: #f8fafc;
-  text-align: center;
-  vertical-align: middle !important;
-}
 
-.sd-board-date-col strong {
-  display: block;
-  font-size: 13px;
-  color: #1e293b;
-}
 
-.sd-board-date-col small {
-  font-size: 11px;
-  color: #64748b;
-}
 
-.sd-reg-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 8px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  font-size: 12px;
-  border: 1px solid transparent;
-}
 
-.sd-reg-card:last-child {
-  margin-bottom: 0;
-}
 
-.sd-reg-name {
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
+
+
+
+
+
+
+
+
+
+
 
 /* Salary tab */
 .sd-salary-summary {
@@ -1262,107 +1180,31 @@
    Manager luôn chiếm slot đầu tiên
    ========================================= */
 
-.sd-shift-cell-slots {
-  min-height: 92px;
-  height: auto;
-  padding: 8px;
-  align-items: stretch;
-  justify-content: flex-start;
-  font-size: 13px;
-  color: #1e293b;
-  background: #ffffff;
-}
 
-.sd-shift-cell-slots.selected {
-  background: #fff7ed;
-  border-color: #ea580c;
-  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.16);
-}
 
-.sd-shift-cell-slots.full,
-.sd-shift-cell-slots.disabled {
-  background: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-  color: #64748b !important;
-  box-shadow: none !important;
-  cursor: not-allowed !important;
-}
 
-.sd-slot-list {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 
-.sd-slot-person,
-.sd-slot-empty {
-  width: 100%;
-  min-height: 30px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
 
-.sd-slot-manager {
-  background: #ffedd5;
-  border: 1px solid #fdba74;
-  color: #9a3412;
-  font-weight: 700;
-}
 
-.sd-slot-staff {
-  background: #dcfce7;
-  border: 1px solid #bbf7d0;
-  color: #166534;
-  font-weight: 700;
-}
 
-.sd-slot-me {
-  background: #dbeafe;
-  border: 1px solid #93c5fd;
-  color: #1e3a8a;
-  font-weight: 700;
-}
 
-.sd-slot-empty {
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  color: #94a3b8;
-  justify-content: center;
-  font-weight: 600;
-}
 
-.sd-slot-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.sd-slot-role,
-.sd-slot-pending {
-  flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 700;
-  opacity: 0.85;
-}
 
-.sd-slot-pending {
-  color: #ea580c;
-}
 
-.sd-slot-full-text {
-  margin-top: 2px;
-  text-align: center;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 700;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .sd-schedule-cell {
   vertical-align: top;
@@ -1701,110 +1543,37 @@
 
 /* ===== Registration board hiển thị giống lịch chính thức ===== */
 
-.sd-registration-board {
-  width: 100%;
-  border-collapse: collapse;
-}
 
-.sd-registration-board th {
-  background: #f8fafc;
-  text-align: center;
-  color: #334155;
-  font-size: 13px;
-  font-weight: 800;
-}
 
-.sd-registration-cell {
-  min-width: 170px;
-  vertical-align: top;
-  background: #fff;
-}
 
-.sd-registration-cell .sd-shift-cell-v {
-  width: 100%;
-  min-height: 92px;
-  height: auto;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: 8px;
-}
 
-.sd-registration-cell .sd-shift-cell-v:hover {
-  background: #fff7ed;
-}
 
-.sd-registration-cell .sd-shift-cell-v.selected {
-  background: #fff7ed;
-  border: none;
-  box-shadow: none;
-}
 
-.sd-registration-cell .sd-shift-cell-v.disabled {
-  background: #f8fafc !important;
-}
 
-.sd-registration-cell .sd-slot-list {
-  width: 100%;
-}
 
-.sd-registration-cell .sd-slot-person,
-.sd-registration-cell .sd-slot-empty {
-  min-height: 30px;
-}
+
+
+
+
+
+
+
+
+
 
 
 /* Trạng thái đăng ký ca rõ ràng hơn */
-.sd-registration-cell .sd-shift-cell-v.selected {
-  background: #fff7ed;
-  outline: 2px solid #f97316;
-  outline-offset: -2px;
-}
 
-.sd-registration-cell .sd-shift-cell-v.pending-cancel {
-  background: #fef2f2;
-  outline: 2px dashed #ef4444;
-  outline-offset: -2px;
-}
 
-.sd-registration-cell .sd-shift-cell-v.pending-cancel:hover {
-  background: #fee2e2;
-}
 
-.sd-slot-saved {
-  flex-shrink: 0;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #bfdbfe;
-  color: #1e40af;
-  font-size: 9px;
-  font-weight: 800;
-  white-space: nowrap;
-}
 
-.sd-slot-cancel-pending {
-  width: 100%;
-  min-height: 30px;
-  padding: 6px 8px;
-  border: 1px dashed #f87171;
-  border-radius: 8px;
-  background: #fee2e2;
-  color: #b91c1c;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 800;
-}
 
-.sd-slot-cancel-pending small {
-  color: #dc2626;
-  font-size: 9px;
-  font-weight: 800;
-  white-space: nowrap;
-}
+
+
+
+
+
+
 
 
 /* =========================================================
@@ -2351,36 +2120,15 @@
   border-color: #fecaca;
 }
 
-.sd-period-message {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border: 1px solid;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.55;
-}
 
-.sd-period-message strong {
-  font-weight: 800;
-}
 
-.sd-period-message--locked {
-  background: #f8fafc;
-  color: #475569;
-  border-color: #cbd5e1;
-}
 
-.sd-period-message--overdue {
-  background: #fff7ed;
-  color: #9a3412;
-  border-color: #fdba74;
-}
 
-.sd-period-message--error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border-color: #fecaca;
-}
+
+
+
+
+
 
 .sd-action-btn:disabled {
   cursor: not-allowed;
@@ -2401,26 +2149,12 @@
     text-align: center;
   }
 
-  .sd-period-message {
-    padding: 10px 12px;
-  }
+  
 }
 
-.sd-shift-cell-v.disabled,
-.sd-shift-cell-v:disabled {
-  cursor: not-allowed !important;
-  background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
-  color: #64748b !important;
-  box-shadow: none !important;
-  opacity: 0.86;
-}
 
-.sd-shift-cell-v.disabled:hover,
-.sd-shift-cell-v:disabled:hover {
-  background: #f8fafc !important;
-  transform: none;
-}
+
+
 
 /* ===== Bố cục trang giờ làm và lương ===== */
 

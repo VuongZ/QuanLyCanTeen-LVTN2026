@@ -1,7 +1,7 @@
+using System.Data;
 using LuanVanTotNghiep.backend.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using System.Data;
 
 namespace LuanVanTotNghiep.Repositories;
 
@@ -60,34 +60,63 @@ public class StaffRegistrationRepo
                 config.DayOfWeek == dayOfWeek);
     }
 
-    public async Task<bool> HasActiveRegistrationAsync(
-        int periodId,
-        int userId,
-        int shiftId,
-        DateOnly workDate,
-        string[] cancelledStatuses)
+    /// <summary>
+    /// Kiểm tra nhân viên đã có phiếu đăng ký chưa bị hủy
+    /// trong đúng đợt, ngày và ca hay chưa.
+    /// </summary>
+    public async Task<bool>
+        HasNonCancelledRegistrationAsync(
+            int periodId,
+            int userId,
+            int shiftId,
+            DateOnly workDate)
     {
         return await _dbSet.AnyAsync(registration =>
             registration.PeriodId == periodId &&
             registration.UserId == userId &&
             registration.ShiftId == shiftId &&
             registration.WorkDate == workDate &&
-            !cancelledStatuses.Contains(
-                registration.Status));
+            registration.Status != "CANCELLED");
     }
 
-    public async Task<int> CountActiveRegistrationsAsync(
-        int periodId,
-        int shiftId,
-        DateOnly workDate,
-        string[] cancelledStatuses)
+    /// <summary>
+    /// Chỉ đếm người giữ vị trí chính thức.
+    /// WAITLIST không chiếm số lượng của ca.
+    /// </summary>
+    public async Task<int>
+        CountRegisteredAsync(
+            int periodId,
+            int shiftId,
+            DateOnly workDate)
     {
         return await _dbSet.CountAsync(registration =>
             registration.PeriodId == periodId &&
             registration.ShiftId == shiftId &&
             registration.WorkDate == workDate &&
-            !cancelledStatuses.Contains(
-                registration.Status));
+            registration.Status == "REGISTERED");
+    }
+
+    /// <summary>
+    /// Lấy người đăng ký chờ sớm nhất.
+    /// ID được dùng để phân xử khi hai dòng có cùng thời gian.
+    /// </summary>
+    public async Task<CaStaffRegistration?>
+        GetOldestWaitlistAsync(
+            int periodId,
+            int shiftId,
+            DateOnly workDate)
+    {
+        return await _dbSet
+            .Where(registration =>
+                registration.PeriodId == periodId &&
+                registration.ShiftId == shiftId &&
+                registration.WorkDate == workDate &&
+                registration.Status == "WAITLIST")
+            .OrderBy(registration =>
+                registration.RegisteredAt)
+            .ThenBy(registration =>
+                registration.Id)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<CaStaffRegistration>>
@@ -96,7 +125,9 @@ public class StaffRegistrationRepo
             int periodId)
     {
         return await _dbSet
-            .Include(registration => registration.Shift)
+            .AsNoTracking()
+            .Include(registration =>
+                registration.Shift)
             .Where(registration =>
                 registration.UserId == userId &&
                 registration.PeriodId == periodId)
@@ -104,6 +135,8 @@ public class StaffRegistrationRepo
                 registration.WorkDate)
             .ThenBy(registration =>
                 registration.ShiftId)
+            .ThenBy(registration =>
+                registration.RegisteredAt)
             .ToListAsync();
     }
 
@@ -111,6 +144,7 @@ public class StaffRegistrationRepo
         GetRegistrationsByPeriodAsync(int periodId)
     {
         return await _dbSet
+            .AsNoTracking()
             .Include(registration =>
                 registration.User)
             .Include(registration =>
@@ -119,6 +153,10 @@ public class StaffRegistrationRepo
                 registration.PeriodId == periodId)
             .OrderBy(registration =>
                 registration.WorkDate)
+            .ThenBy(registration =>
+                registration.ShiftId)
+            .ThenBy(registration =>
+                registration.RegisteredAt)
             .ThenBy(registration =>
                 registration.Id)
             .ToListAsync();

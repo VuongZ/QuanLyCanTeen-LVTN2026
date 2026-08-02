@@ -123,6 +123,13 @@ builder.Services.AddScoped<StaffRegistrationService>();
 builder.Services.AddScoped<FinalScheduleRepo>();
 builder.Services.AddScoped<FinalScheduleService>();
 
+// Nghỉ, vắng và thay ca khẩn cấp
+builder.Services.AddScoped<EmergencyReplacementRepo>();
+builder.Services.AddScoped<EmergencyReplacementService>();
+
+// Ủy quyền ca
+builder.Services.AddScoped<ShiftDelegationService>();
+
 // Điểm danh
 builder.Services.AddScoped<AttendanceRepo>();
 builder.Services.AddScoped<AttendanceService>();
@@ -154,8 +161,11 @@ builder.Services.AddScoped<ShiftClosingService>();
 // Quên checkout
 builder.Services.AddScoped<CheckoutRequestService>();
 
-// Lương
+// Nghiệp vụ lương
 builder.Services.AddScoped<SalaryService>();
+builder.Services.AddScoped<SalaryComplaintService>();
+
+// Nghiệp vụ khiếu nại lương
 builder.Services.AddScoped<SalaryComplaintService>();
 
 // OCR hóa đơn

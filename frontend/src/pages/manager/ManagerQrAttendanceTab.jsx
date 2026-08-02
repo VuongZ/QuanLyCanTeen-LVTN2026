@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
+
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { getAllShifts } from '../../api/ShiftApi'
+import {
+  scanAttendance
+} from '../../api/AttendanceApi'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -128,10 +131,14 @@ export function ManagerQrAttendanceTab({ delegatedShiftId, user }) {
     setIsSubmitting(true); setStatus(null)
     try {
       const employeeQr = parseEmployeeQr(text)
-      const res = await axios.post('/api/StaffRegistration/scan-attendance', {
-        managerId: user.id, employeeId: employeeQr.employeeId, shiftId: Number(shiftId), workDate, action: scanAction,
-      })
-      setScanResult(res.data)
+      const result = await scanAttendance({
+  employeeId: employeeQr.employeeId,
+  shiftId: Number(shiftId),
+  workDate,
+  action: scanAction
+})
+
+setScanResult(result)
       setStatus({ type: 'success', msg: 'Đã lưu chấm công thành công.' })
     } catch (err) { setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Không đọc được mã QR.' }) } finally { setIsSubmitting(false) }
   }

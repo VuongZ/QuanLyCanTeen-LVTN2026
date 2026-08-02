@@ -1,36 +1,75 @@
 import axios from 'axios'
 
-const BASE_URL = '/api/StaffRegistration'
+/**
+ * File này CHỈ gọi API liên quan đến phiếu đăng ký ca.
+ *
+ * Không đặt các API sau trong file này:
+ * - Công bố lịch.
+ * - Lấy lịch chính thức.
+ * - Nghỉ/vắng và thay ca.
+ * - Quét QR chấm công.
+ */
 
-// Lấy danh sách Nhân viên đăng ký trong một đợt
-export async function getRegistrationsByPeriod(periodId) {
-  const response = await axios.get(
-    `${BASE_URL}/period/${periodId}`
-  )
-
-  return response.data
-}
-
-// Lấy lịch chính thức của một đợt đã công bố
-export async function getFinalScheduleByPeriod(periodId) {
-  const response = await axios.get(
-    `${BASE_URL}/final-schedule/period/${periodId}`
-  )
-
-  return response.data
-}
-
-// Công bố lịch làm chính thức
-export async function publishSchedule(
-  periodId,
-  approvedRegistrationIds = []
-) {
+/**
+ * Staff đăng ký một ca.
+ *
+ * Backend tự lấy UserId từ JWT và tự quyết định
+ * REGISTERED hoặc WAITLIST.
+ */
+export async function registerShift(payload) {
   const response = await axios.post(
-    `${BASE_URL}/publish`,
+    '/api/StaffRegistration',
+    payload
+  )
+
+  return response.data
+}
+
+/**
+ * Lấy các phiếu đăng ký của một đợt.
+ */
+export async function getRegistrationsByPeriod(
+  periodId
+) {
+  const response = await axios.get(
+    `/api/StaffRegistration/period/${periodId}`
+  )
+
+  return response.data
+}
+
+/**
+ * Manager/Admin hủy một phiếu.
+ *
+ * Backend hiện nhận raw JSON string nên Axios sẽ gửi:
+ * "CANCELLED"
+ */
+export async function updateRegistrationStatus(
+  registrationId,
+  newStatus
+) {
+  const response = await axios.put(
+    `/api/StaffRegistration/${registrationId}/status`,
+    newStatus,
     {
-      periodId,
-      approvedRegistrationIds
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }
+  )
+
+  return response.data
+}
+
+/**
+ * Staff tự hủy REGISTERED hoặc WAITLIST.
+ */
+export async function cancelRegistration(
+  registrationId,
+  userId
+) {
+  const response = await axios.delete(
+    `/api/StaffRegistration/${registrationId}/user/${userId}`
   )
 
   return response.data

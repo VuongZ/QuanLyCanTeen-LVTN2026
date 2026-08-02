@@ -207,34 +207,176 @@ public partial class AppDbContext : DbContext
         });
 
         modelBuilder.Entity<CaFinalSchedule>(entity =>
+{
+    entity.HasKey(e => e.Id)
+        .HasName("PRIMARY");
+
+    entity
+        .ToTable("ca_final_schedule")
+        .UseCollation("utf8mb4_unicode_ci");
+
+    entity.HasIndex(
+            e => new
+            {
+                e.UserId,
+                e.ShiftId,
+                e.WorkDate
+            },
+            "uq_final_user_shift_date")
+        .IsUnique();
+
+    entity.HasIndex(
+            e => e.SourceRegistrationId,
+            "uq_final_source_registration")
+        .IsUnique();
+
+    entity.HasIndex(
+            e => e.ReplacesScheduleId,
+            "uq_final_replaces_schedule")
+        .IsUnique();
+
+    entity.HasIndex(
+        e => e.PeriodId,
+        "idx_final_period");
+
+    entity.HasIndex(
+        e => new
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            e.AssignmentType,
+            e.Status
+        },
+        "idx_final_assignment");
 
-            entity
-                .ToTable("ca_final_schedule")
-                .UseCollation("utf8mb4_unicode_ci");
+    entity.HasIndex(
+        e => e.AbsenceMarkedByUserId,
+        "idx_final_absence_manager");
 
-            entity.HasIndex(e => e.ShiftId, "fk_final_shift");
+    entity.HasIndex(
+        e => e.AssignedByUserId,
+        "idx_final_assigned_manager");
 
-            entity.HasIndex(e => e.UserId, "fk_final_user");
+    entity.HasIndex(
+        e => e.ShiftId,
+        "fk_final_shift");
 
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.ShiftId).HasColumnName("shift_id");
-            entity.Property(e => e.Status)
-                .HasDefaultValueSql("'DRAFT'")
-                .HasColumnType("enum('DRAFT','PUBLISHED')")
-                .HasColumnName("status");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.WorkDate).HasColumnName("work_date");
+    entity.HasIndex(
+        e => e.UserId,
+        "fk_final_user");
 
-            entity.HasOne(d => d.Shift).WithMany(p => p.CaFinalSchedules)
-                .HasForeignKey(d => d.ShiftId)
-                .HasConstraintName("fk_final_shift");
+    entity.Property(e => e.Id)
+        .HasColumnName("id");
 
-            entity.HasOne(d => d.User).WithMany(p => p.CaFinalSchedules)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("fk_final_user");
-        });
+    entity.Property(e => e.PeriodId)
+        .HasColumnName("period_id");
+
+    entity.Property(e => e.SourceRegistrationId)
+        .HasColumnName("source_registration_id");
+
+    entity.Property(e => e.UserId)
+        .HasColumnName("user_id");
+
+    entity.Property(e => e.ShiftId)
+        .HasColumnName("shift_id");
+
+    entity.Property(e => e.WorkDate)
+        .HasColumnName("work_date");
+
+    entity.Property(e => e.Status)
+        .HasDefaultValueSql("'DRAFT'")
+        .HasColumnType(
+            "enum(" +
+            "'DRAFT'," +
+            "'PUBLISHED'," +
+            "'LEAVE_APPROVED'," +
+            "'ABSENT'," +
+            "'CANCELLED'" +
+            ")")
+        .HasColumnName("status");
+
+    entity.Property(e => e.AssignmentType)
+        .HasDefaultValueSql("'NORMAL'")
+        .HasColumnType(
+            "enum(" +
+            "'NORMAL'," +
+            "'EMERGENCY_REPLACEMENT'" +
+            ")")
+        .HasColumnName("assignment_type");
+
+    entity.Property(e => e.PayMultiplier)
+        .HasPrecision(5, 2)
+        .HasDefaultValueSql("'1.00'")
+        .HasColumnName("pay_multiplier");
+
+    entity.Property(e => e.ReplacesScheduleId)
+        .HasColumnName("replaces_schedule_id");
+
+    entity.Property(e => e.AbsenceReason)
+        .HasMaxLength(500)
+        .HasColumnName("absence_reason");
+
+    entity.Property(e => e.AbsenceMarkedByUserId)
+        .HasColumnName(
+            "absence_marked_by_user_id");
+
+    entity.Property(e => e.AbsenceMarkedAt)
+        .HasColumnType("datetime")
+        .HasColumnName("absence_marked_at");
+
+    entity.Property(e => e.AssignedByUserId)
+        .HasColumnName("assigned_by_user_id");
+
+    entity.Property(e => e.AssignedAt)
+        .HasColumnType("datetime")
+        .HasColumnName("assigned_at");
+
+    entity.HasOne(d => d.Shift)
+        .WithMany(p => p.CaFinalSchedules)
+        .HasForeignKey(d => d.ShiftId)
+        .HasConstraintName("fk_final_shift");
+
+    entity.HasOne(d => d.User)
+        .WithMany(p => p.CaFinalSchedules)
+        .HasForeignKey(d => d.UserId)
+        .HasConstraintName("fk_final_user");
+
+    entity.HasOne(d => d.Period)
+        .WithMany()
+        .HasForeignKey(d => d.PeriodId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName("fk_final_period");
+
+    entity.HasOne(d => d.SourceRegistration)
+        .WithOne()
+        .HasForeignKey<CaFinalSchedule>(
+            d => d.SourceRegistrationId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName(
+            "fk_final_source_registration");
+
+    entity.HasOne(d => d.ReplacesSchedule)
+        .WithOne(p => p.ReplacementSchedule)
+        .HasForeignKey<CaFinalSchedule>(
+            d => d.ReplacesScheduleId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName(
+            "fk_final_replaces_schedule");
+
+    entity.HasOne(d => d.AbsenceMarkedByUser)
+        .WithMany()
+        .HasForeignKey(
+            d => d.AbsenceMarkedByUserId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName(
+            "fk_final_absence_manager");
+
+    entity.HasOne(d => d.AssignedByUser)
+        .WithMany()
+        .HasForeignKey(
+            d => d.AssignedByUserId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName(
+            "fk_final_assigned_manager");
+});
 
         modelBuilder.Entity<CaSupplementalAttendanceRequest>(entity =>
         {
@@ -369,43 +511,84 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("fk_branch_shift");
         });
 
-        modelBuilder.Entity<CaStaffRegistration>(entity =>
+       modelBuilder.Entity<CaStaffRegistration>(entity =>
+{
+    entity.HasKey(e => e.Id)
+        .HasName("PRIMARY");
+
+    entity
+        .ToTable("ca_staff_registration")
+        .UseCollation("utf8mb4_unicode_ci");
+
+    entity.HasIndex(
+        e => e.ShiftId,
+        "fk_reg_shift");
+
+    entity.HasIndex(
+        e => e.UserId,
+        "fk_reg_user");
+
+    entity.HasIndex(
+        e => new
         {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            e.PeriodId,
+            e.ShiftId,
+            e.WorkDate,
+            e.Status,
+            e.RegisteredAt
+        },
+        "idx_registration_waitlist");
 
-            entity
-                .ToTable("ca_staff_registration")
-                .UseCollation("utf8mb4_unicode_ci");
+    entity.Property(e => e.Id)
+        .HasColumnName("id");
 
-            entity.HasIndex(e => e.PeriodId, "fk_reg_period");
+    entity.Property(e => e.UserId)
+        .HasColumnName("user_id");
 
-            entity.HasIndex(e => e.ShiftId, "fk_reg_shift");
+    entity.Property(e => e.ShiftId)
+        .HasColumnName("shift_id");
 
-            entity.HasIndex(e => e.UserId, "fk_reg_user");
+    entity.Property(e => e.WorkDate)
+        .HasColumnName("work_date");
 
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.PeriodId).HasColumnName("period_id");
-            entity.Property(e => e.ShiftId).HasColumnName("shift_id");
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValueSql("'Chờ Duyệt'")
-                .HasColumnName("status");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.WorkDate).HasColumnName("work_date");
+    entity.Property(e => e.Status)
+        .HasColumnType(
+            "enum(" +
+            "'REGISTERED'," +
+            "'WAITLIST'," +
+            "'CANCELLED'," +
+            "'REPLACEMENT_SELECTED'" +
+            ")")
+        .HasColumnName("status");
 
-            entity.HasOne(d => d.Period).WithMany(p => p.CaStaffRegistrations)
-                .HasForeignKey(d => d.PeriodId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("fk_reg_period");
+    entity.Property(e => e.PeriodId)
+        .HasColumnName("period_id");
 
-            entity.HasOne(d => d.Shift).WithMany(p => p.CaStaffRegistrations)
-                .HasForeignKey(d => d.ShiftId)
-                .HasConstraintName("fk_reg_shift");
+    entity.Property(e => e.RegisteredAt)
+        .HasDefaultValueSql(
+            "CURRENT_TIMESTAMP")
+        .HasColumnType("datetime")
+        .HasColumnName("registered_at");
 
-            entity.HasOne(d => d.User).WithMany(p => p.CaStaffRegistrations)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("fk_reg_user");
-        });
+    entity.HasOne(d => d.Period)
+        .WithMany(p =>
+            p.CaStaffRegistrations)
+        .HasForeignKey(d => d.PeriodId)
+        .OnDelete(DeleteBehavior.Cascade)
+        .HasConstraintName("fk_reg_period");
+
+    entity.HasOne(d => d.Shift)
+        .WithMany(p =>
+            p.CaStaffRegistrations)
+        .HasForeignKey(d => d.ShiftId)
+        .HasConstraintName("fk_reg_shift");
+
+    entity.HasOne(d => d.User)
+        .WithMany(p =>
+            p.CaStaffRegistrations)
+        .HasForeignKey(d => d.UserId)
+        .HasConstraintName("fk_reg_user");
+});
 
         modelBuilder.Entity<DmBranch>(entity =>
         {
@@ -975,6 +1158,12 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.WeekendMultiplier)
                 .HasDefaultValueSql("'1.5'")
                 .HasColumnName("weekend_multiplier");
+                entity.Property(
+        e => e.EmergencyReplacementMultiplier)
+    .HasPrecision(5, 2)
+    .HasDefaultValueSql("'1.50'")
+    .HasColumnName(
+        "emergency_replacement_multiplier");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.LuongSalaryRules)
                 .HasForeignKey(d => d.BranchId)
