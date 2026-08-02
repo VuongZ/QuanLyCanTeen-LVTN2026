@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState
+} from 'react';
+
 import {
   finalizeBranchSalaryPeriod,
   getAllSalaries,
@@ -9,13 +14,58 @@ import {
   getSalaryWorkDetails,
   markSalaryPaid,
   reviewSalaryAdjustment,
-  resolveSalaryComplaint,
+  resolveSalaryComplaint
 } from '../../api/SalaryApi';
+
+import '../css/SalaryInsurance.css';
 
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0));
 const number = (value) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0));
 const date = (value) => value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value)) : '—';
 const periodKey = (item) => `${item.year}-${String(item.month).padStart(2, '0')}`;
+/*
+  Lấy phần BHXH do nhân viên đóng.
+
+  Backend đã tính và lưu giá trị này,
+  Frontend không tự nhân tỷ lệ BHXH.
+*/
+function getInsuranceDeduction(item) {
+  return Number(
+    item?.socialInsuranceDeduction || 0
+  );
+}
+
+
+/*
+  Lấy lương thực nhận.
+
+  Ưu tiên sử dụng netSalary do Backend trả về.
+
+  Phép trừ phía sau chỉ là dự phòng cho
+  những dữ liệu cũ chưa có trường netSalary.
+*/
+function getNetSalary(item) {
+  const backendNetSalary =
+    Number(item?.netSalary);
+
+  if (
+    Number.isFinite(backendNetSalary)
+  ) {
+    return backendNetSalary;
+  }
+
+  const grossSalary =
+    Number(item?.totalSalary || 0);
+
+  const insuranceDeduction =
+    getInsuranceDeduction(item);
+
+  return Math.max(
+    0,
+    grossSalary -
+      insuranceDeduction
+  );
+}
 
 function statusLabel(status) {
   if ((status || '').toUpperCase() === 'PAID') return 'Đã thanh toán';
@@ -190,16 +240,82 @@ export function AdminSalaryTab({ isAdmin = true }) {
     });
   }, [items, query, viewMode, isAdmin, selectedBranch, selectedPeriod]);
 
-  const summary = useMemo(() => items
-    .filter((item) => (!isAdmin || selectedBranch === 'ALL' || String(item.branchId) === selectedBranch)
-      && (selectedPeriod === 'ALL' || periodKey(item) === selectedPeriod))
-    .reduce((total, item) => {
-    const normalizedStatus = (item.status || '').toUpperCase();
-    const completed = normalizedStatus === 'PAID';
-    total.count += 1;
-    total[completed ? 'paid' : 'pending'] += Number(item.totalSalary || 0);
-    return total;
-  }, { count: 0, pending: 0, paid: 0 }), [items, isAdmin, selectedBranch, selectedPeriod]);
+  const summary =
+  useMemo(() => {
+    return items
+      .filter((item) => {
+        const matchesBranch =
+          !isAdmin ||
+          selectedBranch === 'ALL' ||
+          String(item.branchId) ===
+            selectedBranch;
+
+        const matchesPeriod =
+          selectedPeriod === 'ALL' ||
+          periodKey(item) ===
+            selectedPeriod;
+
+        return (
+          matchesBranch &&
+          matchesPeriod
+        );
+      })
+      .reduce(
+        (total, item) => {
+          const normalizedStatus =
+            String(
+              item.status || ''
+            ).toUpperCase();
+
+          const isPaid =
+            normalizedStatus ===
+            'PAID';
+
+          const grossSalary =
+            Number(
+              item.totalSalary || 0
+            );
+
+          const insuranceDeduction =
+            getInsuranceDeduction(
+              item
+            );
+
+          const netSalary =
+            getNetSalary(item);
+
+          total.count += 1;
+
+          total.gross +=
+            grossSalary;
+
+          total.insurance +=
+            insuranceDeduction;
+
+          if (isPaid) {
+            total.paid +=
+              netSalary;
+          } else {
+            total.pending +=
+              netSalary;
+          }
+
+          return total;
+        },
+        {
+          count: 0,
+          gross: 0,
+          insurance: 0,
+          pending: 0,
+          paid: 0
+        }
+      );
+  }, [
+    items,
+    isAdmin,
+    selectedBranch,
+    selectedPeriod
+  ]);
 
   async function confirmPayment() {
     if (!selected) return;
@@ -299,10 +415,78 @@ export function AdminSalaryTab({ isAdmin = true }) {
   return (
     <div className={`sd-salary-admin-page ${isAdmin ? 'sd-salary-admin-page--admin' : ''}`}>
       <div className="sd-stat-grid sd-salary-admin-stats">
-        <div className="sd-stat-card"><span className="sd-stat-icon">∑</span><h3>{summary.count}</h3><p>{isAdmin ? 'Bảng lương manager đã chốt' : 'Bảng lương cơ sở'}</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">₫</span><h3>{money(summary.pending)}</h3><p>Chưa thanh toán</p></div>
-        <div className="sd-stat-card"><span className="sd-stat-icon">✓</span><h3>{money(summary.paid)}</h3><p>Đã thanh toán</p></div>
-      </div>
+  <div className="sd-stat-card">
+    <span className="sd-stat-icon">
+      ∑
+    </span>
+
+    <h3>
+      {summary.count}
+    </h3>
+
+    <p>
+      {isAdmin
+        ? 'Bảng lương toàn hệ thống'
+        : 'Bảng lương cơ sở'}
+    </p>
+  </div>
+
+  <div className="sd-stat-card">
+    <span className="sd-stat-icon">
+      ₫
+    </span>
+
+    <h3>
+      {money(summary.gross)}
+    </h3>
+
+    <p>
+      Lương trước BHXH
+    </p>
+  </div>
+
+  <div className="sd-stat-card sd-salary-insurance-stat">
+    <span className="sd-stat-icon">
+      −
+    </span>
+
+    <h3>
+      {money(summary.insurance)}
+    </h3>
+
+    <p>
+      BHXH nhân viên
+    </p>
+  </div>
+
+  <div className="sd-stat-card">
+    <span className="sd-stat-icon">
+      …
+    </span>
+
+    <h3>
+      {money(summary.pending)}
+    </h3>
+
+    <p>
+      Thực nhận chưa trả
+    </p>
+  </div>
+
+  <div className="sd-stat-card sd-salary-paid-stat">
+    <span className="sd-stat-icon">
+      ✓
+    </span>
+
+    <h3>
+      {money(summary.paid)}
+    </h3>
+
+    <p>
+      Thực nhận đã trả
+    </p>
+  </div>
+</div>
 
       {isAdmin && (
         <div className="sd-card sd-adjustment-approval-card">
@@ -474,13 +658,125 @@ export function AdminSalaryTab({ isAdmin = true }) {
 
               <>
                   <div className="sd-salary-detail-summary">
-                    <div><span>Tổng giờ</span><strong>{number(selected.totalHours)} giờ</strong></div>
-                    <div><span>Lương/giờ</span><strong>{money(selected.hourlyWageAtTime)}</strong></div>
-                    <div><span>Lương cơ bản</span><strong>{money(Number(selected.totalHours) * Number(selected.hourlyWageAtTime))}</strong></div>
-                    <div><span>Thưởng</span><strong>{money(selected.totalBonus)}</strong></div>
-                    <div><span>Phạt</span><strong>{money(selected.totalPenalty)}</strong></div>
-                    <div className="total"><span>Thực nhận</span><strong>{money(selected.totalSalary)}</strong></div>
-                  </div>
+  <div>
+    <span>
+      Tổng giờ
+    </span>
+
+    <strong>
+      {number(
+        selected.totalHours
+      )}{' '}
+      giờ
+    </strong>
+  </div>
+
+  <div>
+    <span>
+      Lương/giờ
+    </span>
+
+    <strong>
+      {money(
+        selected.hourlyWageAtTime
+      )}
+    </strong>
+  </div>
+
+  <div>
+    <span>
+      Lương cơ bản
+    </span>
+
+    <strong>
+      {money(
+        Number(
+          selected.totalHours || 0
+        ) *
+        Number(
+          selected.hourlyWageAtTime || 0
+        )
+      )}
+    </strong>
+  </div>
+
+  <div>
+    <span>
+      Thưởng
+    </span>
+
+    <strong>
+      {money(
+        selected.totalBonus
+      )}
+    </strong>
+  </div>
+
+  <div>
+    <span>
+      Phạt
+    </span>
+
+    <strong>
+      {money(
+        selected.totalPenalty
+      )}
+    </strong>
+  </div>
+
+  <div className="salary-gross">
+    <span>
+      Lương trước BHXH
+    </span>
+
+    <strong>
+      {money(
+        selected.totalSalary
+      )}
+    </strong>
+  </div>
+
+  <div className="salary-insurance-deduction">
+    <span>
+      BHXH nhân viên đóng
+    </span>
+
+    <strong>
+      − {money(
+        getInsuranceDeduction(
+          selected
+        )
+      )}
+    </strong>
+  </div>
+
+  <div className="total salary-net">
+    <span>
+      Lương thực nhận
+    </span>
+
+    <strong>
+      {money(
+        getNetSalary(selected)
+      )}
+    </strong>
+  </div>
+</div>
+
+{selected.bhxhContributionId ? (
+  <p className="salary-insurance-note">
+    Bảng lương đã liên kết với khoản đóng
+    BHXH #{selected.bhxhContributionId}.
+    Chỉ phần BHXH của nhân viên được khấu trừ
+    khỏi lương.
+  </p>
+) : (
+  <p className="salary-insurance-note salary-insurance-note--empty">
+    Bảng lương này không có khoản khấu trừ
+    BHXH. Trường hợp này phù hợp với nhân viên
+    PART_TIME hoặc bảng lương chưa được chốt.
+  </p>
+)}
 
                   {selected.finalizedAt && <p className="sd-salary-finalized-note">Chốt lúc {date(selected.finalizedAt)} bởi {selected.finalizedByName || 'Manager'}</p>}
 
@@ -556,29 +852,189 @@ export function AdminSalaryTab({ isAdmin = true }) {
   );
 }
 
-function SalaryEmployeeTable({ history, isAdmin, items, loading, onSelect }) {
-  return <div className="sd-table-wrap"><table className="sd-table sd-salary-employee-table"><thead><tr>
-    <th>Nhân viên</th><th>Cơ sở</th><th>Tháng</th><th>Giờ làm</th><th>Thực nhận</th><th>Ngân hàng</th><th>Trạng thái</th>
-  </tr></thead><tbody>
-    {loading ? <tr><td colSpan={7} className="sd-td-empty">Đang tải danh sách lương...</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="sd-td-empty">{history ? 'Chưa có lịch sử trả lương.' : (isAdmin ? 'Chưa có bảng lương nào được manager chốt.' : 'Không có bảng lương đang chờ trả.')}</td></tr> : items.map((item) => <tr
-      className="sd-tr"
-      key={item.id}
-      onClick={() => onSelect(item)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onSelect(item);
+function SalaryEmployeeTable({
+  history,
+  isAdmin,
+  items,
+  loading,
+  onSelect
+}) {
+  return (
+   <div className="sd-table-wrap sd-salary-insurance-table-wrap">
+      <table
+        className={
+          'sd-table ' +
+          'sd-salary-employee-table ' +
+          'sd-salary-insurance-table'
         }
-      }}
-      role="button"
-      style={{ cursor: 'pointer' }}
-      tabIndex={0}
-    >
-      <td><strong>{item.fullName || item.username}</strong></td>
-      <td>{item.branchName || 'Chưa gán cơ sở'}</td>
-      <td>{item.month}/{item.year}</td><td>{number(item.totalHours)} giờ</td><td className="sd-salary-admin-total">{money(item.totalSalary)}</td>
-      <td><strong>{item.bankName || 'Chưa có'}</strong><span className="sd-subline">{item.bankAccountNumber || 'Chưa có STK'}</span></td>
-      <td><span className={`sd-status-pill ${statusClass(item.status)}`}>{statusLabel(item.status)}</span></td>
-    </tr>)}
-  </tbody></table></div>;
+      >
+        <thead>
+          <tr>
+            <th>
+              Nhân viên
+            </th>
+
+            <th>
+              Cơ sở
+            </th>
+
+            <th>
+              Tháng
+            </th>
+
+            <th>
+              Giờ làm
+            </th>
+
+            <th>
+              Lương trước BHXH
+            </th>
+
+            <th>
+              Khấu trừ BHXH
+            </th>
+
+            <th>
+              Thực nhận
+            </th>
+
+            <th>
+              Ngân hàng
+            </th>
+
+            <th>
+              Trạng thái
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {loading ? (
+            <tr>
+              <td
+                colSpan={9}
+                className="sd-td-empty"
+              >
+                Đang tải danh sách lương...
+              </td>
+            </tr>
+          ) : items.length === 0 ? (
+            <tr>
+              <td
+                colSpan={9}
+                className="sd-td-empty"
+              >
+                {history
+                  ? 'Chưa có lịch sử trả lương.'
+                  : (
+                      isAdmin
+                        ? 'Chưa có bảng lương nào được Manager chốt.'
+                        : 'Không có bảng lương đang chờ trả.'
+                    )}
+              </td>
+            </tr>
+          ) : (
+            items.map((item) => {
+              const insuranceDeduction =
+                getInsuranceDeduction(
+                  item
+                );
+
+              const netSalary =
+                getNetSalary(item);
+
+              return (
+                <tr
+                  className="sd-tr"
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    onSelect(item);
+                  }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === 'Enter' ||
+                      event.key === ' '
+                    ) {
+                      event.preventDefault();
+                      onSelect(item);
+                    }
+                  }}
+                >
+                  <td>
+                    <strong>
+                      {item.fullName ||
+                        item.username}
+                    </strong>
+                  </td>
+
+                  <td>
+                    {item.branchName ||
+                      'Chưa gán cơ sở'}
+                  </td>
+
+                  <td>
+                    {item.month}/{item.year}
+                  </td>
+
+                  <td>
+                    {number(
+                      item.totalHours
+                    )}{' '}
+                    giờ
+                  </td>
+
+                  <td className="sd-salary-gross-value">
+                    {money(
+                      item.totalSalary
+                    )}
+                  </td>
+
+                  <td className="sd-salary-insurance-value">
+                    {insuranceDeduction > 0
+                      ? `− ${money(
+                          insuranceDeduction
+                        )}`
+                      : money(0)}
+                  </td>
+
+                  <td className="sd-salary-net-value">
+                    {money(netSalary)}
+                  </td>
+
+                  <td>
+                    <strong>
+                      {item.bankName ||
+                        'Chưa có'}
+                    </strong>
+
+                    <span className="sd-subline">
+                      {item.bankAccountNumber ||
+                        'Chưa có STK'}
+                    </span>
+                  </td>
+
+                  <td>
+                    <span
+                      className={
+                        `sd-status-pill ` +
+                        statusClass(
+                          item.status
+                        )
+                      }
+                    >
+                      {statusLabel(
+                        item.status
+                      )}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 }

@@ -15,6 +15,7 @@ import { ManagerImportTab } from './manager/ManagerImportTab'
 import { ManagerSalaryRuleTab } from './manager/ManagerSalaryRuleTab'
 import { AdminSupplierTab } from './admin/AdminSupplierTab';
 import { AdminSalaryTab } from './admin/AdminSalaryTab';
+import {AdminSocialInsuranceTab} from './admin/AdminSocialInsuranceTab';
 import { AdminWorkHoursRanking } from './admin/AdminWorkHoursRanking';
 import { InventoryTab } from './shared/InventoryTab';
 import { ManagerExportTab } from './manager/ManagerExportTab';
@@ -260,6 +261,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'salaries': return isAdmin
         ? { eyebrow: 'Tài chính', title: 'Tổng lương theo cơ sở' }
         : { eyebrow: 'Tài chính', title: 'Trả lương nhân viên' }
+      case 'socialInsurance':return {
+    eyebrow: 'Phúc lợi',
+    title: 'Bảo hiểm xã hội'
+  };
 
       case 'frontStock':
         return isAdmin
@@ -284,6 +289,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
     NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Salary rule' })
     NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
+    NAV_ITEMS.push({id: 'socialInsurance',icon: '🛡️',label: 'Bảo hiểm xã hội'});
     NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
     NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
@@ -506,6 +512,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             {activeTab === 'inventory' && isManager && <ManagerImportTab user={user} branches={branches} />}
             {activeTab === 'systemSchedule' && isAdmin && <AdminSystemScheduleTab branches={branches} />}
             {activeTab === 'salaries' && (isAdmin || isManager) && <AdminSalaryTab isAdmin={isAdmin} />}
+            {activeTab === 'socialInsurance' && isAdmin && (<AdminSocialInsuranceTab />)}
             {activeTab === 'suppliers' && isAdmin && <AdminSupplierTab />}
             {activeTab === 'inventoryReport' && <InventoryTab currentUser={user} branches={branches} />}
             {activeTab === 'frontStock' && (isAdmin || isManager) && (

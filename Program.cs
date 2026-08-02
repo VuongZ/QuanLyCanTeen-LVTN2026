@@ -168,6 +168,12 @@ builder.Services.AddScoped<SalaryComplaintService>();
 // Nghiệp vụ khiếu nại lương
 builder.Services.AddScoped<SalaryComplaintService>();
 
+// ==============================
+// BẢO HIỂM XÃ HỘI
+// ==============================
+builder.Services.AddScoped<ISocialInsuranceRepo,SocialInsuranceRepo>();
+builder.Services.AddScoped<ISocialInsuranceService, SocialInsuranceService>();
+
 // OCR hóa đơn
 builder.Services.AddScoped<InvoiceOcrService>();
 
