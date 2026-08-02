@@ -1,0 +1,388 @@
+/* =========================================================
+   TRANG QUẢN LÝ LƯƠNG CÓ KHẤU TRỪ BHXH
+   ========================================================= */
+
+
+/* =========================================================
+   1. CÁC THẺ THỐNG KÊ
+   ========================================================= */
+
+/*
+  CSS cũ của hệ thống chia sd-stat-grid thành 4 cột.
+
+  Trang lương hiện có 5 thẻ nên phải ghi đè
+  riêng thành 5 cột trên màn hình lớn.
+*/
+.sd-salary-admin-page .sd-salary-admin-stats {
+  display: grid;
+  grid-template-columns: repeat(
+    5,
+    minmax(0, 1fr)
+  );
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+/*
+  Ngăn nội dung tiền tệ làm thẻ bị giãn
+  hoặc tràn sang thẻ bên cạnh.
+*/
+.sd-salary-admin-page
+.sd-salary-admin-stats
+.sd-stat-card {
+  min-width: 0;
+  padding: 16px;
+}
+
+.sd-salary-admin-page
+.sd-salary-admin-stats
+.sd-stat-card h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+/* Thẻ tổng BHXH nhân viên. */
+.sd-salary-admin-page
+.sd-salary-insurance-stat {
+  border: 1px solid #fecaca;
+  background: #fff7f7;
+}
+
+.sd-salary-admin-page
+.sd-salary-insurance-stat h3 {
+  color: #b91c1c;
+}
+
+/* Thẻ lương thực nhận đã trả. */
+.sd-salary-admin-page
+.sd-salary-paid-stat {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.sd-salary-admin-page
+.sd-salary-paid-stat h3 {
+  color: #166534;
+}
+
+
+/* =========================================================
+   2. BẢNG LƯƠNG
+   ========================================================= */
+
+/*
+  Bảng mới có 9 cột:
+
+  1. Nhân viên
+  2. Cơ sở
+  3. Tháng
+  4. Giờ làm
+  5. Lương trước BHXH
+  6. Khấu trừ BHXH
+  7. Thực nhận
+  8. Ngân hàng
+  9. Trạng thái
+*/
+.sd-salary-admin-page
+.sd-table.sd-salary-insurance-table,
+.sd-s8
+.sd-salary-admin-page
+.sd-table.sd-salary-insurance-table,
+.sd-salary-admin-page--admin
+.sd-table.sd-salary-insurance-table {
+  min-width: 1380px;
+  table-layout: fixed;
+}
+
+/* Nhân viên. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(1),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(1) {
+  width: 190px;
+}
+
+/* Cơ sở. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(2),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(2) {
+  width: 150px;
+}
+
+/* Tháng. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(3),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(3) {
+  width: 90px;
+  white-space: nowrap;
+}
+
+/* Giờ làm. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(4),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(4) {
+  width: 105px;
+  white-space: nowrap;
+}
+
+/* Lương trước BHXH. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(5),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(5) {
+  width: 165px;
+  text-align: right;
+}
+
+/* Khấu trừ BHXH. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(6),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(6) {
+  width: 155px;
+  text-align: right;
+}
+
+/* Thực nhận. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(7),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(7) {
+  width: 165px;
+  text-align: right;
+}
+
+/* Ngân hàng. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(8),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(8) {
+  width: 190px;
+  text-align: left;
+}
+
+/* Trạng thái. */
+.sd-salary-admin-page
+.sd-salary-insurance-table
+th:nth-child(9),
+.sd-salary-admin-page
+.sd-salary-insurance-table
+td:nth-child(9) {
+  width: 170px;
+  text-align: center;
+}
+
+
+/* =========================================================
+   3. MÀU SẮC GIÁ TRỊ TIỀN LƯƠNG
+   ========================================================= */
+
+.sd-salary-gross-value {
+  color: #334155;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-salary-insurance-value {
+  color: #b91c1c;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sd-salary-net-value {
+  color: #166534;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   4. MODAL CHI TIẾT BẢNG LƯƠNG
+   ========================================================= */
+
+.sd-salary-admin-page
+.sd-salary-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(
+    4,
+    minmax(0, 1fr)
+  );
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.sd-salary-admin-page
+.sd-salary-detail-summary > div {
+  min-width: 0;
+}
+
+/* Lương trước BHXH. */
+.sd-salary-admin-page
+.sd-salary-detail-summary
+.salary-gross {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+/* Phần BHXH bị khấu trừ. */
+.sd-salary-admin-page
+.sd-salary-detail-summary
+.salary-insurance-deduction {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.sd-salary-admin-page
+.sd-salary-detail-summary
+.salary-insurance-deduction strong {
+  color: #b91c1c;
+}
+
+/* Lương thực nhận. */
+.sd-salary-admin-page
+.sd-salary-detail-summary
+.salary-net {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.sd-salary-admin-page
+.sd-salary-detail-summary
+.salary-net strong {
+  color: #166534;
+}
+
+
+/* =========================================================
+   5. GHI CHÚ BHXH
+   ========================================================= */
+
+.salary-insurance-note {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.salary-insurance-note--empty {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+
+/* =========================================================
+   6. RESPONSIVE
+   ========================================================= */
+
+/* Laptop nhỏ: các thẻ chia thành 3 cột. */
+@media (max-width: 1300px) {
+  .sd-salary-admin-page
+  .sd-salary-admin-stats {
+    grid-template-columns: repeat(
+      3,
+      minmax(0, 1fr)
+    );
+  }
+
+  .sd-salary-admin-page
+  .sd-salary-detail-summary {
+    grid-template-columns: repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  }
+}
+
+/* Máy tính bảng: các thẻ chia thành 2 cột. */
+@media (max-width: 900px) {
+  .sd-salary-admin-page
+  .sd-salary-admin-stats {
+    grid-template-columns: repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  }
+}
+
+/*
+  Mobile:
+
+  Không dùng kiểu chuyển bảng thành card của CSS chung,
+  vì bảng lương có nhiều cột.
+
+  Cho phép kéo ngang bảng để dữ liệu không bị chồng.
+*/
+@media (max-width: 767px) {
+  .sd-salary-insurance-table-wrap {
+    overflow-x: auto !important;
+    border-radius: 12px !important;
+  }
+
+  .sd-salary-admin-page
+  .sd-table.sd-salary-insurance-table {
+    display: table !important;
+    min-width: 1180px !important;
+    table-layout: fixed !important;
+  }
+
+  .sd-salary-admin-page
+  .sd-salary-insurance-table thead {
+    display: table-header-group !important;
+  }
+
+  .sd-salary-admin-page
+  .sd-salary-insurance-table tbody {
+    display: table-row-group !important;
+  }
+
+  .sd-salary-admin-page
+  .sd-salary-insurance-table tr {
+    display: table-row !important;
+  }
+
+  .sd-salary-admin-page
+  .sd-salary-insurance-table th,
+  .sd-salary-admin-page
+  .sd-salary-insurance-table td {
+    display: table-cell !important;
+  }
+}
+
+/* Điện thoại nhỏ: các thẻ chỉ còn một cột. */
+@media (max-width: 600px) {
+  .sd-salary-admin-page
+  .sd-salary-admin-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-salary-admin-page
+  .sd-salary-detail-summary {
+    grid-template-columns: 1fr;
+  }
+}

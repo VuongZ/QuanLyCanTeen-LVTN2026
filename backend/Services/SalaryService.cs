@@ -51,9 +51,18 @@ public class SalaryService
                 TotalHours = s.TotalHours,
                 HourlyWageAtTime = s.HourlyWageAtTime,
                 TotalSalary = s.TotalSalary,
-                TotalBonus = s.TotalBonus ?? 0,
-                TotalPenalty = s.TotalPenalty ?? 0,
-                Status = s.Status,
+TotalBonus = s.TotalBonus ?? 0,
+TotalPenalty = s.TotalPenalty ?? 0,
+
+// Khoản đóng BHXH được liên kết với bảng lương.
+BhxhContributionId =
+    s.BhxhContributionId,
+
+// Phần BHXH do nhân viên đóng.
+SocialInsuranceDeduction =
+    s.SocialInsuranceDeduction,
+
+Status = s.Status,
                 PaidAt = s.PaidAt,
                 FinalizedAt = s.FinalizedAt,
                 FinalizedByUserId = s.FinalizedByUserId,
@@ -94,9 +103,16 @@ public class SalaryService
                 TotalHours = s.TotalHours,
                 HourlyWageAtTime = s.HourlyWageAtTime,
                 TotalSalary = s.TotalSalary,
-                TotalBonus = s.TotalBonus ?? 0,
-                TotalPenalty = s.TotalPenalty ?? 0,
-                Status = s.Status,
+TotalBonus = s.TotalBonus ?? 0,
+TotalPenalty = s.TotalPenalty ?? 0,
+
+BhxhContributionId =
+    s.BhxhContributionId,
+
+SocialInsuranceDeduction =
+    s.SocialInsuranceDeduction,
+
+Status = s.Status,
                 PaidAt = s.PaidAt,
                 FinalizedAt = s.FinalizedAt,
                 FinalizedByUserId = s.FinalizedByUserId,
@@ -136,9 +152,16 @@ public class SalaryService
                 TotalHours = s.TotalHours,
                 HourlyWageAtTime = s.HourlyWageAtTime,
                 TotalSalary = s.TotalSalary,
-                TotalBonus = s.TotalBonus ?? 0,
-                TotalPenalty = s.TotalPenalty ?? 0,
-                Status = s.Status,
+TotalBonus = s.TotalBonus ?? 0,
+TotalPenalty = s.TotalPenalty ?? 0,
+
+BhxhContributionId =
+    s.BhxhContributionId,
+
+SocialInsuranceDeduction =
+    s.SocialInsuranceDeduction,
+
+Status = s.Status,
                 PaidAt = s.PaidAt,
                 FinalizedAt = s.FinalizedAt,
                 FinalizedByUserId = s.FinalizedByUserId,
@@ -168,12 +191,78 @@ public class SalaryService
                 Month = g.Key.Month,
                 Year = g.Key.Year,
                 SalaryCount = g.Count(),
-                PendingTotal = g.Sum(s => (s.Status ?? "").ToUpper() == "PAID" ? 0 : s.TotalSalary),
-                PaidTotal = g.Sum(s => (s.Status ?? "").ToUpper() == "PAID" ? s.TotalSalary : 0),
-                TotalSalary = g.Sum(s => s.TotalSalary),
-                PendingCount = g.Count(s => (s.Status ?? "").ToUpper() != "PAID"),
-                PaidCount = g.Count(s => (s.Status ?? "").ToUpper() == "PAID"),
-                EmployeeCount = g.Select(s => s.UserId).Distinct().Count()
+
+/*
+  Tổng lương trước khi trừ BHXH.
+*/
+TotalSalary =
+    g.Sum(s => s.TotalSalary),
+
+/*
+  Tổng phần BHXH do nhân viên đóng.
+*/
+TotalSocialInsuranceDeduction =
+    g.Sum(s =>
+        s.SocialInsuranceDeduction),
+
+/*
+  Tổng tiền thực nhận:
+
+  TotalSalary - SocialInsuranceDeduction
+
+  Nếu dữ liệu bất thường khiến kết quả âm,
+  hệ thống lấy 0.
+*/
+TotalNetSalary =
+    g.Sum(s =>
+        s.TotalSalary >
+        s.SocialInsuranceDeduction
+            ? s.TotalSalary -
+              s.SocialInsuranceDeduction
+            : 0m),
+
+/*
+  Tổng tiền thực nhận chưa thanh toán.
+*/
+PendingTotal =
+    g.Sum(s =>
+        (s.Status ?? "").ToUpper() == "PAID"
+            ? 0m
+            : (
+                s.TotalSalary >
+                s.SocialInsuranceDeduction
+                    ? s.TotalSalary -
+                      s.SocialInsuranceDeduction
+                    : 0m
+            )),
+
+/*
+  Tổng tiền thực nhận đã thanh toán.
+*/
+PaidTotal =
+    g.Sum(s =>
+        (s.Status ?? "").ToUpper() == "PAID"
+            ? (
+                s.TotalSalary >
+                s.SocialInsuranceDeduction
+                    ? s.TotalSalary -
+                      s.SocialInsuranceDeduction
+                    : 0m
+            )
+            : 0m),
+
+PendingCount =
+    g.Count(s =>
+        (s.Status ?? "").ToUpper() != "PAID"),
+
+PaidCount =
+    g.Count(s =>
+        (s.Status ?? "").ToUpper() == "PAID"),
+
+EmployeeCount =
+    g.Select(s => s.UserId)
+        .Distinct()
+        .Count()
             })
             .OrderByDescending(s => s.Year)
             .ThenByDescending(s => s.Month)
@@ -264,12 +353,76 @@ public class SalaryService
 
         if (!existingTransfer)
         {
-            var salaries = await _context.LuongMonthlySalaries
-                .Where(s => s.User.BranchId == branchId && s.Month == month && s.Year == year)
-                .ToListAsync();
+            var salaries =
+    await _context.LuongMonthlySalaries
+        .Include(s => s.User)
+        .Where(s =>
+            s.User.BranchId == branchId &&
+            s.Month == month &&
+            s.Year == year)
+        .ToListAsync();
 
             if (salaries.Count == 0)
                 return null;
+                /*
+  Chỉ được chuyển quỹ khi tất cả bảng lương
+  đã được Manager chốt.
+
+  Việc chốt lương là lúc hệ thống liên kết
+  khoản đóng BHXH.
+*/
+var notFinalizedSalary =
+    salaries.FirstOrDefault(s =>
+        !string.Equals(
+            s.Status,
+            "FINALIZED",
+            StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(
+            s.Status,
+            "PAID",
+            StringComparison.OrdinalIgnoreCase));
+
+if (notFinalizedSalary != null)
+{
+    var employeeName =
+        notFinalizedSalary.User.FullName
+        ?? notFinalizedSalary.User.Email
+        ?? notFinalizedSalary.User.PhoneNumber
+        ?? $"ID {notFinalizedSalary.UserId}";
+
+    throw new InvalidOperationException(
+        $"Bảng lương của {employeeName} chưa được chốt. " +
+        "Không thể chuyển quỹ lương.");
+}
+/*
+  Nhân viên FULL_TIME phải được liên kết
+  với khoản đóng BHXH trước khi chuyển quỹ.
+*/
+var missingBhxhSalary =
+    salaries.FirstOrDefault(s =>
+        SalaryWagePolicy
+            .NormalizeEmploymentType(
+                s.User.EmploymentType) ==
+        SalaryWagePolicy.FullTime
+        &&
+        (
+            !s.BhxhContributionId.HasValue ||
+            s.SocialInsuranceDeduction <= 0
+        ));
+
+if (missingBhxhSalary != null)
+{
+    var employeeName =
+        missingBhxhSalary.User.FullName
+        ?? missingBhxhSalary.User.Email
+        ?? missingBhxhSalary.User.PhoneNumber
+        ?? $"ID {missingBhxhSalary.UserId}";
+
+    throw new InvalidOperationException(
+        $"Bảng lương của {employeeName} chưa có " +
+        "khoản khấu trừ BHXH. " +
+        "Vui lòng chốt lại bảng lương trước khi chuyển quỹ.");
+}
 
             var manager = await _context.NsUsers
                 .AsNoTracking()
@@ -290,7 +443,16 @@ public class SalaryService
                 Month = month,
                 Year = year,
                 SalaryCount = salaries.Count,
-                TotalAmount = salaries.Sum(s => s.TotalSalary),
+                /*
+  Admin chuyển số tiền thực tế cần trả,
+  không chuyển phần BHXH đã khấu trừ.
+*/
+TotalAmount =
+    salaries.Sum(s =>
+        Math.Max(
+            0m,
+            s.TotalSalary -
+            s.SocialInsuranceDeduction)),
                 TransferredAt = DateTime.Now
             });
 
@@ -596,29 +758,62 @@ public class SalaryService
             .FirstOrDefaultAsync();
 
         foreach (var salary in salaries)
-        {
-            var status = (salary.Status ?? "PENDING").ToUpperInvariant();
-            if (status == "PAID")
-                continue;
-            if (status != "PENDING" && status != "FINALIZED")
-                throw new InvalidOperationException($"Bảng lương của {salary.User.FullName} có trạng thái không hợp lệ.");
-            if (status == "FINALIZED")
-                continue;
+{
+    var status =
+        (salary.Status ?? "PENDING")
+            .ToUpperInvariant();
 
-            if (rule != null)
-            {
-                var adjustment = await BuildAdjustmentDtoAsync(
-                    salary.User,
-                    month,
-                    year,
-                    rule);
-                await SetSalaryAdjustmentTotalsAsync(salary, adjustment);
-            }
+    if (status == "PAID")
+    {
+        continue;
+    }
 
-            salary.Status = "FINALIZED";
-            salary.FinalizedAt = DateTime.Now;
-            salary.FinalizedByUserId = managerUserId;
-        }
+    if (
+        status != "PENDING" &&
+        status != "FINALIZED"
+    )
+    {
+        throw new InvalidOperationException(
+            $"Bảng lương của {salary.User.FullName} " +
+            "có trạng thái không hợp lệ.");
+    }
+
+    /*
+      Liên kết và lấy khoản khấu trừ BHXH.
+    */
+    await ApplySocialInsuranceDeductionAsync(
+        salary
+    );
+
+    /*
+      Nếu bảng lương đã chốt từ trước,
+      chỉ cập nhật thông tin BHXH rồi bỏ qua
+      việc chốt trạng thái lần nữa.
+    */
+    if (status == "FINALIZED")
+    {
+        continue;
+    }
+
+    if (rule != null)
+    {
+        var adjustment =
+            await BuildAdjustmentDtoAsync(
+                salary.User,
+                month,
+                year,
+                rule);
+
+        await SetSalaryAdjustmentTotalsAsync(
+            salary,
+            adjustment);
+    }
+
+    salary.Status = "FINALIZED";
+    salary.FinalizedAt = DateTime.Now;
+    salary.FinalizedByUserId =
+        managerUserId;
+}
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -710,55 +905,154 @@ public class SalaryService
         return await GetAdjustmentByIdAsync(adjustment.Id);
     }
 
-    public async Task<SalaryDto?> FinalizeAsync(int salaryId, int branchId, int managerUserId)
-    {
-        var salary = await _context.LuongMonthlySalaries
+
+/// Manager chốt một bảng lương.
+///
+/// Khi chốt:
+/// - Kiểm tra yêu cầu thưởng/phạt.
+/// - Tính lại thưởng, phạt và tổng lương.
+/// - Liên kết khoản đóng BHXH đối với FULL_TIME.
+/// - Lưu phần BHXH nhân viên phải đóng.
+/// - Chuyển trạng thái sang FINALIZED.
+
+public async Task<SalaryDto?> FinalizeAsync(
+    int salaryId,
+    int branchId,
+    int managerUserId)
+{
+    var salary =
+        await _context.LuongMonthlySalaries
             .Include(s => s.User)
-            .ThenInclude(u => u.Branch)
+                .ThenInclude(u => u.Branch)
             .Include(s => s.User)
-            .ThenInclude(u => u.NsUserBankAccounts)
+                .ThenInclude(u => u.NsUserBankAccounts)
             .Include(s => s.FinalizedByUser)
-            .FirstOrDefaultAsync(s => s.Id == salaryId && s.User.BranchId == branchId);
+            .FirstOrDefaultAsync(s =>
+                s.Id == salaryId &&
+                s.User.BranchId == branchId);
 
-        if (salary == null)
-            return null;
+    if (salary == null)
+    {
+        return null;
+    }
 
-        var status = (salary.Status ?? "PENDING").ToUpperInvariant();
-        if (status == "PAID")
-            throw new InvalidOperationException("Bảng lương đã thanh toán.");
+    var status =
+        (salary.Status ?? "PENDING")
+            .ToUpperInvariant();
 
-        if (status != "PENDING" && status != "FINALIZED")
-            throw new InvalidOperationException("Trạng thái bảng lương không cho phép chốt.");
+    if (status == "PAID")
+    {
+        throw new InvalidOperationException(
+            "Bảng lương đã thanh toán.");
+    }
 
-        if (status != "FINALIZED")
+    if (
+        status != "PENDING" &&
+        status != "FINALIZED"
+    )
+    {
+        throw new InvalidOperationException(
+            "Trạng thái bảng lương không cho phép chốt.");
+    }
+
+    /*
+      Chỉ thực hiện lại phần tính lương và đổi trạng thái
+      khi bảng lương chưa được chốt.
+    */
+    if (status != "FINALIZED")
+    {
+        // Không cho chốt nếu còn yêu cầu thưởng/phạt
+        // đang chờ Admin duyệt.
+        var hasPendingAdjustment =
+            await _context
+                .LuongSalaryAdjustmentHistories
+                .AnyAsync(h =>
+                    h.SalaryId == salary.Id &&
+                    h.Status == AdjustmentPending);
+
+        if (hasPendingAdjustment)
         {
-            var hasPendingAdjustment = await _context.LuongSalaryAdjustmentHistories
-                .AnyAsync(h => h.SalaryId == salary.Id && h.Status == AdjustmentPending);
-            if (hasPendingAdjustment)
-                throw new InvalidOperationException("Còn yêu cầu thưởng/phạt đang chờ Admin duyệt.");
-
-            var rule = await _context.LuongSalaryRules
-                .AsNoTracking()
-                .Where(r => r.BranchId == salary.User.BranchId)
-                .OrderByDescending(r => r.Id)
-                .FirstOrDefaultAsync();
-            if (rule != null)
-            {
-                var adjustment = await BuildAdjustmentDtoAsync(salary.User, salary.Month, salary.Year, rule);
-                await SetSalaryAdjustmentTotalsAsync(salary, adjustment);
-            }
-
-            salary.Status = "FINALIZED";
-            salary.FinalizedAt = DateTime.Now;
-            salary.FinalizedByUserId = managerUserId;
-            await _context.SaveChangesAsync();
-            var finalizedByReference = _context.Entry(salary).Reference(s => s.FinalizedByUser);
-            finalizedByReference.IsLoaded = false;
-            await finalizedByReference.LoadAsync();
+            throw new InvalidOperationException(
+                "Còn yêu cầu thưởng/phạt đang chờ Admin duyệt.");
         }
 
-        return ToDto(salary);
+        // Lấy quy tắc thưởng/phạt hiện tại của cơ sở.
+        var rule =
+            await _context.LuongSalaryRules
+                .AsNoTracking()
+                .Where(r =>
+                    r.BranchId ==
+                    salary.User.BranchId)
+                .OrderByDescending(r => r.Id)
+                .FirstOrDefaultAsync();
+
+        if (rule != null)
+        {
+            var adjustment =
+                await BuildAdjustmentDtoAsync(
+                    salary.User,
+                    salary.Month,
+                    salary.Year,
+                    rule);
+
+            await SetSalaryAdjustmentTotalsAsync(
+                salary,
+                adjustment);
+        }
+
+        /*
+          Liên kết khoản đóng BHXH.
+
+          PART_TIME:
+          - Không khấu trừ.
+
+          FULL_TIME:
+          - Phải có khoản BHXH CONFIRMED hoặc PAID
+            cùng tháng và năm.
+        */
+        await ApplySocialInsuranceDeductionAsync(
+            salary);
+
+        salary.Status = "FINALIZED";
+        salary.FinalizedAt = DateTime.Now;
+        salary.FinalizedByUserId =
+            managerUserId;
     }
+    else
+    {
+        /*
+          Hỗ trợ các bảng lương đã FINALIZED từ trước
+          nhưng chưa có liên kết BHXH.
+        */
+        await ApplySocialInsuranceDeductionAsync(
+            salary);
+    }
+
+    // Chỉ lưu một lần sau khi hoàn thành mọi xử lý.
+    await _context.SaveChangesAsync();
+
+    /*
+      Tải lại thông tin người chốt.
+
+      Khi vừa gán FinalizedByUserId,
+      navigation FinalizedByUser có thể vẫn đang null.
+    */
+    if (salary.FinalizedByUserId.HasValue)
+    {
+        var finalizedByReference =
+            _context.Entry(salary)
+                .Reference(s =>
+                    s.FinalizedByUser);
+
+        finalizedByReference.IsLoaded =
+            false;
+
+        await finalizedByReference
+            .LoadAsync();
+    }
+
+    return ToDto(salary);
+}
 
     public async Task<SalaryDto?> MarkPaidAsync(int salaryId, int branchId)
     {
@@ -793,37 +1087,204 @@ public class SalaryService
         return ToDto(salary);
     }
 
-    private static SalaryDto ToDto(LuongMonthlySalary s)
+  
+/// Chuyển Entity bảng lương thành DTO trả về cho Frontend.
+private static SalaryDto ToDto(
+    LuongMonthlySalary s)
+{
+    return new SalaryDto
     {
-        return new SalaryDto
-        {
-            Id = s.Id,
-            UserId = s.UserId,
-            Username = s.User?.Email ?? s.User?.PhoneNumber,
-            FullName = s.User?.FullName,
-            BranchId = s.User?.BranchId,
-            BranchName = s.User?.Branch?.Name,
-            BankName = s.User?.NsUserBankAccounts.FirstOrDefault()?.BankName,
-            BankAccountNumber = s.User?.NsUserBankAccounts.FirstOrDefault()?.BankAccountNumber,
-            BankAccountName = s.User?.NsUserBankAccounts.FirstOrDefault()?.BankAccountName,
-            Month = s.Month,
-            Year = s.Year,
-            TotalHours = s.TotalHours,
-            HourlyWageAtTime = s.HourlyWageAtTime,
-            TotalSalary = s.TotalSalary,
-            TotalBonus = s.TotalBonus ?? 0,
-            TotalPenalty = s.TotalPenalty ?? 0,
-            Status = s.Status,
-            PaidAt = s.PaidAt,
-            FinalizedAt = s.FinalizedAt,
-            FinalizedByUserId = s.FinalizedByUserId,
-            FinalizedByName = s.FinalizedByUser?.FullName
-                ?? s.FinalizedByUser?.Email
-                ?? s.FinalizedByUser?.PhoneNumber,
-            CreatedAt = s.CreatedAt
-        };
+        Id = s.Id,
+
+        UserId = s.UserId,
+
+        Username =
+            s.User?.Email ??
+            s.User?.PhoneNumber,
+
+        FullName =
+            s.User?.FullName,
+
+        BranchId =
+            s.User?.BranchId,
+
+        BranchName =
+            s.User?.Branch?.Name,
+
+        BankName =
+            s.User
+                ?.NsUserBankAccounts
+                .FirstOrDefault()
+                ?.BankName,
+
+        BankAccountNumber =
+            s.User
+                ?.NsUserBankAccounts
+                .FirstOrDefault()
+                ?.BankAccountNumber,
+
+        BankAccountName =
+            s.User
+                ?.NsUserBankAccounts
+                .FirstOrDefault()
+                ?.BankAccountName,
+
+        Month = s.Month,
+
+        Year = s.Year,
+
+        TotalHours =
+            s.TotalHours,
+
+        HourlyWageAtTime =
+            s.HourlyWageAtTime,
+
+        // Tổng lương trước khi trừ BHXH.
+        TotalSalary =
+            s.TotalSalary,
+
+        TotalBonus =
+            s.TotalBonus ?? 0,
+
+        TotalPenalty =
+            s.TotalPenalty ?? 0,
+
+        // ID khoản đóng BHXH liên kết với bảng lương.
+        BhxhContributionId =
+            s.BhxhContributionId,
+
+        // Phần BHXH do nhân viên đóng.
+        SocialInsuranceDeduction =
+            s.SocialInsuranceDeduction,
+
+        Status =
+            s.Status,
+
+        PaidAt =
+            s.PaidAt,
+
+        FinalizedAt =
+            s.FinalizedAt,
+
+        FinalizedByUserId =
+            s.FinalizedByUserId,
+
+        FinalizedByName =
+            s.FinalizedByUser?.FullName
+            ?? s.FinalizedByUser?.Email
+            ?? s.FinalizedByUser?.PhoneNumber,
+
+        CreatedAt =
+            s.CreatedAt
+    };
+}
+
+/// <summary>
+/// Liên kết khoản đóng BHXH với bảng lương.
+///
+/// Quy tắc:
+/// - PART_TIME không bị khấu trừ BHXH.
+/// - FULL_TIME phải có khoản đóng BHXH cùng tháng.
+/// - Chỉ dùng khoản có trạng thái CONFIRMED hoặc PAID.
+/// - Chỉ trừ phần EmployeeAmount.
+/// - EmployerAmount là phần doanh nghiệp đóng,
+///   không trừ vào lương nhân viên.
+/// </summary>
+private async Task ApplySocialInsuranceDeductionAsync(
+    LuongMonthlySalary salary)
+{
+    if (salary.User == null)
+    {
+        throw new InvalidOperationException(
+            "Không xác định được nhân viên của bảng lương.");
     }
 
+    var employmentType =
+        SalaryWagePolicy.NormalizeEmploymentType(
+            salary.User.EmploymentType);
+
+    /*
+      Nhân viên PART_TIME không tham gia
+      phân hệ BHXH trong phạm vi đồ án.
+    */
+    if (employmentType != SalaryWagePolicy.FullTime)
+    {
+        salary.BhxhContributionId = null;
+        salary.SocialInsuranceDeduction = 0;
+
+        return;
+    }
+
+    /*
+      FULL_TIME phải có khoản đóng BHXH
+      cùng tháng và cùng năm.
+
+      Chỉ lấy khoản đã được Admin xác nhận
+      hoặc đã được đánh dấu là đã nộp.
+    */
+    var contribution =
+        await _context.BhxhMonthlyContributions
+            .AsNoTracking()
+            .Where(c =>
+                c.UserId == salary.UserId
+                && c.Month == salary.Month
+                && c.Year == salary.Year)
+            .Where(c =>
+                c.Status.ToUpper() == "CONFIRMED"
+                || c.Status.ToUpper() == "PAID")
+            .OrderByDescending(c =>
+                c.Status.ToUpper() == "PAID")
+            .ThenByDescending(c => c.Id)
+            .FirstOrDefaultAsync();
+
+    if (contribution == null)
+    {
+        var employeeName =
+            salary.User.FullName
+            ?? salary.User.Email
+            ?? salary.User.PhoneNumber
+            ?? $"ID {salary.UserId}";
+
+        throw new InvalidOperationException(
+            $"Nhân viên {employeeName} là FULL_TIME nhưng " +
+            $"chưa có khoản đóng BHXH đã xác nhận cho " +
+            $"tháng {salary.Month}/{salary.Year}.");
+    }
+
+    /*
+      Kiểm tra khoản BHXH có đang được liên kết
+      với một bảng lương khác hay không.
+
+      Việc kiểm tra trước giúp trả thông báo rõ ràng,
+      thay vì chờ database báo lỗi UNIQUE.
+    */
+    var linkedToAnotherSalary =
+        await _context.LuongMonthlySalaries
+            .AsNoTracking()
+            .AnyAsync(s =>
+                s.BhxhContributionId == contribution.Id
+                && s.Id != salary.Id);
+
+    if (linkedToAnotherSalary)
+    {
+        throw new InvalidOperationException(
+            "Khoản đóng BHXH này đã được liên kết " +
+            "với một bảng lương khác.");
+    }
+
+    /*
+      Lưu liên kết tới khoản đóng BHXH.
+    */
+    salary.BhxhContributionId =
+        contribution.Id;
+
+    /*
+      Chỉ khấu trừ phần nhân viên đóng.
+      Không trừ EmployerAmount.
+    */
+    salary.SocialInsuranceDeduction =
+        contribution.EmployeeAmount;
+}
     private static bool IsSalaryLocked(string? status)
     {
         return string.Equals(status, "FINALIZED", StringComparison.OrdinalIgnoreCase)

@@ -36,6 +36,15 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<CaStaffRegistration> CaStaffRegistrations { get; set; }
 
+    // ========================================================
+    // BẢO HIỂM XÃ HỘI
+    // ========================================================
+    public virtual DbSet<BhxhRateConfig> BhxhRateConfigs { get; set; }
+
+    public virtual DbSet<BhxhEmployeeProfile> BhxhEmployeeProfiles { get; set; }
+
+    public virtual DbSet<BhxhMonthlyContribution> BhxhMonthlyContributions { get; set; }
+
     public virtual DbSet<DmBranch> DmBranches { get; set; }
 
     public virtual DbSet<KhoBranchFrontStock> KhoBranchFrontStocks { get; set; }
@@ -555,6 +564,363 @@ public partial class AppDbContext : DbContext
         .HasConstraintName("fk_reg_user");
 });
 
+        // ========================================================
+        // BẢO HIỂM XÃ HỘI
+        // ========================================================
+
+        modelBuilder.Entity<BhxhRateConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id)
+                .HasName("PRIMARY");
+
+            entity
+                .ToTable("bhxh_rate_config")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.HasIndex(
+                    e => e.EffectiveFrom,
+                    "uq_bhxh_rate_effective_from")
+                .IsUnique();
+
+            entity.HasIndex(
+                e => new
+                {
+                    e.IsActive,
+                    e.EffectiveFrom,
+                    e.EffectiveTo
+                },
+                "idx_bhxh_rate_active");
+
+            entity.HasIndex(
+                e => e.CreatedByUserId,
+                "idx_bhxh_rate_created_by");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.EmployeeRate)
+                .HasPrecision(5, 2)
+                .HasDefaultValueSql("'8.00'")
+                .HasColumnName("employee_rate");
+
+            entity.Property(e => e.EmployerRate)
+                .HasPrecision(5, 2)
+                .HasDefaultValueSql("'17.50'")
+                .HasColumnName("employer_rate");
+
+            entity.Property(e => e.EffectiveFrom)
+                .HasColumnName("effective_from");
+
+            entity.Property(e => e.EffectiveTo)
+                .HasColumnName("effective_to");
+
+            entity.Property(e => e.IsActive)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("is_active");
+
+            entity.Property(e => e.CreatedByUserId)
+                .HasColumnName("created_by_user_id");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName(
+                    "fk_bhxh_rate_created_by");
+        });
+
+        modelBuilder.Entity<BhxhEmployeeProfile>(entity =>
+        {
+            entity.HasKey(e => e.Id)
+                .HasName("PRIMARY");
+
+            entity
+                .ToTable("bhxh_employee_profile")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.HasIndex(
+                    e => e.UserId,
+                    "uq_bhxh_profile_user")
+                .IsUnique();
+
+            entity.HasIndex(
+                    e => e.SocialInsuranceNumber,
+                    "uq_bhxh_social_number")
+                .IsUnique();
+
+            entity.HasIndex(
+                e => new
+                {
+                    e.Status,
+                    e.StartDate,
+                    e.EndDate
+                },
+                "idx_bhxh_profile_status");
+
+            entity.HasIndex(
+                e => e.CreatedByUserId,
+                "idx_bhxh_profile_created_by");
+
+            entity.HasIndex(
+                e => e.UpdatedByUserId,
+                "idx_bhxh_profile_updated_by");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id");
+
+            entity.Property(e => e.SocialInsuranceNumber)
+                .HasMaxLength(20)
+                .HasColumnName(
+                    "social_insurance_number");
+
+            entity.Property(e => e.InsuranceSalaryBasis)
+                .HasPrecision(15, 2)
+                .HasColumnName(
+                    "insurance_salary_basis");
+
+            entity.Property(e => e.StartDate)
+                .HasColumnName("start_date");
+
+            entity.Property(e => e.EndDate)
+                .HasColumnName("end_date");
+
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("'PENDING'")
+                .HasColumnType(
+                    "enum(" +
+                    "'PENDING'," +
+                    "'ACTIVE'," +
+                    "'SUSPENDED'," +
+                    "'STOPPED'" +
+                    ")")
+                .HasColumnName("status");
+
+            entity.Property(e => e.Note)
+                .HasMaxLength(500)
+                .HasColumnName("note");
+
+            entity.Property(e => e.CreatedByUserId)
+                .HasColumnName("created_by_user_id");
+
+            entity.Property(e => e.UpdatedByUserId)
+                .HasColumnName("updated_by_user_id");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName(
+                    "fk_bhxh_profile_user");
+
+            entity.HasOne(d => d.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName(
+                    "fk_bhxh_profile_created_by");
+
+            entity.HasOne(d => d.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName(
+                    "fk_bhxh_profile_updated_by");
+        });
+
+        modelBuilder.Entity<BhxhMonthlyContribution>(entity =>
+        {
+            entity.HasKey(e => e.Id)
+                .HasName("PRIMARY");
+
+            entity
+                .ToTable("bhxh_monthly_contribution")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.HasIndex(
+                    e => new
+                    {
+                        e.UserId,
+                        e.Month,
+                        e.Year
+                    },
+                    "uq_bhxh_user_month_year")
+                .IsUnique();
+
+            entity.HasIndex(
+                e => new
+                {
+                    e.Year,
+                    e.Month,
+                    e.Status
+                },
+                "idx_bhxh_contribution_period");
+
+            entity.HasIndex(
+                e => e.ProfileId,
+                "idx_bhxh_contribution_profile");
+
+            entity.HasIndex(
+                e => e.RateConfigId,
+                "idx_bhxh_contribution_rate");
+
+            entity.HasIndex(
+                e => e.ConfirmedByUserId,
+                "idx_bhxh_contribution_confirmed_by");
+
+            entity.HasIndex(
+                e => e.PaidByUserId,
+                "idx_bhxh_contribution_paid_by");
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id");
+
+            entity.Property(e => e.ProfileId)
+                .HasColumnName("profile_id");
+
+            entity.Property(e => e.RateConfigId)
+                .HasColumnName("rate_config_id");
+
+            entity.Property(e => e.Month)
+                .HasColumnType("tinyint")
+                .HasColumnName("month");
+
+            entity.Property(e => e.Year)
+                .HasColumnType("smallint")
+                .HasColumnName("year");
+
+            entity.Property(e => e.InsuranceSalaryBasis)
+                .HasPrecision(15, 2)
+                .HasColumnName(
+                    "insurance_salary_basis");
+
+            entity.Property(e => e.EmployeeRate)
+                .HasPrecision(5, 2)
+                .HasColumnName("employee_rate");
+
+            entity.Property(e => e.EmployerRate)
+                .HasPrecision(5, 2)
+                .HasColumnName("employer_rate");
+
+            entity.Property(e => e.EmployeeAmount)
+                .HasPrecision(15, 2)
+                .HasColumnName("employee_amount");
+
+            entity.Property(e => e.EmployerAmount)
+                .HasPrecision(15, 2)
+                .HasColumnName("employer_amount");
+
+            entity.Property(e => e.TotalAmount)
+                .HasPrecision(15, 2)
+                .HasColumnName("total_amount");
+
+            entity.Property(e => e.Status)
+                .HasDefaultValueSql("'DRAFT'")
+                .HasColumnType(
+                    "enum(" +
+                    "'DRAFT'," +
+                    "'CONFIRMED'," +
+                    "'PAID'," +
+                    "'CANCELLED'" +
+                    ")")
+                .HasColumnName("status");
+
+            entity.Property(e => e.ConfirmedByUserId)
+                .HasColumnName(
+                    "confirmed_by_user_id");
+
+            entity.Property(e => e.ConfirmedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("confirmed_at");
+
+            entity.Property(e => e.PaidByUserId)
+                .HasColumnName("paid_by_user_id");
+
+            entity.Property(e => e.PaidAt)
+                .HasColumnType("datetime")
+                .HasColumnName("paid_at");
+
+            entity.Property(e => e.Note)
+                .HasMaxLength(500)
+                .HasColumnName("note");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName(
+                    "fk_bhxh_contribution_user");
+
+            entity.HasOne(d => d.Profile)
+                .WithMany(p =>
+                    p.BhxhMonthlyContributions)
+                .HasForeignKey(d => d.ProfileId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName(
+                    "fk_bhxh_contribution_profile");
+
+            entity.HasOne(d => d.RateConfig)
+                .WithMany(p =>
+                    p.BhxhMonthlyContributions)
+                .HasForeignKey(d => d.RateConfigId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName(
+                    "fk_bhxh_contribution_rate");
+
+            entity.HasOne(d => d.ConfirmedByUser)
+                .WithMany()
+                .HasForeignKey(
+                    d => d.ConfirmedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName(
+                    "fk_bhxh_contribution_confirmed_by");
+
+            entity.HasOne(d => d.PaidByUser)
+                .WithMany()
+                .HasForeignKey(d => d.PaidByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName(
+                    "fk_bhxh_contribution_paid_by");
+        });
+
         modelBuilder.Entity<DmBranch>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
@@ -948,67 +1314,132 @@ public partial class AppDbContext : DbContext
         });
 
         modelBuilder.Entity<LuongMonthlySalary>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PRIMARY");
+{
+    entity.HasKey(e => e.Id)
+        .HasName("PRIMARY");
 
-            entity
-                .ToTable("luong_monthly_salary")
-                .UseCollation("utf8mb4_unicode_ci");
+    entity
+        .ToTable("luong_monthly_salary")
+        .UseCollation("utf8mb4_unicode_ci");
 
-            entity.HasIndex(e => new { e.UserId, e.Month, e.Year }, "unique_user_month_year").IsUnique();
+    // Mỗi nhân viên chỉ có một bảng lương
+    // trong cùng một tháng và năm.
+    entity.HasIndex(
+            e => new
+            {
+                e.UserId,
+                e.Month,
+                e.Year
+            },
+            "unique_user_month_year")
+        .IsUnique();
 
-            entity.HasIndex(e => e.FinalizedByUserId, "idx_monthly_salary_finalized_by");
+    entity.HasIndex(
+        e => e.FinalizedByUserId,
+        "idx_monthly_salary_finalized_by");
 
-            entity.HasIndex(e => e.UserId, "user_id");
+    entity.HasIndex(
+        e => e.UserId,
+        "user_id");
 
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnType("timestamp")
-                .HasColumnName("created_at");
-            entity.Property(e => e.HourlyWageAtTime)
-                .HasPrecision(10, 2)
-                .HasColumnName("hourly_wage_at_time");
-            entity.Property(e => e.Month).HasColumnName("month");
-            entity.Property(e => e.PaidAt)
-                .HasColumnType("datetime")
-                .HasColumnName("paid_at");
-            entity.Property(e => e.FinalizedAt)
-                .HasColumnType("datetime")
-                .HasColumnName("finalized_at");
-            entity.Property(e => e.FinalizedByUserId).HasColumnName("finalized_by_user_id");
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValueSql("'PENDING'")
-                .HasColumnName("status");
-            entity.Property(e => e.TotalBonus)
-                .HasPrecision(15, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("total_bonus");
-            entity.Property(e => e.TotalHours)
-                .HasPrecision(10, 2)
-                .HasColumnName("total_hours");
-            entity.Property(e => e.TotalPenalty)
-                .HasPrecision(15, 2)
-                .HasDefaultValueSql("'0.00'")
-                .HasColumnName("total_penalty");
-            entity.Property(e => e.TotalSalary)
-                .HasPrecision(15, 2)
-                .HasColumnName("total_salary");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.Year).HasColumnName("year");
+    // Một khoản đóng BHXH chỉ được liên kết
+    // với tối đa một bảng lương.
+    entity.HasIndex(
+            e => e.BhxhContributionId,
+            "uq_salary_bhxh_contribution")
+        .IsUnique();
 
-            entity.HasOne(d => d.User).WithMany(p => p.LuongMonthlySalaries)
-                .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("luong_monthly_salary_ibfk_1");
+    entity.Property(e => e.Id)
+        .HasColumnName("id");
 
-            entity.HasOne(d => d.FinalizedByUser).WithMany(p => p.FinalizedMonthlySalaries)
-                .HasForeignKey(d => d.FinalizedByUserId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("fk_monthly_salary_finalized_by");
+    entity.Property(e => e.UserId)
+        .HasColumnName("user_id");
 
-        });
+    entity.Property(e => e.Month)
+        .HasColumnName("month");
+
+    entity.Property(e => e.Year)
+        .HasColumnName("year");
+
+    entity.Property(e => e.TotalHours)
+        .HasPrecision(10, 2)
+        .HasColumnName("total_hours");
+
+    entity.Property(e => e.HourlyWageAtTime)
+        .HasPrecision(10, 2)
+        .HasColumnName("hourly_wage_at_time");
+
+    entity.Property(e => e.TotalSalary)
+        .HasPrecision(15, 2)
+        .HasColumnName("total_salary");
+
+    entity.Property(e => e.TotalBonus)
+        .HasPrecision(15, 2)
+        .HasDefaultValueSql("'0.00'")
+        .HasColumnName("total_bonus");
+
+    entity.Property(e => e.TotalPenalty)
+        .HasPrecision(15, 2)
+        .HasDefaultValueSql("'0.00'")
+        .HasColumnName("total_penalty");
+
+    // ID khoản đóng BHXH được liên kết.
+    entity.Property(e => e.BhxhContributionId)
+        .HasColumnName("bhxh_contribution_id");
+
+    // Phần BHXH do nhân viên đóng.
+    entity.Property(e => e.SocialInsuranceDeduction)
+        .HasPrecision(15, 2)
+        .HasDefaultValueSql("'0.00'")
+        .HasColumnName("social_insurance_deduction");
+
+    entity.Property(e => e.Status)
+        .HasMaxLength(20)
+        .HasDefaultValueSql("'PENDING'")
+        .HasColumnName("status");
+
+    entity.Property(e => e.PaidAt)
+        .HasColumnType("datetime")
+        .HasColumnName("paid_at");
+
+    entity.Property(e => e.FinalizedAt)
+        .HasColumnType("datetime")
+        .HasColumnName("finalized_at");
+
+    entity.Property(e => e.FinalizedByUserId)
+        .HasColumnName("finalized_by_user_id");
+
+    entity.Property(e => e.CreatedAt)
+        .HasDefaultValueSql("CURRENT_TIMESTAMP")
+        .HasColumnType("timestamp")
+        .HasColumnName("created_at");
+
+    // Quan hệ bảng lương với nhân viên.
+    entity.HasOne(d => d.User)
+        .WithMany(p => p.LuongMonthlySalaries)
+        .HasForeignKey(d => d.UserId)
+        .OnDelete(DeleteBehavior.ClientSetNull)
+        .HasConstraintName(
+            "luong_monthly_salary_ibfk_1");
+
+    // Quan hệ với người chốt bảng lương.
+    entity.HasOne(d => d.FinalizedByUser)
+        .WithMany(p => p.FinalizedMonthlySalaries)
+        .HasForeignKey(d => d.FinalizedByUserId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName(
+            "fk_monthly_salary_finalized_by");
+
+    // Quan hệ một - một giữa bảng lương
+    // và khoản đóng BHXH.
+    entity.HasOne(d => d.BhxhContribution)
+        .WithOne(p => p.MonthlySalary)
+        .HasForeignKey<LuongMonthlySalary>(
+            d => d.BhxhContributionId)
+        .OnDelete(DeleteBehavior.SetNull)
+        .HasConstraintName(
+            "fk_salary_bhxh_contribution");
+});
 
         modelBuilder.Entity<LuongSalaryAdjustmentHistory>(entity =>
         {
