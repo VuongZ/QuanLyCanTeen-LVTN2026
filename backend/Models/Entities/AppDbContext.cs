@@ -675,7 +675,7 @@ public partial class AppDbContext : DbContext
                     "fk_bhxh_rate_created_by");
         });
 
-        modelBuilder.Entity<BhxhEmployeeProfile>(entity =>
+                modelBuilder.Entity<BhxhEmployeeProfile>(entity =>
         {
             entity.HasKey(e => e.Id)
                 .HasName("PRIMARY");
@@ -684,16 +684,20 @@ public partial class AppDbContext : DbContext
                 .ToTable("bhxh_employee_profile")
                 .UseCollation("utf8mb4_unicode_ci");
 
+            // Mỗi nhân viên chỉ có một hồ sơ BHXH hiện tại.
             entity.HasIndex(
                     e => e.UserId,
                     "uq_bhxh_profile_user")
                 .IsUnique();
 
+            // Mã số BHXH không được trùng giữa các nhân viên.
             entity.HasIndex(
                     e => e.SocialInsuranceNumber,
                     "uq_bhxh_social_number")
                 .IsUnique();
 
+            // Index hỗ trợ lọc hồ sơ theo trạng thái
+            // và khoảng thời gian tham gia.
             entity.HasIndex(
                 e => new
                 {
@@ -733,6 +737,8 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.EndDate)
                 .HasColumnName("end_date");
 
+            // Trạng thái nghiệp vụ do Admin quản lý:
+            // PENDING, ACTIVE, SUSPENDED hoặc STOPPED.
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'PENDING'")
                 .HasColumnType(
@@ -744,6 +750,30 @@ public partial class AppDbContext : DbContext
                     ")")
                 .HasColumnName("status");
 
+            // Trạng thái Staff kiểm tra hồ sơ:
+            // PENDING, CONFIRMED hoặc CHANGE_REQUESTED.
+            entity.Property(e => e.StaffConfirmationStatus)
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasDefaultValueSql("'PENDING'")
+                .HasColumnName(
+                    "staff_confirmation_status");
+
+            // Thời điểm Staff xác nhận hồ sơ.
+            // Có thể NULL khi Staff chưa xác nhận
+            // hoặc đã yêu cầu Admin chỉnh sửa.
+            entity.Property(e => e.StaffConfirmedAt)
+                .HasColumnType("datetime")
+                .HasColumnName(
+                    "staff_confirmed_at");
+
+            // Nội dung phản hồi của Staff.
+            entity.Property(e => e.StaffConfirmationNote)
+                .HasMaxLength(500)
+                .HasColumnName(
+                    "staff_confirmation_note");
+
+            // Ghi chú nội bộ của Admin.
             entity.Property(e => e.Note)
                 .HasMaxLength(500)
                 .HasColumnName("note");
@@ -765,6 +795,7 @@ public partial class AppDbContext : DbContext
                 .HasColumnType("timestamp")
                 .HasColumnName("updated_at");
 
+            // Nhân viên sở hữu hồ sơ.
             entity.HasOne(d => d.User)
                 .WithMany()
                 .HasForeignKey(d => d.UserId)
@@ -772,6 +803,7 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName(
                     "fk_bhxh_profile_user");
 
+            // Admin đã tạo hồ sơ.
             entity.HasOne(d => d.CreatedByUser)
                 .WithMany()
                 .HasForeignKey(d => d.CreatedByUserId)
@@ -779,6 +811,7 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName(
                     "fk_bhxh_profile_created_by");
 
+            // Admin cập nhật hồ sơ gần nhất.
             entity.HasOne(d => d.UpdatedByUser)
                 .WithMany()
                 .HasForeignKey(d => d.UpdatedByUserId)

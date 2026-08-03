@@ -4,39 +4,68 @@ using LuanVanTotNghiep.Repositories;
 
 namespace LuanVanTotNghiep.Services;
 
-///  
-/// Xử lý toàn bộ nghiệp vụ BHXH.
-///
-/// Service chịu trách nhiệm:
-/// - Kiểm tra dữ liệu.
-/// - Kiểm tra nhân viên FULL_TIME.
-/// - Tính tiền đóng BHXH.
-/// - Chuyển trạng thái.
-/// - Không xóa cứng dữ liệu.
-///
-/// Repository chỉ chịu trách nhiệm đọc và lưu database.
-///  
+// Xử lý các nghiệp vụ dùng chung của phân hệ BHXH.
+//
+// Service chịu trách nhiệm:
+// - Kiểm tra dữ liệu đầu vào.
+// - Kiểm tra nhân viên FULL_TIME.
+// - Kiểm tra trạng thái hồ sơ.
+// - Tính tiền đóng BHXH.
+// - Chuyển Entity sang DTO.
+// - Không xóa cứng dữ liệu.
+//
+// Các chức năng chi tiết được chia thành các file partial:
+// - SocialInsuranceService.Employees.cs
+// - SocialInsuranceService.Profiles.cs
+// - SocialInsuranceService.RateConfigs.cs
+// - SocialInsuranceService.Contributions.cs
 public partial class SocialInsuranceService
     : ISocialInsuranceService
 {
-    private const string FullTimeType = "FULL_TIME";
-    private const string MaternityType = "MATERNITY";
+    // Theo nghiệp vụ của nhóm,
+    // chỉ nhân viên FULL_TIME tham gia BHXH.
+    private const string FullTimeType =
+        "FULL_TIME";
 
-    private const string PendingStatus = "PENDING";
-    private const string ActiveStatus = "ACTIVE";
-    private const string SuspendedStatus = "SUSPENDED";
-    private const string StoppedStatus = "STOPPED";
+    // Trạng thái hồ sơ do Admin quản lý.
+    private const string PendingStatus =
+        "PENDING";
 
-    private const string DraftStatus = "DRAFT";
-    private const string ConfirmedStatus = "CONFIRMED";
-    private const string PaidStatus = "PAID";
-    private const string CancelledStatus = "CANCELLED";
+    private const string ActiveStatus =
+        "ACTIVE";
+
+    private const string SuspendedStatus =
+        "SUSPENDED";
+
+    private const string StoppedStatus =
+        "STOPPED";
+
+    // Trạng thái Staff kiểm tra hồ sơ.
+    private const string StaffConfirmationPending =
+        "PENDING";
+
+    private const string StaffConfirmationConfirmed =
+        "CONFIRMED";
+
+    private const string StaffConfirmationChangeRequested =
+        "CHANGE_REQUESTED";
+
+    // Trạng thái khoản đóng BHXH hằng tháng.
+    private const string DraftStatus =
+        "DRAFT";
+
+    private const string ConfirmedStatus =
+        "CONFIRMED";
+
+    private const string PaidStatus =
+        "PAID";
+
+    private const string CancelledStatus =
+        "CANCELLED";
 
     private readonly ISocialInsuranceRepo _repo;
 
-    ///  
-    /// Repository được Dependency Injection truyền vào.
-    ///  
+    // Repository được Dependency Injection truyền vào.
     public SocialInsuranceService(
         ISocialInsuranceRepo repo)
     {
@@ -48,25 +77,28 @@ public partial class SocialInsuranceService
     // HÀM HỖ TRỢ THỜI GIAN VIỆT NAM
     // ========================================================
 
-    ///  
-    /// Tìm múi giờ Việt Nam trên Windows hoặc Linux.
-    ///  
+    // Tìm múi giờ Việt Nam.
+    //
+    // Windows thường dùng:
+    // SE Asia Standard Time
+    //
+    // Linux thường dùng:
+    // Asia/Ho_Chi_Minh
     private static TimeZoneInfo GetVietnamTimeZone()
     {
         try
         {
-            // ID thường dùng trên Windows.
             return TimeZoneInfo.FindSystemTimeZoneById(
                 "SE Asia Standard Time");
         }
         catch (TimeZoneNotFoundException)
         {
-            // ID thường dùng trên Linux.
             return TimeZoneInfo.FindSystemTimeZoneById(
                 "Asia/Ho_Chi_Minh");
         }
     }
 
+    // Lấy thời gian hiện tại theo múi giờ Việt Nam.
     private static DateTime GetVietnamNow()
     {
         return TimeZoneInfo.ConvertTimeFromUtc(
@@ -74,6 +106,7 @@ public partial class SocialInsuranceService
             GetVietnamTimeZone());
     }
 
+    // Lấy ngày hiện tại theo múi giờ Việt Nam.
     private static DateOnly GetVietnamToday()
     {
         return DateOnly.FromDateTime(
@@ -85,11 +118,9 @@ public partial class SocialInsuranceService
     // HÀM KIỂM TRA DỮ LIỆU DÙNG CHUNG
     // ========================================================
 
-    ///  
-    /// Chuẩn hóa chuỗi:
-    /// - Xóa khoảng trắng đầu và cuối.
-    /// - Chuỗi rỗng được chuyển thành null.
-    ///  
+    // Chuẩn hóa chuỗi:
+    // - Xóa khoảng trắng đầu và cuối.
+    // - Chuỗi rỗng được chuyển thành NULL.
     private static string? NormalizeNullableText(
         string? value)
     {
@@ -101,23 +132,21 @@ public partial class SocialInsuranceService
         return value.Trim();
     }
 
-    ///  
-    /// Kiểm tra nhân viên có phải FULL_TIME hay không.
-    ///  
+    // Kiểm tra nhân viên có đủ điều kiện
+    // tham gia BHXH theo nghiệp vụ của nhóm hay không.
+    //
+    // Chỉ nhân viên FULL_TIME và chưa bị xóa
+    // mới được tạo hoặc kích hoạt hồ sơ BHXH.
     private static void EnsureFullTimeEmployee(
         NsUser user)
     {
         if (!string.Equals(
                 user.EmploymentType,
                 FullTimeType,
-                StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(
-                user.EmploymentType,
-                MaternityType,
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Chỉ nhân viên FULL_TIME hoặc Thai sản mới được tham gia BHXH.");
+                "Chỉ nhân viên FULL_TIME mới được tham gia BHXH.");
         }
 
         if (user.IsDeleted == true)
@@ -127,12 +156,10 @@ public partial class SocialInsuranceService
         }
     }
 
-    ///  
-    /// Kiểm tra người thực hiện thao tác có tồn tại.
-    ///
-    /// Việc kiểm tra đúng vai trò Admin sẽ được bảo vệ thêm
-    /// tại Controller bằng Authorize.
-    ///  
+    // Kiểm tra người thực hiện thao tác có tồn tại.
+    //
+    // Việc kiểm tra người đó có đúng vai trò Admin hoặc Staff
+    // được thực hiện thêm tại Controller bằng Authorize.
     private async Task EnsureActorExistsAsync(
         int userId)
     {
@@ -143,7 +170,8 @@ public partial class SocialInsuranceService
         }
 
         var user =
-            await _repo.GetUserByIdAsync(userId);
+            await _repo.GetUserByIdAsync(
+                userId);
 
         if (user == null)
         {
@@ -152,9 +180,8 @@ public partial class SocialInsuranceService
         }
     }
 
-    ///  
-    /// Kiểm tra ngày kết thúc không đứng trước ngày bắt đầu.
-    ///  
+    // Kiểm tra ngày kết thúc
+    // không được đứng trước ngày bắt đầu.
     private static void ValidateDateRange(
         DateOnly startDate,
         DateOnly? endDate)
@@ -167,11 +194,11 @@ public partial class SocialInsuranceService
         }
     }
 
-    ///  
-    /// Kiểm tra hai khoảng thời gian có chồng nhau không.
-    ///
-    /// EndDate null được hiểu là chưa có ngày kết thúc.
-    ///  
+    // Kiểm tra hai khoảng thời gian
+    // có chồng lên nhau hay không.
+    //
+    // EndDate bằng NULL được hiểu là
+    // chưa xác định ngày kết thúc.
     private static bool DateRangesOverlap(
         DateOnly firstStart,
         DateOnly? firstEnd,
@@ -188,9 +215,7 @@ public partial class SocialInsuranceService
                secondStart <= firstEndValue;
     }
 
-    ///  
-    /// Kiểm tra tháng và năm hợp lệ.
-    ///  
+    // Kiểm tra tháng và năm hợp lệ.
     private static void ValidatePeriod(
         int month,
         int year)
@@ -213,152 +238,222 @@ public partial class SocialInsuranceService
     // HÀM CHUYỂN ENTITY SANG DTO
     // ========================================================
 
-
-/// Chuyển Entity cấu hình tỷ lệ thành DTO.
-///
-/// hasBeenUsed:
-/// - true: cấu hình đã được dùng để sinh khoản đóng.
-/// - false: cấu hình chưa được sử dụng.
-
-private static BhxhRateConfigDto MapRateConfig(
-    BhxhRateConfig entity,
-    bool hasBeenUsed = false)
-{
-    var today =
-        GetVietnamToday();
-
-    /*
-      Chỉ cho phép chỉnh sửa khi đồng thời:
-
-      1. Cấu hình vẫn đang hoạt động.
-      2. Ngày hiệu lực nằm trong tương lai.
-      3. Chưa từng được dùng để sinh khoản đóng.
-    */
-    var canEdit =
-        entity.IsActive &&
-        entity.EffectiveFrom > today &&
-        !hasBeenUsed;
-
-    return new BhxhRateConfigDto
+    // Chuyển Entity cấu hình tỷ lệ thành DTO.
+    //
+    // hasBeenUsed:
+    // - true: cấu hình đã được dùng sinh khoản đóng.
+    // - false: cấu hình chưa được sử dụng.
+    private static BhxhRateConfigDto MapRateConfig(
+        BhxhRateConfig entity,
+        bool hasBeenUsed = false)
     {
-        Id =
-            entity.Id,
+        var today =
+            GetVietnamToday();
 
-        EmployeeRate =
-            entity.EmployeeRate,
+        // Chỉ cho phép chỉnh sửa khi:
+        // 1. Cấu hình vẫn hoạt động.
+        // 2. Ngày hiệu lực nằm trong tương lai.
+        // 3. Cấu hình chưa được sử dụng.
+        var canEdit =
+            entity.IsActive &&
+            entity.EffectiveFrom > today &&
+            !hasBeenUsed;
 
-        EmployerRate =
-            entity.EmployerRate,
+        return new BhxhRateConfigDto
+        {
+            Id =
+                entity.Id,
 
-        EffectiveFrom =
-            entity.EffectiveFrom,
+            EmployeeRate =
+                entity.EmployeeRate,
 
-        EffectiveTo =
-            entity.EffectiveTo,
+            EmployerRate =
+                entity.EmployerRate,
 
-        IsActive =
-            entity.IsActive,
+            EffectiveFrom =
+                entity.EffectiveFrom,
 
-        // Hai trường mới phục vụ Frontend.
-        HasBeenUsed =
-            hasBeenUsed,
+            EffectiveTo =
+                entity.EffectiveTo,
 
-        CanEdit =
-            canEdit,
+            IsActive =
+                entity.IsActive,
 
-        CreatedByUserId =
-            entity.CreatedByUserId,
+            HasBeenUsed =
+                hasBeenUsed,
 
-        CreatedByUserName =
-            entity.CreatedByUser?.FullName,
+            CanEdit =
+                canEdit,
 
-        CreatedAt =
-            entity.CreatedAt,
+            CreatedByUserId =
+                entity.CreatedByUserId,
 
-        UpdatedAt =
-            entity.UpdatedAt
-    };
-}
+            CreatedByUserName =
+                entity.CreatedByUser?.FullName,
+
+            CreatedAt =
+                entity.CreatedAt,
+
+            UpdatedAt =
+                entity.UpdatedAt
+        };
+    }
+
+    // Chuyển Entity hồ sơ BHXH sang DTO.
+    //
+    // Hàm này được dùng chung cho:
+    // - Admin xem hồ sơ nhân viên.
+    // - Staff xem hồ sơ của chính mình.
     private static BhxhEmployeeProfileDto MapProfile(
         BhxhEmployeeProfile entity)
     {
         return new BhxhEmployeeProfileDto
         {
-            Id = entity.Id,
-            UserId = entity.UserId,
+            Id =
+                entity.Id,
+
+            UserId =
+                entity.UserId,
+
             FullName =
                 entity.User?.FullName
                 ?? string.Empty,
+
             Email =
                 entity.User?.Email
                 ?? string.Empty,
+
             EmploymentType =
                 entity.User?.EmploymentType
                 ?? string.Empty,
+
             SocialInsuranceNumber =
                 entity.SocialInsuranceNumber,
+
             InsuranceSalaryBasis =
                 entity.InsuranceSalaryBasis,
-            StartDate = entity.StartDate,
-            EndDate = entity.EndDate,
-            Status = entity.Status,
-            Note = entity.Note,
+
+            StartDate =
+                entity.StartDate,
+
+            EndDate =
+                entity.EndDate,
+
+            Status =
+                entity.Status,
+
+            // Trạng thái Staff kiểm tra hồ sơ.
+            StaffConfirmationStatus =
+                entity.StaffConfirmationStatus,
+
+            // Thời điểm Staff xác nhận hồ sơ.
+            StaffConfirmedAt =
+                entity.StaffConfirmedAt,
+
+            // Nội dung Staff yêu cầu Admin chỉnh sửa.
+            StaffConfirmationNote =
+                entity.StaffConfirmationNote,
+
+            // Ghi chú nội bộ của Admin.
+            Note =
+                entity.Note,
+
             CreatedByUserId =
                 entity.CreatedByUserId,
+
             CreatedByUserName =
                 entity.CreatedByUser?.FullName,
+
             UpdatedByUserId =
                 entity.UpdatedByUserId,
+
             UpdatedByUserName =
                 entity.UpdatedByUser?.FullName,
-            CreatedAt = entity.CreatedAt,
-            UpdatedAt = entity.UpdatedAt
+
+            CreatedAt =
+                entity.CreatedAt,
+
+            UpdatedAt =
+                entity.UpdatedAt
         };
     }
 
+    // Chuyển Entity khoản đóng BHXH sang DTO.
     private static BhxhMonthlyContributionDto
         MapContribution(
             BhxhMonthlyContribution entity)
     {
         return new BhxhMonthlyContributionDto
         {
-            Id = entity.Id,
-            UserId = entity.UserId,
+            Id =
+                entity.Id,
+
+            UserId =
+                entity.UserId,
+
             FullName =
                 entity.User?.FullName
                 ?? string.Empty,
-            ProfileId = entity.ProfileId,
+
+            ProfileId =
+                entity.ProfileId,
+
             RateConfigId =
                 entity.RateConfigId,
-            Month = entity.Month,
-            Year = entity.Year,
+
+            Month =
+                entity.Month,
+
+            Year =
+                entity.Year,
+
             InsuranceSalaryBasis =
                 entity.InsuranceSalaryBasis,
+
             EmployeeRate =
                 entity.EmployeeRate,
+
             EmployerRate =
                 entity.EmployerRate,
+
             EmployeeAmount =
                 entity.EmployeeAmount,
+
             EmployerAmount =
                 entity.EmployerAmount,
+
             TotalAmount =
                 entity.TotalAmount,
-            Status = entity.Status,
+
+            Status =
+                entity.Status,
+
             ConfirmedByUserId =
                 entity.ConfirmedByUserId,
+
             ConfirmedByUserName =
                 entity.ConfirmedByUser?.FullName,
+
             ConfirmedAt =
                 entity.ConfirmedAt,
+
             PaidByUserId =
                 entity.PaidByUserId,
+
             PaidByUserName =
                 entity.PaidByUser?.FullName,
-            PaidAt = entity.PaidAt,
-            Note = entity.Note,
-            CreatedAt = entity.CreatedAt,
-            UpdatedAt = entity.UpdatedAt
+
+            PaidAt =
+                entity.PaidAt,
+
+            Note =
+                entity.Note,
+
+            CreatedAt =
+                entity.CreatedAt,
+
+            UpdatedAt =
+                entity.UpdatedAt
         };
     }
 }

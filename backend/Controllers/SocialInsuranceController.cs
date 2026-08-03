@@ -657,6 +657,53 @@ public async Task<IActionResult>
         }
     }
 
+    // Staff xác nhận hoặc yêu cầu Admin chỉnh sửa
+    // hồ sơ BHXH của chính mình.
+    //
+    // PUT:
+    // /api/SocialInsurance/my-profile/confirmation
+    //
+    // UserId được lấy từ JWT.
+    // Frontend không được truyền UserId.
+    [HttpPut("my-profile/confirmation")]
+    [Authorize(Roles = "STAFF")]
+    public async Task<IActionResult>
+        UpdateMyProfileConfirmation(
+            [FromBody]
+            UpdateMyBhxhConfirmationRequest request)
+    {
+        try
+        {
+            // Luôn lấy ID Staff từ JWT
+            // để tránh xác nhận hộ tài khoản khác.
+            var staffUserId =
+                GetCurrentUserId();
+
+            var result =
+                await _service
+                    .UpdateMyProfileConfirmationAsync(
+                        staffUserId,
+                        request);
+
+            var message =
+                result.StaffConfirmationStatus ==
+                    "CONFIRMED"
+                    ? "Bạn đã xác nhận thông tin hồ sơ BHXH."
+                    : "Đã gửi yêu cầu chỉnh sửa hồ sơ BHXH đến Admin.";
+
+            return Ok(new
+            {
+                message,
+                data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            return HandleException(
+                ex,
+                nameof(UpdateMyProfileConfirmation));
+        }
+    }
 
     // ========================================================
     // 5. KHOẢN ĐÓNG BHXH - ADMIN

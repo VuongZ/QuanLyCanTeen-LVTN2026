@@ -34,26 +34,26 @@ public class SocialInsuranceRepo : ISocialInsuranceRepo
     // ========================================================
 
     public async Task<List<NsUser>>
-        GetFullTimeEmployeesAsync()
-    {
-        return await _context.NsUsers
+    GetFullTimeEmployeesAsync()
+{
+    return await _context.NsUsers
 
-            // AsNoTracking giúp truy vấn chỉ đọc nhẹ hơn.
-            // EF không cần theo dõi thay đổi của các nhân viên này.
-            .AsNoTracking()
+        // Đây là truy vấn chỉ đọc nên không cần
+        // Entity Framework theo dõi thay đổi.
+        .AsNoTracking()
 
-            // Chỉ lấy tài khoản chưa bị xóa
-            // và có loại lao động FULL_TIME.
-            .Where(user =>
-                user.IsDeleted != true &&
-                (user.EmploymentType == "FULL_TIME" ||
-                 user.EmploymentType == "MATERNITY"))
+        // Theo nghiệp vụ của nhóm:
+        // chỉ nhân viên FULL_TIME tham gia BHXH.
+        .Where(user =>
+            user.IsDeleted != true &&
+            user.EmploymentType == "FULL_TIME")
 
-            // Sắp xếp theo tên để giao diện dễ xem.
-            .OrderBy(user => user.FullName)
+        // Sắp xếp theo tên để Admin dễ tìm.
+        .OrderBy(user =>
+            user.FullName)
 
-            .ToListAsync();
-    }
+        .ToListAsync();
+}
 
     public async Task<NsUser?> GetUserByIdAsync(int userId)
     {
@@ -216,6 +216,29 @@ public async Task<bool>
                 profile.Id == profileId);
     }
 
+    // Lấy hồ sơ của Staff để cập nhật trạng thái xác nhận.
+//
+// Không dùng AsNoTracking vì Entity Framework phải theo dõi
+// Entity này để SaveChangesAsync có thể lưu thay đổi.
+public async Task<BhxhEmployeeProfile?>
+    GetProfileByUserIdForUpdateAsync(
+        int userId)
+{
+    return await _context.BhxhEmployeeProfiles
+
+        // Nạp thông tin nhân viên để Service kiểm tra
+        // người này vẫn là nhân viên FULL_TIME.
+        .Include(profile => profile.User)
+
+        // Nạp thông tin Admin tạo và cập nhật hồ sơ,
+        // để sau khi lưu có thể trả DTO đầy đủ.
+        .Include(profile => profile.CreatedByUser)
+        .Include(profile => profile.UpdatedByUser)
+
+        .FirstOrDefaultAsync(profile =>
+            profile.UserId == userId);
+}
+
     public async Task<BhxhEmployeeProfile?>
         GetProfileByIdForUpdateAsync(int profileId)
     {
@@ -280,55 +303,59 @@ public async Task<bool>
     }
 
     public async Task<List<BhxhEmployeeProfile>>
-        GetActiveProfilesForPeriodAsync(
-            int month,
-            int year)
-    {
-        // Ngày đầu tiên của tháng cần tính.
-        DateOnly firstDayOfMonth =
-            new DateOnly(year, month, 1);
+    GetActiveProfilesForPeriodAsync(
+        int month,
+        int year)
+{
+    // Ngày đầu tiên của tháng cần tính.
+    DateOnly firstDayOfMonth =
+        new DateOnly(year, month, 1);
 
-        // Ngày cuối cùng của tháng cần tính.
-        DateOnly lastDayOfMonth =
-            firstDayOfMonth
-                .AddMonths(1)
-                .AddDays(-1);
+    // Ngày cuối cùng của tháng cần tính.
+    DateOnly lastDayOfMonth =
+        firstDayOfMonth
+            .AddMonths(1)
+            .AddDays(-1);
 
-        return await _context.BhxhEmployeeProfiles
+    return await _context.BhxhEmployeeProfiles
 
-            // Nạp thông tin nhân viên để Service tạo DTO
-            // và kiểm tra loại lao động.
-            .Include(profile => profile.User)
+        // Nạp thông tin nhân viên để Service
+        // tạo khoản đóng và kiểm tra FULL_TIME.
+        .Include(profile => profile.User)
 
-            .Where(profile =>
+        .Where(profile =>
 
-                // Chỉ hồ sơ đang hoạt động mới được tính.
-                profile.Status == "ACTIVE" &&
+            // Hồ sơ phải được Admin kích hoạt.
+            profile.Status == "ACTIVE" &&
 
-                // Nhân viên vẫn phải là FULL_TIME
-                // tại thời điểm sinh khoản đóng.
-                (profile.User.EmploymentType == "FULL_TIME" ||
-                 profile.User.EmploymentType == "MATERNITY") &&
+            // Staff phải xác nhận thông tin hồ sơ.
+            profile.StaffConfirmationStatus ==
+                "CONFIRMED" &&
 
-                // Không tính cho nhân viên đã bị xóa.
-                profile.User.IsDeleted != true &&
+            // Chỉ FULL_TIME tham gia BHXH.
+            profile.User.EmploymentType ==
+                "FULL_TIME" &&
 
-                // Hồ sơ phải bắt đầu trước hoặc trong
-                // tháng được chọn.
-                profile.StartDate <= lastDayOfMonth &&
+            // Không tính cho nhân viên đã bị xóa.
+            profile.User.IsDeleted != true &&
 
-                // EndDate NULL nghĩa là vẫn tham gia.
-                // Nếu có EndDate thì phải kết thúc
-                // từ ngày đầu tháng trở đi.
-                (
-                    profile.EndDate == null ||
-                    profile.EndDate >= firstDayOfMonth
-                ))
+            // Hồ sơ phải bắt đầu trước hoặc
+            // trong tháng được chọn.
+            profile.StartDate <= lastDayOfMonth &&
 
-            .OrderBy(profile => profile.User.FullName)
+            // EndDate NULL nghĩa là vẫn tham gia.
+            // Nếu có EndDate thì thời gian tham gia
+            // phải giao với tháng đang tính.
+            (
+                profile.EndDate == null ||
+                profile.EndDate >= firstDayOfMonth
+            ))
 
-            .ToListAsync();
-    }
+        .OrderBy(profile =>
+            profile.User.FullName)
+
+        .ToListAsync();
+}
 
 
     // ========================================================

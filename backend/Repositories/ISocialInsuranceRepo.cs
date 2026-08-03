@@ -147,6 +147,14 @@ Task AddRateConfigAsync(
     Task<BhxhEmployeeProfile?> GetProfileByUserIdAsync(
         int userId);
 
+        // Lấy hồ sơ của một nhân viên để cập nhật.
+//
+// Hàm này không dùng AsNoTracking ở Repository,
+// vì Staff sẽ thay đổi trạng thái xác nhận hồ sơ.
+Task<BhxhEmployeeProfile?>
+    GetProfileByUserIdForUpdateAsync(
+        int userId);
+
     ///  
     /// Kiểm tra một nhân viên đã có hồ sơ BHXH chưa.
     ///  

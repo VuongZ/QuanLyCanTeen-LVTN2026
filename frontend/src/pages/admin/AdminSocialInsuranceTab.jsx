@@ -1,30 +1,32 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState
 } from 'react';
 
 import {
-  // Nhân viên và hồ sơ BHXH.
-  getFullTimeEmployees,
-  getAllSocialInsuranceProfiles,
+  cancelSocialInsuranceContribution,
+  confirmSocialInsuranceContribution,
   createSocialInsuranceProfile,
+  createSocialInsuranceRate,
+  deactivateSocialInsuranceRate,
+  generateSocialInsuranceContributions,
+  getAllSocialInsuranceProfiles,
+  getAllSocialInsuranceRates,
+  getFullTimeEmployees,
+  getSocialInsuranceContributionsByPeriod,
+  markSocialInsuranceContributionPaid,
   updateSocialInsuranceProfile,
   updateSocialInsuranceProfileStatus,
-
-  // Cấu hình tỷ lệ BHXH.
-  getAllSocialInsuranceRates,
-  createSocialInsuranceRate,
-  updateSocialInsuranceRate,
-  deactivateSocialInsuranceRate
+  updateSocialInsuranceRate
 } from '../../api/SocialInsuranceApi';
 
 import '../css/SocialInsuranceTab.css';
 
 
-
 // ============================================================
-// CÁC GIÁ TRỊ TRẠNG THÁI
+// TRẠNG THÁI
 // ============================================================
 
 const PROFILE_STATUS = {
@@ -34,42 +36,83 @@ const PROFILE_STATUS = {
   STOPPED: 'STOPPED'
 };
 
-const STATUS_DISPLAY = {
+const STAFF_CONFIRMATION_STATUS = {
+  PENDING: 'PENDING',
+  CONFIRMED: 'CONFIRMED',
+  CHANGE_REQUESTED: 'CHANGE_REQUESTED'
+};
+
+const CONTRIBUTION_STATUS = {
+  DRAFT: 'DRAFT',
+  CONFIRMED: 'CONFIRMED',
+  PAID: 'PAID',
+  CANCELLED: 'CANCELLED'
+};
+
+const PROFILE_STATUS_DISPLAY = {
   PENDING: {
     label: 'Chờ hoàn tất',
-    className: 'bhxh-status--pending'
+    className: 'bhxh-badge--warning'
   },
-
   ACTIVE: {
     label: 'Đang tham gia',
-    className: 'bhxh-status--active'
+    className: 'bhxh-badge--success'
   },
-
   SUSPENDED: {
     label: 'Tạm ngừng',
-    className: 'bhxh-status--suspended'
+    className: 'bhxh-badge--orange'
   },
-
   STOPPED: {
     label: 'Đã kết thúc',
-    className: 'bhxh-status--stopped'
+    className: 'bhxh-badge--neutral'
+  }
+};
+
+const STAFF_CONFIRMATION_DISPLAY = {
+  PENDING: {
+    label: 'Chờ Staff xác nhận',
+    className: 'bhxh-badge--warning'
+  },
+  CONFIRMED: {
+    label: 'Staff đã xác nhận',
+    className: 'bhxh-badge--success'
+  },
+  CHANGE_REQUESTED: {
+    label: 'Yêu cầu chỉnh sửa',
+    className: 'bhxh-badge--danger'
+  }
+};
+
+const CONTRIBUTION_STATUS_DISPLAY = {
+  DRAFT: {
+    label: 'Tạm tính',
+    className: 'bhxh-badge--warning'
+  },
+  CONFIRMED: {
+    label: 'Đã xác nhận',
+    className: 'bhxh-badge--blue'
+  },
+  PAID: {
+    label: 'Đã nộp',
+    className: 'bhxh-badge--success'
+  },
+  CANCELLED: {
+    label: 'Đã hủy',
+    className: 'bhxh-badge--neutral'
   }
 };
 
 
 // ============================================================
-// CÁC HÀM HỖ TRỢ
+// HÀM HỖ TRỢ
 // ============================================================
 
-/*
-  Lấy nội dung lỗi do Backend trả về.
+function normalizeStatus(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase();
+}
 
-  Backend thường trả:
-
-  {
-    message: "Nội dung lỗi"
-  }
-*/
 function getApiErrorMessage(
   error,
   fallbackMessage
@@ -91,26 +134,14 @@ function getApiErrorMessage(
   );
 }
 
-
-/*
-  Chuẩn hóa trạng thái thành chữ in hoa.
-*/
-function normalizeStatus(status) {
-  return String(status || '')
-    .trim()
-    .toUpperCase();
-}
-
-
-/*
-  Hiển thị tiền theo định dạng Việt Nam.
-
-  Ví dụ:
-
-  6000000
-  → 6.000.000 ₫
-*/
 function formatMoney(value) {
+  const numberValue =
+    Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return '—';
+  }
+
   return new Intl.NumberFormat(
     'vi-VN',
     {
@@ -118,21 +149,16 @@ function formatMoney(value) {
       currency: 'VND',
       maximumFractionDigits: 0
     }
-  ).format(
-    Number(value || 0)
-  );
+  ).format(numberValue);
 }
 
-/*
-  Hiển thị tỷ lệ phần trăm.
-
-  Ví dụ:
-  8    → 8%
-  17.5 → 17,5%
-*/
 function formatPercent(value) {
-  const numericValue =
-    Number(value || 0);
+  const numberValue =
+    Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return '—';
+  }
 
   return (
     new Intl.NumberFormat(
@@ -141,41 +167,10 @@ function formatPercent(value) {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2
       }
-    ).format(numericValue) + '%'
+    ).format(numberValue) + '%'
   );
 }
 
-/*
-  Chuyển EmploymentType sang tên dễ đọc.
-*/
-function formatEmploymentType(value) {
-  const normalizedValue =
-    String(value || '')
-      .trim()
-      .toUpperCase();
-
-  if (normalizedValue === 'FULL_TIME') {
-    return 'Full-time';
-  }
-
-  if (normalizedValue === 'MATERNITY') {
-    return 'Thai sản';
-  }
-
-  if (normalizedValue === 'PART_TIME') {
-    return 'Part-time';
-  }
-
-  return value || '—';
-}
-
-
-/*
-  Chuyển ngày:
-
-  2026-08-01
-  → 01/08/2026
-*/
 function formatDate(value) {
   if (!value) {
     return '—';
@@ -207,15 +202,28 @@ function formatDate(value) {
   );
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return '—';
+  }
 
-/*
-  Lấy ngày hiện tại theo múi giờ Việt Nam.
+  const date =
+    new Date(value);
 
-  Kết quả:
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
 
-  YYYY-MM-DD
-*/
-function getVietnamToday() {
+  return new Intl.DateTimeFormat(
+    'vi-VN',
+    {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }
+  ).format(date);
+}
+
+function getVietnamDateParts() {
   const parts =
     new Intl.DateTimeFormat(
       'en-US',
@@ -229,46 +237,204 @@ function getVietnamToday() {
       new Date()
     );
 
-  const values =
-    Object.fromEntries(
-      parts.map((part) => [
-        part.type,
-        part.value
-      ])
-    );
+  return Object.fromEntries(
+    parts.map((part) => [
+      part.type,
+      part.value
+    ])
+  );
+}
+
+function getVietnamToday() {
+  const parts =
+    getVietnamDateParts();
 
   return (
-    `${values.year}-` +
-    `${values.month}-` +
-    `${values.day}`
+    `${parts.year}-` +
+    `${parts.month}-` +
+    `${parts.day}`
+  );
+}
+
+function getVietnamCurrentPeriod() {
+  const parts =
+    getVietnamDateParts();
+
+  return {
+    month: Number(parts.month),
+    year: Number(parts.year)
+  };
+}
+
+function formatEmploymentType(value) {
+  return normalizeStatus(value) ===
+    'FULL_TIME'
+    ? 'Full-time'
+    : value || '—';
+}
+
+function getProfileDisplay(status) {
+  return (
+    PROFILE_STATUS_DISPLAY[
+      normalizeStatus(status)
+    ] || {
+      label: 'Chưa có hồ sơ',
+      className: 'bhxh-badge--neutral'
+    }
+  );
+}
+
+function getStaffConfirmationDisplay(status) {
+  return (
+    STAFF_CONFIRMATION_DISPLAY[
+      normalizeStatus(status)
+    ] || {
+      label: 'Chưa có hồ sơ',
+      className: 'bhxh-badge--neutral'
+    }
+  );
+}
+
+function getContributionDisplay(status) {
+  return (
+    CONTRIBUTION_STATUS_DISPLAY[
+      normalizeStatus(status)
+    ] || {
+      label: status || 'Không xác định',
+      className: 'bhxh-badge--neutral'
+    }
   );
 }
 
 
-/*
-  Component hiển thị trạng thái hồ sơ.
-*/
-function StatusBadge({
-  status
+// ============================================================
+// COMPONENT DÙNG CHUNG
+// ============================================================
+
+function Badge({
+  display
 }) {
-  const normalizedStatus =
-    normalizeStatus(status);
-
-  const display =
-    STATUS_DISPLAY[normalizedStatus];
-
   return (
     <span
       className={
-        `bhxh-status ` +
-        (
-          display?.className ||
-          'bhxh-status--none'
-        )
+        `bhxh-badge ${display.className}`
       }
     >
-      {display?.label || 'Chưa có hồ sơ'}
+      {display.label}
     </span>
+  );
+}
+
+function ProfileStatusBadge({
+  status
+}) {
+  return (
+    <Badge
+      display={
+        getProfileDisplay(status)
+      }
+    />
+  );
+}
+
+function StaffConfirmationBadge({
+  status
+}) {
+  return (
+    <Badge
+      display={
+        getStaffConfirmationDisplay(
+          status
+        )
+      }
+    />
+  );
+}
+
+function ContributionStatusBadge({
+  status
+}) {
+  return (
+    <Badge
+      display={
+        getContributionDisplay(status)
+      }
+    />
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  description
+}) {
+  return (
+    <div className="bhxh-empty-state">
+      <span className="bhxh-empty-icon">
+        {icon}
+      </span>
+
+      <strong>{title}</strong>
+
+      {description && (
+        <p>{description}</p>
+      )}
+    </div>
+  );
+}
+
+function Modal({
+  title,
+  subtitle,
+  disabled,
+  onClose,
+  children,
+  footer
+}) {
+  return (
+    <div
+      className="bhxh-modal-overlay"
+      onMouseDown={onClose}
+      role="presentation"
+    >
+      <div
+        className="bhxh-modal"
+        onMouseDown={(event) => {
+          event.stopPropagation();
+        }}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="bhxh-modal-header">
+          <div>
+            <h2>{title}</h2>
+
+            {subtitle && (
+              <p>{subtitle}</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="bhxh-modal-close"
+            disabled={disabled}
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="bhxh-modal-body">
+          {children}
+        </div>
+
+        {footer && (
+          <div className="bhxh-modal-footer">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -278,290 +444,330 @@ function StatusBadge({
 // ============================================================
 
 export function AdminSocialInsuranceTab() {
-  // Danh sách nhân viên FULL_TIME.
+  const currentPeriod =
+    useMemo(
+      () => getVietnamCurrentPeriod(),
+      []
+    );
+
+  const [activeSection, setActiveSection] =
+    useState('profiles');
+
+  const [employees, setEmployees] =
+    useState([]);
+
+  const [profiles, setProfiles] =
+    useState([]);
+
+  const [rates, setRates] =
+    useState([]);
+
   const [
-    employees,
-    setEmployees
+    contributions,
+    setContributions
   ] = useState([]);
 
-  // Danh sách hồ sơ BHXH.
   const [
-    profiles,
-    setProfiles
-  ] = useState([]);
-
-  // Danh sách cấu hình tỷ lệ BHXH.
-const [
-  rates,
-  setRates
-] = useState([]);
-
-/*
-  true:
-  → đang mở modal tạo cấu hình tỷ lệ.
-
-  false:
-  → modal đang đóng.
-*/
-const [
-  rateModal,
-  setRateModal
-] = useState(false);
-
-/*
-  Cấu hình tỷ lệ đang được chỉnh sửa.
-
-  null:
-  → Modal đang ở chế độ tạo mới.
-
-  Có dữ liệu:
-  → Modal đang ở chế độ chỉnh sửa.
-*/
-const [
-  selectedRate,
-  setSelectedRate
-] = useState(null);
-
-/*
-  Cấu hình đang được chọn để ngừng sử dụng.
-
-  null:
-  → không mở modal.
-*/
-const [
-  deactivateRateModal,
-  setDeactivateRateModal
-] = useState(null);
-
-// Lỗi trong form tạo tỷ lệ.
-const [
-  rateFormError,
-  setRateFormError
-] = useState('');
-
-// Lỗi trong modal ngừng cấu hình.
-const [
-  deactivateRateError,
-  setDeactivateRateError
-] = useState('');
-
-// Form tạo cấu hình tỷ lệ mới.
-const [
-  rateForm,
-  setRateForm
-] = useState({
-  employeeRate: '8',
-  employerRate: '17.5',
-  effectiveFrom: '',
-  effectiveTo: ''
-});
-
-// Ngày kết thúc của cấu hình bị ngừng.
-const [
-  deactivateEffectiveTo,
-  setDeactivateEffectiveTo
-] = useState('');
-
-  // Từ khóa tìm kiếm.
-  const [
-    searchText,
-    setSearchText
-  ] = useState('');
-
-  // Trạng thái tải dữ liệu.
-  const [
-    loading,
-    setLoading
+    loadingOverview,
+    setLoadingOverview
   ] = useState(true);
 
-  // Trạng thái đang gửi request lưu.
   const [
-    saving,
-    setSaving
+    loadingContributions,
+    setLoadingContributions
   ] = useState(false);
 
-  /*
-    Giá trị của profileModal:
+  const [savingKey, setSavingKey] =
+    useState('');
 
-    null
-    → không mở modal.
+  const [message, setMessage] =
+    useState(null);
 
-    create
-    → tạo hồ sơ mới.
+  const [searchText, setSearchText] =
+    useState('');
 
-    edit
-    → cập nhật hồ sơ.
-  */
   const [
-    profileModal,
-    setProfileModal
-  ] = useState(null);
+    profileStatusFilter,
+    setProfileStatusFilter
+  ] = useState('ALL');
 
-  // Nhân viên đang được tạo hồ sơ.
+  const [
+    confirmationFilter,
+    setConfirmationFilter
+  ] = useState('ALL');
+
+  const [selectedMonth, setSelectedMonth] =
+    useState(currentPeriod.month);
+
+  const [selectedYear, setSelectedYear] =
+    useState(currentPeriod.year);
+
+
+  // ==========================================================
+  // STATE HỒ SƠ
+  // ==========================================================
+
+  const [profileModal, setProfileModal] =
+    useState(null);
+
   const [
     selectedEmployee,
     setSelectedEmployee
   ] = useState(null);
 
-  // Hồ sơ đang được chỉnh sửa.
   const [
     selectedProfile,
     setSelectedProfile
   ] = useState(null);
 
-  /*
-    Modal chuyển trạng thái có dạng:
-
-    {
-      profile: {...},
-      targetStatus: "ACTIVE"
-    }
-  */
-  const [
-    statusModal,
-    setStatusModal
-  ] = useState(null);
-
-  // Thông báo chung của trang.
-  const [
-    message,
-    setMessage
-  ] = useState(null);
-
-  // Lỗi hiển thị trong modal hồ sơ.
   const [
     profileFormError,
     setProfileFormError
   ] = useState('');
 
-  // Lỗi hiển thị trong modal trạng thái.
+  const [profileForm, setProfileForm] =
+    useState({
+      socialInsuranceNumber: '',
+      insuranceSalaryBasis: '',
+      startDate: '',
+      endDate: '',
+      note: ''
+    });
+
+  const [statusModal, setStatusModal] =
+    useState(null);
+
   const [
     statusFormError,
     setStatusFormError
   ] = useState('');
 
-  // Form tạo hoặc cập nhật hồ sơ.
-  const [
-    profileForm,
-    setProfileForm
-  ] = useState({
-    socialInsuranceNumber: '',
-    insuranceSalaryBasis: '',
-    startDate: '',
-    endDate: '',
-    note: ''
-  });
+  const [statusNote, setStatusNote] =
+    useState('');
 
-  // Ghi chú khi đổi trạng thái.
+
+  // ==========================================================
+  // STATE CẤU HÌNH TỶ LỆ
+  // ==========================================================
+
+  const [rateModalOpen, setRateModalOpen] =
+    useState(false);
+
+  const [selectedRate, setSelectedRate] =
+    useState(null);
+
   const [
-    statusNote,
-    setStatusNote
+    rateFormError,
+    setRateFormError
   ] = useState('');
+
+  const [rateForm, setRateForm] =
+    useState({
+      employeeRate: '8',
+      employerRate: '17.5',
+      effectiveFrom: '',
+      effectiveTo: ''
+    });
+
+  const [
+    deactivateRateModal,
+    setDeactivateRateModal
+  ] = useState(null);
+
+  const [
+    deactivateEffectiveTo,
+    setDeactivateEffectiveTo
+  ] = useState('');
+
+  const [
+    deactivateRateError,
+    setDeactivateRateError
+  ] = useState('');
+
+
+  // ==========================================================
+  // STATE KHOẢN ĐÓNG
+  // ==========================================================
+
+  const [
+    cancelContributionModal,
+    setCancelContributionModal
+  ] = useState(null);
+
+  const [
+    cancelReason,
+    setCancelReason
+  ] = useState('');
+
+  const [
+    cancelContributionError,
+    setCancelContributionError
+  ] = useState('');
+
+
+  const isSaving =
+    Boolean(savingKey);
 
 
   // ==========================================================
   // TẢI DỮ LIỆU
   // ==========================================================
 
-  /*
-    Tải đồng thời:
-  - Nhân viên FULL_TIME.
-  - Hồ sơ BHXH.
-  - Lịch sử cấu hình tỷ lệ BHXH.
-*/
-async function loadData() {
-  setLoading(true);
-  setMessage(null);
+  const loadOverview =
+    useCallback(
+      async () => {
+        setLoadingOverview(true);
 
-  try {
-    const [
-      employeeData,
-      profileData,
-      rateData
-    ] = await Promise.all([
-      getFullTimeEmployees(),
+        try {
+          const [
+            employeeData,
+            profileData,
+            rateData
+          ] = await Promise.all([
+            getFullTimeEmployees(),
+            getAllSocialInsuranceProfiles(),
+            getAllSocialInsuranceRates()
+          ]);
 
-      getAllSocialInsuranceProfiles(),
+          setEmployees(
+            Array.isArray(employeeData)
+              ? employeeData
+              : []
+          );
 
-      getAllSocialInsuranceRates()
-    ]);
+          setProfiles(
+            Array.isArray(profileData)
+              ? profileData
+              : []
+          );
 
-    setEmployees(
-      Array.isArray(employeeData)
-        ? employeeData
-        : []
+          setRates(
+            Array.isArray(rateData)
+              ? rateData
+              : []
+          );
+        } catch (error) {
+          setEmployees([]);
+          setProfiles([]);
+          setRates([]);
+
+          setMessage({
+            type: 'error',
+            text: getApiErrorMessage(
+              error,
+              'Không thể tải dữ liệu BHXH.'
+            )
+          });
+        } finally {
+          setLoadingOverview(false);
+        }
+      },
+      []
     );
 
-    setProfiles(
-      Array.isArray(profileData)
-        ? profileData
-        : []
+  const loadContributions =
+    useCallback(
+      async (
+        month,
+        year
+      ) => {
+        const normalizedMonth =
+          Number(month);
+
+        const normalizedYear =
+          Number(year);
+
+        if (
+          normalizedMonth < 1 ||
+          normalizedMonth > 12 ||
+          normalizedYear < 2000 ||
+          normalizedYear > 2100
+        ) {
+          setMessage({
+            type: 'error',
+            text:
+              'Tháng hoặc năm được chọn không hợp lệ.'
+          });
+
+          return;
+        }
+
+        setLoadingContributions(true);
+
+        try {
+          const data =
+            await getSocialInsuranceContributionsByPeriod(
+              normalizedMonth,
+              normalizedYear
+            );
+
+          setContributions(
+            Array.isArray(data)
+              ? data
+              : []
+          );
+        } catch (error) {
+          setContributions([]);
+
+          setMessage({
+            type: 'error',
+            text: getApiErrorMessage(
+              error,
+              'Không thể tải khoản đóng BHXH.'
+            )
+          });
+        } finally {
+          setLoadingContributions(false);
+        }
+      },
+      []
     );
 
-    setRates(
-      Array.isArray(rateData)
-        ? rateData
-        : []
-    );
-  } catch (error) {
-    setEmployees([]);
-    setProfiles([]);
-    setRates([]);
-
-    setMessage({
-      type: 'error',
-
-      text: getApiErrorMessage(
-        error,
-        'Không tải được dữ liệu BHXH.'
-      )
-    });
-  } finally {
-    setLoading(false);
-  }
-}
-
-
-  /*
-    Tự động tải dữ liệu khi Admin mở tab.
-  */
   useEffect(() => {
-    loadData();
-  }, []);
+    loadOverview();
+  }, [
+    loadOverview
+  ]);
+
+  useEffect(() => {
+    if (
+      activeSection ===
+      'contributions'
+    ) {
+      loadContributions(
+        selectedMonth,
+        selectedYear
+      );
+    }
+  }, [
+    activeSection,
+    selectedMonth,
+    selectedYear,
+    loadContributions
+  ]);
 
 
   // ==========================================================
-  // XỬ LÝ DANH SÁCH
+  // DỮ LIỆU TÍNH TOÁN
   // ==========================================================
 
-  /*
-    Chuyển danh sách hồ sơ thành Map:
-
-    UserId → Profile
-  */
   const profileByUserId =
     useMemo(() => {
-      const result =
+      const map =
         new Map();
 
-      profiles.forEach(
-        (profile) => {
-          result.set(
-            String(profile.userId),
-            profile
-          );
-        }
-      );
+      profiles.forEach((profile) => {
+        map.set(
+          String(profile.userId),
+          profile
+        );
+      });
 
-      return result;
+      return map;
     }, [
       profiles
     ]);
 
-
-  /*
-    Ghép từng nhân viên với hồ sơ BHXH tương ứng.
-  */
   const employeeRows =
     useMemo(() => {
       const normalizedSearch =
@@ -570,18 +776,43 @@ async function loadData() {
           .toLowerCase();
 
       return employees
-        .map((employee) => {
-          const profile =
+        .map((employee) => ({
+          ...employee,
+          profile:
             profileByUserId.get(
               String(employee.userId)
-            ) || null;
-
-          return {
-            ...employee,
-            profile
-          };
-        })
+            ) || null
+        }))
         .filter((row) => {
+          const profileStatus =
+            normalizeStatus(
+              row.profile?.status
+            );
+
+          const confirmationStatus =
+            normalizeStatus(
+              row.profile
+                ?.staffConfirmationStatus
+            );
+
+          if (
+            profileStatusFilter !==
+              'ALL' &&
+            profileStatus !==
+              profileStatusFilter
+          ) {
+            return false;
+          }
+
+          if (
+            confirmationFilter !==
+              'ALL' &&
+            confirmationStatus !==
+              confirmationFilter
+          ) {
+            return false;
+          }
+
           if (!normalizedSearch) {
             return true;
           }
@@ -593,8 +824,11 @@ async function loadData() {
             row.employmentType,
             row.profile
               ?.socialInsuranceNumber,
+            row.profile?.status,
             row.profile
-              ?.status
+              ?.staffConfirmationStatus,
+            row.profile
+              ?.staffConfirmationNote
           ]
             .filter(Boolean)
             .join(' ')
@@ -607,524 +841,235 @@ async function loadData() {
     }, [
       employees,
       profileByUserId,
+      profileStatusFilter,
+      confirmationFilter,
       searchText
     ]);
 
+  const profileStatistics =
+    useMemo(() => {
+      return {
+        employees:
+          employees.length,
 
-  /*
-  Tính số liệu thống kê hồ sơ BHXH.
-*/
-const statistics =
-  useMemo(() => {
-    const activeCount =
-      profiles.filter(
-        (profile) =>
-          normalizeStatus(
-            profile.status
-          ) ===
-          PROFILE_STATUS.ACTIVE
-      ).length;
+        profiles:
+          profiles.length,
 
-    const pendingCount =
-      profiles.filter(
-        (profile) =>
-          normalizeStatus(
-            profile.status
-          ) ===
-          PROFILE_STATUS.PENDING
-      ).length;
+        active:
+          profiles.filter(
+            (profile) =>
+              normalizeStatus(
+                profile.status
+              ) ===
+              PROFILE_STATUS.ACTIVE
+          ).length,
 
-    return {
-      fullTimeCount:
-        employees.length,
+        waitingConfirmation:
+          profiles.filter(
+            (profile) =>
+              normalizeStatus(
+                profile
+                  .staffConfirmationStatus
+              ) ===
+              STAFF_CONFIRMATION_STATUS
+                .PENDING
+          ).length,
 
-      profileCount:
-        profiles.length,
+        changeRequested:
+          profiles.filter(
+            (profile) =>
+              normalizeStatus(
+                profile
+                  .staffConfirmationStatus
+              ) ===
+              STAFF_CONFIRMATION_STATUS
+                .CHANGE_REQUESTED
+          ).length
+      };
+    }, [
+      employees,
+      profiles
+    ]);
 
-      activeCount,
-
-      pendingCount
-    };
-  }, [
-    employees,
-    profiles
-  ]);
-
-
-/*
-  Sắp xếp cấu hình có ngày hiệu lực
-  mới nhất lên đầu bảng.
-*/
-const sortedRates =
-  useMemo(() => {
-    return [...rates].sort(
-      (
-        firstRate,
-        secondRate
-      ) => {
-        return String(
-          secondRate.effectiveFrom || ''
-        ).localeCompare(
-          String(
-            firstRate.effectiveFrom || ''
-          )
-        );
-      }
-    );
-  }, [
-    rates
-  ]);
-
-
-/*
-  Tìm cấu hình thực sự có hiệu lực
-  tại ngày hiện tại.
-
-  Không chỉ dựa vào isActive vì có thể tồn tại
-  cấu hình đã được lập lịch cho tương lai.
-*/
-const activeRate =
-  useMemo(() => {
-    const today =
-      getVietnamToday();
-
-    return (
-      sortedRates.find((rate) => {
-        const effectiveFrom =
-          String(
-            rate.effectiveFrom || ''
-          ).slice(0, 10);
-
-        const effectiveTo =
-          rate.effectiveTo
-            ? String(
-                rate.effectiveTo
-              ).slice(0, 10)
-            : null;
-
-        return (
-          Boolean(rate.isActive) &&
-          effectiveFrom <= today &&
-          (
-            !effectiveTo ||
-            effectiveTo >= today
-          )
-        );
-      }) || null
-    );
-  }, [
-    sortedRates
-  ]);
-
-// ==========================================================
-// CẤU HÌNH TỶ LỆ BHXH
-// ==========================================================
-
-/*
-  Mở modal ở chế độ tạo cấu hình mới.
-*/
-function openCreateRateModal() {
-  /*
-    Xóa cấu hình đang chọn để modal
-    chuyển về chế độ tạo mới.
-  */
-  setSelectedRate(null);
-
-  setRateForm({
-    employeeRate: '8',
-    employerRate: '17.5',
-    effectiveFrom: getVietnamToday(),
-    effectiveTo: ''
-  });
-
-  setRateFormError('');
-  setMessage(null);
-  setRateModal(true);
-}
-
-
-/*
-  Mở modal ở chế độ chỉnh sửa cấu hình.
-*/
-function openEditRateModal(rate) {
-  /*
-    Frontend chỉ cho mở modal sửa khi
-    Backend trả về canEdit = true.
-  */
-  if (!rate?.id || !rate.canEdit) {
-    setMessage({
-      type: 'error',
-      text:
-        'Cấu hình này không đủ điều kiện ' +
-        'để chỉnh sửa trực tiếp.'
-    });
-
-    return;
-  }
-
-  // Ghi nhớ cấu hình đang sửa.
-  setSelectedRate(rate);
-
-  // Đưa dữ liệu hiện tại lên form.
-  setRateForm({
-    employeeRate:
-      String(rate.employeeRate ?? ''),
-
-    employerRate:
-      String(rate.employerRate ?? ''),
-
-    effectiveFrom:
-      rate.effectiveFrom
-        ? String(
-            rate.effectiveFrom
-          ).slice(0, 10)
-        : '',
-
-    effectiveTo:
-      rate.effectiveTo
-        ? String(
-            rate.effectiveTo
-          ).slice(0, 10)
-        : ''
-  });
-
-  setRateFormError('');
-  setMessage(null);
-  setRateModal(true);
-}
-
-
-/*
-  Đóng modal tạo hoặc chỉnh sửa cấu hình.
-*/
-function closeRateModal() {
-  if (saving) {
-    return;
-  }
-
-  setRateModal(false);
-
-  // Xóa cấu hình đang được chỉnh sửa.
-  setSelectedRate(null);
-
-  setRateFormError('');
-}
-
-
-/*
-  Kiểm tra form tạo cấu hình tỷ lệ.
-*/
-function validateRateForm() {
-  const employeeRateText =
-  String(
-    rateForm.employeeRate ?? ''
-  ).trim();
-
-const employerRateText =
-  String(
-    rateForm.employerRate ?? ''
-  ).trim();
-
-if (!employeeRateText) {
-  return 'Tỷ lệ nhân viên đóng là bắt buộc.';
-}
-
-if (!employerRateText) {
-  return 'Tỷ lệ doanh nghiệp đóng là bắt buộc.';
-}
-
-const employeeRate =
-  Number(employeeRateText);
-
-const employerRate =
-  Number(employerRateText);
-
-  if (
-    !Number.isFinite(employeeRate) ||
-    employeeRate < 0 ||
-    employeeRate > 100
-  ) {
-    return (
-      'Tỷ lệ nhân viên phải nằm ' +
-      'trong khoảng từ 0 đến 100.'
-    );
-  }
-
-  if (
-    !Number.isFinite(employerRate) ||
-    employerRate < 0 ||
-    employerRate > 100
-  ) {
-    return (
-      'Tỷ lệ doanh nghiệp phải nằm ' +
-      'trong khoảng từ 0 đến 100.'
-    );
-  }
-
-  if (!rateForm.effectiveFrom) {
-    return (
-      'Ngày bắt đầu hiệu lực là bắt buộc.'
-    );
-  }
-  /*
-  Khi chỉnh sửa, ngày bắt đầu mới
-  vẫn phải nằm trong tương lai.
-
-  Backend cũng kiểm tra lại điều kiện này.
-*/
-if (
-  selectedRate &&
-  rateForm.effectiveFrom <=
-    getVietnamToday()
-) {
-  return (
-    'Ngày bắt đầu hiệu lực khi chỉnh sửa ' +
-    'phải là một ngày trong tương lai.'
-  );
-}
-
-  if (
-    rateForm.effectiveTo &&
-    rateForm.effectiveTo <
-      rateForm.effectiveFrom
-  ) {
-    return (
-      'Ngày kết thúc hiệu lực không được ' +
-      'trước ngày bắt đầu hiệu lực.'
-    );
-  }
-
-  return '';
-}
-
-
-/*
-  Lưu cấu hình tỷ lệ.
-
-  selectedRate có dữ liệu:
-  → Cập nhật cấu hình.
-
-  selectedRate là null:
-  → Tạo cấu hình mới.
-*/
-async function handleSaveRate() {
-  const validationError =
-    validateRateForm();
-
-  if (validationError) {
-    setRateFormError(validationError);
-    return;
-  }
-
-  const isEditing =
-    Boolean(selectedRate?.id);
-
-  const payload = {
-    employeeRate:
-      Number(rateForm.employeeRate),
-
-    employerRate:
-      Number(rateForm.employerRate),
-
-    effectiveFrom:
-      rateForm.effectiveFrom,
-
-    effectiveTo:
-      rateForm.effectiveTo || null
-  };
-
-  setSaving(true);
-  setRateFormError('');
-
-  try {
-    let response;
-
-    if (isEditing) {
-      response =
-        await updateSocialInsuranceRate(
-          selectedRate.id,
-          payload
-        );
-    } else {
-      response =
-        await createSocialInsuranceRate(
-          payload
-        );
-    }
-
-    setRateModal(false);
-    setSelectedRate(null);
-
-    await loadData();
-
-    setMessage({
-      type: 'success',
-
-      text:
-        response?.message ||
+  const sortedRates =
+    useMemo(() => {
+      return [...rates].sort(
         (
-          isEditing
-            ? 'Đã cập nhật cấu hình tỷ lệ BHXH.'
-            : 'Đã tạo cấu hình tỷ lệ BHXH.'
-        )
-    });
-  } catch (error) {
-    setRateFormError(
-      getApiErrorMessage(
-        error,
-        isEditing
-          ? (
-              'Không cập nhật được cấu hình ' +
-              'tỷ lệ BHXH.'
+          firstRate,
+          secondRate
+        ) =>
+          String(
+            secondRate.effectiveFrom ||
+            ''
+          ).localeCompare(
+            String(
+              firstRate.effectiveFrom ||
+              ''
             )
-          : (
-              'Không tạo được cấu hình ' +
-              'tỷ lệ BHXH.'
+          )
+      );
+    }, [
+      rates
+    ]);
+
+  const activeRate =
+    useMemo(() => {
+      const today =
+        getVietnamToday();
+
+      return (
+        sortedRates.find((rate) => {
+          const from =
+            String(
+              rate.effectiveFrom || ''
+            ).slice(0, 10);
+
+          const to =
+            rate.effectiveTo
+              ? String(
+                  rate.effectiveTo
+                ).slice(0, 10)
+              : null;
+
+          return (
+            Boolean(rate.isActive) &&
+            from <= today &&
+            (
+              !to ||
+              to >= today
             )
-      )
-    );
-  } finally {
-    setSaving(false);
-  }
-}
+          );
+        }) || null
+      );
+    }, [
+      sortedRates
+    ]);
 
+  const selectedPeriodRate =
+    useMemo(() => {
+      const targetDate =
+        `${selectedYear}-` +
+        `${String(selectedMonth)
+          .padStart(2, '0')}-01`;
 
-/*
-  Mở modal ngừng sử dụng một cấu hình.
+      return (
+        sortedRates.find((rate) => {
+          const from =
+            String(
+              rate.effectiveFrom || ''
+            ).slice(0, 10);
 
-  Mặc định lấy ngày hiện tại làm ngày kết thúc.
-*/
-function openDeactivateRateModal(rate) {
-  const effectiveFrom =
-    String(
-      rate?.effectiveFrom || ''
-    ).slice(0, 10);
+          const to =
+            rate.effectiveTo
+              ? String(
+                  rate.effectiveTo
+                ).slice(0, 10)
+              : null;
 
-  const today =
-    getVietnamToday();
+          return (
+            from <= targetDate &&
+            (
+              !to ||
+              to >= targetDate
+            )
+          );
+        }) || null
+      );
+    }, [
+      sortedRates,
+      selectedMonth,
+      selectedYear
+    ]);
 
-  setDeactivateEffectiveTo(
-    today < effectiveFrom
-      ? effectiveFrom
-      : today
-  );
+  const contributionStatistics =
+    useMemo(() => {
+      const result = {
+        totalCount:
+          contributions.length,
 
-  setDeactivateRateError('');
-  setMessage(null);
-  setDeactivateRateModal(rate);
-}
+        draftCount:
+          0,
 
+        confirmedCount:
+          0,
 
-/*
-  Đóng modal ngừng cấu hình.
-*/
-function closeDeactivateRateModal() {
-  if (saving) {
-    return;
-  }
+        paidCount:
+          0,
 
-  setDeactivateRateModal(null);
-  setDeactivateEffectiveTo('');
-  setDeactivateRateError('');
-}
+        employeeAmount:
+          0,
 
+        employerAmount:
+          0,
 
-/*
-  Ngừng sử dụng cấu hình tỷ lệ.
+        totalAmount:
+          0
+      };
 
-  Hệ thống không xóa bản ghi.
-  Chỉ cập nhật:
-  - isActive = false.
-  - effectiveTo.
-*/
-async function handleDeactivateRate() {
-  const rate =
-    deactivateRateModal;
+      contributions.forEach(
+        (contribution) => {
+          const status =
+            normalizeStatus(
+              contribution.status
+            );
 
-  if (!rate?.id) {
-    setDeactivateRateError(
-      'Không xác định được cấu hình tỷ lệ.'
-    );
+          if (
+            status ===
+            CONTRIBUTION_STATUS.DRAFT
+          ) {
+            result.draftCount += 1;
+          }
 
-    return;
-  }
+          if (
+            status ===
+            CONTRIBUTION_STATUS.CONFIRMED
+          ) {
+            result.confirmedCount += 1;
+          }
 
-  if (!deactivateEffectiveTo) {
-    setDeactivateRateError(
-      'Ngày kết thúc hiệu lực là bắt buộc.'
-    );
+          if (
+            status ===
+            CONTRIBUTION_STATUS.PAID
+          ) {
+            result.paidCount += 1;
+          }
 
-    return;
-  }
+          if (
+            status !==
+            CONTRIBUTION_STATUS.CANCELLED
+          ) {
+            result.employeeAmount +=
+              Number(
+                contribution.employeeAmount ||
+                0
+              );
 
-  const effectiveFrom =
-    String(
-      rate.effectiveFrom || ''
-    ).slice(0, 10);
+            result.employerAmount +=
+              Number(
+                contribution.employerAmount ||
+                0
+              );
 
-  if (
-    deactivateEffectiveTo <
-    effectiveFrom
-  ) {
-    setDeactivateRateError(
-      'Ngày kết thúc không được trước ' +
-      'ngày bắt đầu hiệu lực.'
-    );
-
-    return;
-  }
-
-  setSaving(true);
-  setDeactivateRateError('');
-
-  try {
-    const response =
-      await deactivateSocialInsuranceRate(
-        rate.id,
-        {
-          effectiveTo:
-            deactivateEffectiveTo
+            result.totalAmount +=
+              Number(
+                contribution.totalAmount ||
+                0
+              );
+          }
         }
       );
 
-    setDeactivateRateModal(null);
-    setDeactivateEffectiveTo('');
+      return result;
+    }, [
+      contributions
+    ]);
 
-    await loadData();
-
-    setMessage({
-      type: 'success',
-
-      text:
-        response?.message ||
-        'Đã ngừng sử dụng cấu hình tỷ lệ.'
-    });
-  } catch (error) {
-    setDeactivateRateError(
-      getApiErrorMessage(
-        error,
-        'Không ngừng được cấu hình tỷ lệ.'
-      )
-    );
-  } finally {
-    setSaving(false);
-  }
-}
 
   // ==========================================================
-  // MODAL TẠO / CẬP NHẬT HỒ SƠ
+  // HỒ SƠ BHXH
   // ==========================================================
 
-  /*
-    Mở form tạo hồ sơ.
-
-    Ngày bắt đầu mặc định:
-    - Ngày tuyển dụng nếu có.
-    - Nếu không có thì lấy ngày hiện tại.
-  */
-  function openCreateProfile(
-    employee
-  ) {
+  function openCreateProfile(employee) {
     setSelectedEmployee(employee);
     setSelectedProfile(null);
 
@@ -1148,13 +1093,7 @@ async function handleDeactivateRate() {
     setProfileModal('create');
   }
 
-
-  /*
-    Mở form cập nhật hồ sơ.
-  */
-  function openEditProfile(
-    profile
-  ) {
+  function openEditProfile(profile) {
     setSelectedEmployee(null);
     setSelectedProfile(profile);
 
@@ -1184,8 +1123,7 @@ async function handleDeactivateRate() {
           : '',
 
       note:
-        profile.note ||
-        ''
+        profile.note || ''
     });
 
     setProfileFormError('');
@@ -1193,12 +1131,8 @@ async function handleDeactivateRate() {
     setProfileModal('edit');
   }
 
-
-  /*
-    Đóng modal hồ sơ.
-  */
   function closeProfileModal() {
-    if (saving) {
+    if (isSaving) {
       return;
     }
 
@@ -1208,15 +1142,10 @@ async function handleDeactivateRate() {
     setProfileFormError('');
   }
 
-
-  /*
-    Kiểm tra dữ liệu form trước khi gửi Backend.
-  */
   function validateProfileForm() {
     const salaryBasis =
       Number(
-        profileForm
-          .insuranceSalaryBasis
+        profileForm.insuranceSalaryBasis
       );
 
     if (
@@ -1231,8 +1160,7 @@ async function handleDeactivateRate() {
 
     if (!profileForm.startDate) {
       return (
-        'Ngày bắt đầu tham gia ' +
-        'là bắt buộc.'
+        'Ngày bắt đầu tham gia là bắt buộc.'
       );
     }
 
@@ -1250,10 +1178,6 @@ async function handleDeactivateRate() {
     return '';
   }
 
-
-  /*
-    Tạo mới hoặc cập nhật hồ sơ.
-  */
   async function handleSaveProfile() {
     const validationError =
       validateProfileForm();
@@ -1269,34 +1193,34 @@ async function handleDeactivateRate() {
     const isCreating =
       profileModal === 'create';
 
-    setSaving(true);
+    const commonPayload = {
+      socialInsuranceNumber:
+        profileForm
+          .socialInsuranceNumber
+          .trim() || null,
+
+      insuranceSalaryBasis:
+        Number(
+          profileForm
+            .insuranceSalaryBasis
+        ),
+
+      startDate:
+        profileForm.startDate,
+
+      endDate:
+        profileForm.endDate ||
+        null,
+
+      note:
+        profileForm.note
+          .trim() || null
+    };
+
+    setSavingKey('profile-save');
     setProfileFormError('');
 
     try {
-      const commonPayload = {
-        socialInsuranceNumber:
-          profileForm
-            .socialInsuranceNumber
-            .trim() || null,
-
-        insuranceSalaryBasis:
-          Number(
-            profileForm
-              .insuranceSalaryBasis
-          ),
-
-        startDate:
-          profileForm.startDate,
-
-        endDate:
-          profileForm.endDate ||
-          null,
-
-        note:
-          profileForm.note
-            .trim() || null
-      };
-
       let response;
 
       if (isCreating) {
@@ -1316,7 +1240,7 @@ async function handleDeactivateRate() {
       } else {
         if (!selectedProfile?.id) {
           throw new Error(
-            'Không xác định được hồ sơ BHXH.'
+            'Không xác định được hồ sơ.'
           );
         }
 
@@ -1331,11 +1255,10 @@ async function handleDeactivateRate() {
       setSelectedEmployee(null);
       setSelectedProfile(null);
 
-      await loadData();
+      await loadOverview();
 
       setMessage({
         type: 'success',
-
         text:
           response?.message ||
           (
@@ -1348,29 +1271,58 @@ async function handleDeactivateRate() {
       setProfileFormError(
         getApiErrorMessage(
           error,
-          'Không lưu được hồ sơ BHXH.'
+          'Không thể lưu hồ sơ BHXH.'
         )
       );
     } finally {
-      setSaving(false);
+      setSavingKey('');
     }
   }
 
-
-  // ==========================================================
-  // MODAL ĐỔI TRẠNG THÁI
-  // ==========================================================
-
-  /*
-    Mở modal đổi trạng thái.
-  */
   function openStatusModal(
     profile,
     targetStatus
   ) {
+    const normalizedTarget =
+      normalizeStatus(targetStatus);
+
+    const confirmationStatus =
+      normalizeStatus(
+        profile?.staffConfirmationStatus
+      );
+
+    if (
+      normalizedTarget ===
+        PROFILE_STATUS.ACTIVE &&
+      confirmationStatus !==
+        STAFF_CONFIRMATION_STATUS
+          .CONFIRMED
+    ) {
+      setMessage({
+        type: 'error',
+
+        text:
+          confirmationStatus ===
+            STAFF_CONFIRMATION_STATUS
+              .CHANGE_REQUESTED
+            ? (
+                'Staff đang yêu cầu chỉnh sửa. ' +
+                'Admin cần cập nhật hồ sơ trước ' +
+                'khi kích hoạt.'
+              )
+            : (
+                'Phải chờ Staff xác nhận hồ sơ ' +
+                'trước khi kích hoạt.'
+              )
+      });
+
+      return;
+    }
+
     setStatusModal({
       profile,
-      targetStatus
+      targetStatus:
+        normalizedTarget
     });
 
     setStatusNote('');
@@ -1378,12 +1330,8 @@ async function handleDeactivateRate() {
     setMessage(null);
   }
 
-
-  /*
-    Đóng modal đổi trạng thái.
-  */
   function closeStatusModal() {
-    if (saving) {
+    if (isSaving) {
       return;
     }
 
@@ -1392,12 +1340,6 @@ async function handleDeactivateRate() {
     setStatusFormError('');
   }
 
-
-  /*
-    Cập nhật trạng thái hồ sơ.
-
-    Không xóa cứng hồ sơ khỏi database.
-  */
   async function handleUpdateStatus() {
     const profile =
       statusModal?.profile;
@@ -1410,13 +1352,13 @@ async function handleDeactivateRate() {
       !targetStatus
     ) {
       setStatusFormError(
-        'Không xác định được hồ sơ hoặc trạng thái mới.'
+        'Không xác định được hồ sơ hoặc trạng thái.'
       );
 
       return;
     }
 
-    setSaving(true);
+    setSavingKey('profile-status');
     setStatusFormError('');
 
     try {
@@ -1428,8 +1370,7 @@ async function handleDeactivateRate() {
               targetStatus,
 
             note:
-              statusNote
-                .trim() ||
+              statusNote.trim() ||
               null
           }
         );
@@ -1437,11 +1378,10 @@ async function handleDeactivateRate() {
       setStatusModal(null);
       setStatusNote('');
 
-      await loadData();
+      await loadOverview();
 
       setMessage({
         type: 'success',
-
         text:
           response?.message ||
           'Đã cập nhật trạng thái hồ sơ.'
@@ -1450,1414 +1390,2786 @@ async function handleDeactivateRate() {
       setStatusFormError(
         getApiErrorMessage(
           error,
-          'Không cập nhật được trạng thái hồ sơ.'
+          'Không thể cập nhật trạng thái.'
         )
       );
     } finally {
-      setSaving(false);
+      setSavingKey('');
     }
   }
 
 
   // ==========================================================
-  // GIAO DIỆN
+  // CẤU HÌNH TỶ LỆ
   // ==========================================================
 
-  return (
-    <div className="bhxh-page">
-      {/* ================================================== */}
-      {/* GIỚI THIỆU */}
-      {/* ================================================== */}
+  function openCreateRateModal() {
+    setSelectedRate(null);
 
-      <div className="sd-card bhxh-hero-card">
-        <div className="sd-card-header bhxh-hero-header">
-          <div>
-            <p className="sd-eyebrow">
-              Bảo hiểm xã hội
-            </p>
+    setRateForm({
+      employeeRate: '8',
+      employerRate: '17.5',
+      effectiveFrom:
+        getVietnamToday(),
+      effectiveTo: ''
+    });
 
-            <h2>
-              Quản lý hồ sơ nhân viên
-            </h2>
+    setRateFormError('');
+    setMessage(null);
+    setRateModalOpen(true);
+  }
 
-            <p className="bhxh-description">
-              Chỉ quản lý hồ sơ BHXH của nhân viên FULL_TIME.
-            </p>
-          </div>
+  function openEditRateModal(rate) {
+    if (!rate?.id || !rate.canEdit) {
+      setMessage({
+        type: 'error',
+        text:
+          'Cấu hình này không đủ điều kiện ' +
+          'để chỉnh sửa trực tiếp.'
+      });
 
-          <button
-            type="button"
-            className="sd-btn-ghost"
-            disabled={loading}
-            onClick={loadData}
-          >
-            {loading
-              ? 'Đang tải...'
-              : '↻ Làm mới'}
-          </button>
-        </div>
-      </div>
+      return;
+    }
 
+    setSelectedRate(rate);
 
-      {/* ================================================== */}
-      {/* THÔNG BÁO */}
-      {/* ================================================== */}
+    setRateForm({
+      employeeRate:
+        String(
+          rate.employeeRate ?? ''
+        ),
 
-      {message && (
-        <div
-          role="alert"
-          className={
-            `bhxh-alert ` +
-            `bhxh-alert--${message.type}`
-          }
-        >
-          {message.text}
-        </div>
-      )}
+      employerRate:
+        String(
+          rate.employerRate ?? ''
+        ),
 
+      effectiveFrom:
+        rate.effectiveFrom
+          ? String(
+              rate.effectiveFrom
+            ).slice(0, 10)
+          : '',
 
-      {/* ================================================== */}
-      {/* THỐNG KÊ */}
-      {/* ================================================== */}
+      effectiveTo:
+        rate.effectiveTo
+          ? String(
+              rate.effectiveTo
+            ).slice(0, 10)
+          : ''
+    });
 
-      <div className="bhxh-stats">
-        <div className="sd-card bhxh-stat-card">
-          <p className="bhxh-stat-label">
-            Nhân viên
-          </p>
+    setRateFormError('');
+    setMessage(null);
+    setRateModalOpen(true);
+  }
 
-          <strong className="bhxh-stat-value">
-            {statistics.fullTimeCount}
-          </strong>
-        </div>
+  function closeRateModal() {
+    if (isSaving) {
+      return;
+    }
 
-        <div className="sd-card bhxh-stat-card">
-          <p className="bhxh-stat-label">
-            Đã có hồ sơ
-          </p>
+    setRateModalOpen(false);
+    setSelectedRate(null);
+    setRateFormError('');
+  }
 
-          <strong className="bhxh-stat-value">
-            {statistics.profileCount}
-          </strong>
-        </div>
+  function validateRateForm() {
+    const employeeRateText =
+      String(
+        rateForm.employeeRate ?? ''
+      ).trim();
 
-        <div className="sd-card bhxh-stat-card">
-          <p className="bhxh-stat-label">
-            Đang tham gia
-          </p>
+    const employerRateText =
+      String(
+        rateForm.employerRate ?? ''
+      ).trim();
 
-          <strong
-            className={
-              'bhxh-stat-value ' +
-              'bhxh-stat-value--active'
-            }
-          >
-            {statistics.activeCount}
-          </strong>
-        </div>
+    if (!employeeRateText) {
+      return (
+        'Tỷ lệ nhân viên đóng là bắt buộc.'
+      );
+    }
 
-        <div className="sd-card bhxh-stat-card">
-          <p className="bhxh-stat-label">
-            Chờ hoàn tất
-          </p>
+    if (!employerRateText) {
+      return (
+        'Tỷ lệ doanh nghiệp đóng là bắt buộc.'
+      );
+    }
 
-          <strong
-            className={
-              'bhxh-stat-value ' +
-              'bhxh-stat-value--pending'
-            }
-          >
-            {statistics.pendingCount}
-          </strong>
-        </div>
-      </div>
+    const employeeRate =
+      Number(employeeRateText);
 
+    const employerRate =
+      Number(employerRateText);
 
-      {/* ================================================== */}
-      {/* DANH SÁCH NHÂN VIÊN */}
-      {/* ================================================== */}
+    if (
+      !Number.isFinite(employeeRate) ||
+      employeeRate < 0 ||
+      employeeRate > 100
+    ) {
+      return (
+        'Tỷ lệ nhân viên phải nằm ' +
+        'trong khoảng từ 0 đến 100.'
+      );
+    }
 
-      <div className="sd-card bhxh-list-card">
-        <div className="sd-card-header bhxh-list-header">
-          <div>
-            <p className="sd-eyebrow">
-              Hồ sơ tham gia
-            </p>
+    if (
+      !Number.isFinite(employerRate) ||
+      employerRate < 0 ||
+      employerRate > 100
+    ) {
+      return (
+        'Tỷ lệ doanh nghiệp phải nằm ' +
+        'trong khoảng từ 0 đến 100.'
+      );
+    }
 
-            <h2>
-              Danh sách nhân viên
-            </h2>
-          </div>
+    if (!rateForm.effectiveFrom) {
+      return (
+        'Ngày bắt đầu hiệu lực là bắt buộc.'
+      );
+    }
 
-          <input
-            className="bhxh-search"
-            type="search"
-            value={searchText}
-            placeholder="Tìm tên, email, mã số BHXH..."
-            onChange={(event) => {
-              setSearchText(
-                event.target.value
-              );
-            }}
-          />
-        </div>
+    if (
+      selectedRate &&
+      rateForm.effectiveFrom <=
+        getVietnamToday()
+    ) {
+      return (
+        'Ngày bắt đầu khi chỉnh sửa ' +
+        'phải nằm trong tương lai.'
+      );
+    }
 
-        {loading ? (
-          <p className="bhxh-loading">
-            Đang tải dữ liệu BHXH...
-          </p>
-        ) : (
-          <div className="sd-table-wrap">
-            <table className="sd-table bhxh-table">
-              <thead>
-                <tr>
-                  <th>
-                    Nhân viên
-                  </th>
+    if (
+      rateForm.effectiveTo &&
+      rateForm.effectiveTo <
+        rateForm.effectiveFrom
+    ) {
+      return (
+        'Ngày kết thúc không được ' +
+        'trước ngày bắt đầu.'
+      );
+    }
 
-                  <th>
-                    Loại Nhân viên
-                  </th>
+    return '';
+  }
 
-                  <th>
-                    Trạng thái
-                  </th>
+  async function handleSaveRate() {
+    const validationError =
+      validateRateForm();
 
-                  <th>
-                    Mã số BHXH
-                  </th>
+    if (validationError) {
+      setRateFormError(
+        validationError
+      );
 
-                  <th>
-                    Lương căn cứ
-                  </th>
+      return;
+    }
 
-                  <th>
-                    Thời gian tham gia
-                  </th>
+    const isEditing =
+      Boolean(selectedRate?.id);
 
-                  <th className="sd-text-right">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
+    const payload = {
+      employeeRate:
+        Number(
+          rateForm.employeeRate
+        ),
 
-              <tbody>
-                {employeeRows.map(
-                  (employee) => {
-                    const profile =
-                      employee.profile;
+      employerRate:
+        Number(
+          rateForm.employerRate
+        ),
 
-                    const status =
-                      normalizeStatus(
-                        profile?.status
-                      );
+      effectiveFrom:
+        rateForm.effectiveFrom,
 
-                    return (
-                      <tr
-                        key={
-                          employee.userId
-                        }
-                      >
-                        {/* NHÂN VIÊN */}
-                        <td>
-                          <strong className="bhxh-employee-name">
-                            {employee.fullName ||
-                              'Chưa có tên'}
-                          </strong>
+      effectiveTo:
+        rateForm.effectiveTo ||
+        null
+    };
 
-                          <span className="bhxh-secondary-text">
-                            {employee.email ||
-                              'Chưa có email'}
-                          </span>
+    setSavingKey('rate-save');
+    setRateFormError('');
 
-                          {employee.phoneNumber && (
-                            <span className="bhxh-secondary-text">
-                              {employee.phoneNumber}
-                            </span>
-                          )}
-                        </td>
+    try {
+      let response;
 
-                        {/* LOẠI NHÂN VIÊN */}
-                        <td>
-                          <strong>
-                            {formatEmploymentType(
-                              employee.employmentType
-                            )}
-                          </strong>
-
-                          <span className="bhxh-secondary-text">
-                            Tuyển dụng:{' '}
-                            {formatDate(
-                              employee.hireDate
-                            )}
-                          </span>
-                        </td>
-
-                        {/* TRẠNG THÁI */}
-                        <td>
-                          <StatusBadge
-                            status={
-                              profile?.status
-                            }
-                          />
-                        </td>
-
-                        {/* MÃ SỐ BHXH */}
-                        <td>
-                          <span className="bhxh-insurance-number">
-                            {profile
-                              ?.socialInsuranceNumber ||
-                              '—'}
-                          </span>
-                        </td>
-
-                        {/* LƯƠNG CĂN CỨ */}
-                        <td>
-                          <span className="bhxh-salary-basis">
-                            {profile
-                              ? formatMoney(
-                                  profile
-                                    .insuranceSalaryBasis
-                                )
-                              : '—'}
-                          </span>
-                        </td>
-
-                        {/* THỜI GIAN */}
-                        <td>
-                          {profile ? (
-                            <>
-                              <div>
-                                Từ:{' '}
-
-                                <strong>
-                                  {formatDate(
-                                    profile.startDate
-                                  )}
-                                </strong>
-                              </div>
-
-                              <span className="bhxh-secondary-text">
-                                Đến:{' '}
-
-                                {profile.endDate
-                                  ? formatDate(
-                                      profile.endDate
-                                    )
-                                  : 'Chưa xác định'}
-                              </span>
-                            </>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-
-                        {/* THAO TÁC */}
-                        <td>
-                          <div className="bhxh-actions">
-                            {!profile && (
-                              <button
-                                type="button"
-                                className="sd-btn-primary"
-                                disabled={saving}
-                                onClick={() => {
-                                  openCreateProfile(
-                                    employee
-                                  );
-                                }}
-                              >
-                                Tạo hồ sơ
-                              </button>
-                            )}
-
-                            {profile && (
-                              <button
-                                type="button"
-                                className={
-                                  'sd-action-btn ' +
-                                  'sd-action-edit'
-                                }
-                                title="Chỉnh sửa hồ sơ"
-                                disabled={saving}
-                                onClick={() => {
-                                  openEditProfile(
-                                    profile
-                                  );
-                                }}
-                              >
-                                ✎
-                              </button>
-                            )}
-
-                            {status ===
-                              PROFILE_STATUS.PENDING && (
-                              <button
-                                type="button"
-                                className="sd-btn-primary"
-                                disabled={saving}
-                                onClick={() => {
-                                  openStatusModal(
-                                    profile,
-                                    PROFILE_STATUS.ACTIVE
-                                  );
-                                }}
-                              >
-                                Kích hoạt
-                              </button>
-                            )}
-
-                            {status ===
-                              PROFILE_STATUS.ACTIVE && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="sd-btn-ghost"
-                                  disabled={saving}
-                                  onClick={() => {
-                                    openStatusModal(
-                                      profile,
-                                      PROFILE_STATUS.SUSPENDED
-                                    );
-                                  }}
-                                >
-                                  Tạm ngừng
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="sd-btn-ghost"
-                                  disabled={saving}
-                                  onClick={() => {
-                                    openStatusModal(
-                                      profile,
-                                      PROFILE_STATUS.STOPPED
-                                    );
-                                  }}
-                                >
-                                  Kết thúc
-                                </button>
-                              </>
-                            )}
-
-                            {status ===
-                              PROFILE_STATUS.SUSPENDED && (
-                              <>
-                                <button
-                                  type="button"
-                                  className="sd-btn-primary"
-                                  disabled={saving}
-                                  onClick={() => {
-                                    openStatusModal(
-                                      profile,
-                                      PROFILE_STATUS.ACTIVE
-                                    );
-                                  }}
-                                >
-                                  Kích hoạt lại
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="sd-btn-ghost"
-                                  disabled={saving}
-                                  onClick={() => {
-                                    openStatusModal(
-                                      profile,
-                                      PROFILE_STATUS.STOPPED
-                                    );
-                                  }}
-                                >
-                                  Kết thúc
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  }
-                )}
-
-                {employeeRows.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="bhxh-empty"
-                    >
-                      Không tìm thấy nhân viên FULL_TIME phù hợp.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ================================================== */}
-{/* CẤU HÌNH TỶ LỆ BHXH */}
-{/* ================================================== */}
-
-<div className="sd-card bhxh-rate-card">
-  <div className="sd-card-header bhxh-rate-header">
-    <div>
-      <p className="sd-eyebrow">
-        Cấu hình đóng BHXH
-      </p>
-
-      <h2>
-        Tỷ lệ đóng theo thời gian
-      </h2>
-
-      <p className="bhxh-description">
-        Tỷ lệ được sử dụng khi sinh khoản
-        đóng BHXH hằng tháng.
-      </p>
-    </div>
-
-    <button
-      type="button"
-      className={
-        'sd-btn-primary ' +
-        'bhxh-rate-create-button'
+      if (isEditing) {
+        response =
+          await updateSocialInsuranceRate(
+            selectedRate.id,
+            payload
+          );
+      } else {
+        response =
+          await createSocialInsuranceRate(
+            payload
+          );
       }
-      disabled={saving}
-      onClick={openCreateRateModal}
-    >
-      ＋ Tạo cấu hình mới
-    </button>
-  </div>
 
-  {activeRate && (
-    <div className="bhxh-current-rate">
-      <div>
-        <span>
-          Nhân viên đóng
-        </span>
+      setRateModalOpen(false);
+      setSelectedRate(null);
 
-        <strong>
-          {formatPercent(
-            activeRate.employeeRate
-          )}
-        </strong>
-      </div>
+      await loadOverview();
 
-      <div>
-        <span>
-          Doanh nghiệp đóng
-        </span>
+      setMessage({
+        type: 'success',
 
-        <strong>
-          {formatPercent(
-            activeRate.employerRate
-          )}
-        </strong>
-      </div>
+        text:
+          response?.message ||
+          (
+            isEditing
+              ? 'Đã cập nhật cấu hình tỷ lệ.'
+              : 'Đã tạo cấu hình tỷ lệ.'
+          )
+      });
+    } catch (error) {
+      setRateFormError(
+        getApiErrorMessage(
+          error,
+          isEditing
+            ? 'Không thể cập nhật cấu hình.'
+            : 'Không thể tạo cấu hình.'
+        )
+      );
+    } finally {
+      setSavingKey('');
+    }
+  }
 
-      <div>
-        <span>
-          Tổng tỷ lệ
-        </span>
+  function openDeactivateRateModal(rate) {
+    const effectiveFrom =
+      String(
+        rate?.effectiveFrom || ''
+      ).slice(0, 10);
 
-        <strong>
-          {formatPercent(
-            Number(
-              activeRate.employeeRate || 0
-            ) +
-            Number(
-              activeRate.employerRate || 0
-            )
-          )}
-        </strong>
-      </div>
+    const today =
+      getVietnamToday();
 
-      <div>
-        <span>
-          Hiệu lực từ
-        </span>
+    setDeactivateEffectiveTo(
+      today < effectiveFrom
+        ? effectiveFrom
+        : today
+    );
 
-        <strong>
-          {formatDate(
-            activeRate.effectiveFrom
-          )}
-        </strong>
-      </div>
-    </div>
-  )}
+    setDeactivateRateError('');
+    setMessage(null);
+    setDeactivateRateModal(rate);
+  }
 
-  {!activeRate && !loading && (
-    <div className="bhxh-rate-warning">
-      Hiện chưa có cấu hình tỷ lệ BHXH
-      đang hoạt động. Hệ thống sẽ không thể
-      sinh khoản đóng mới nếu không tìm thấy
-      cấu hình phù hợp.
-    </div>
-  )}
+  function closeDeactivateRateModal() {
+    if (isSaving) {
+      return;
+    }
 
-  {loading ? (
-    <p className="bhxh-loading">
-      Đang tải cấu hình tỷ lệ...
-    </p>
-  ) : (
-    <div className="sd-table-wrap">
-      <table className="sd-table bhxh-rate-table">
-        <thead>
-          <tr>
-            <th>
-              Nhân viên đóng
-            </th>
+    setDeactivateRateModal(null);
+    setDeactivateEffectiveTo('');
+    setDeactivateRateError('');
+  }
 
-            <th>
-              Doanh nghiệp đóng
-            </th>
+  async function handleDeactivateRate() {
+    const rate =
+      deactivateRateModal;
 
-            <th>
-              Tổng tỷ lệ
-            </th>
+    if (!rate?.id) {
+      setDeactivateRateError(
+        'Không xác định được cấu hình.'
+      );
 
-            <th>
-              Hiệu lực từ
-            </th>
+      return;
+    }
 
-            <th>
-              Hiệu lực đến
-            </th>
+    if (!deactivateEffectiveTo) {
+      setDeactivateRateError(
+        'Ngày kết thúc là bắt buộc.'
+      );
 
-            <th>
-              Trạng thái
-            </th>
+      return;
+    }
 
-            <th>
-              Người tạo
-            </th>
+    const effectiveFrom =
+      String(
+        rate.effectiveFrom || ''
+      ).slice(0, 10);
 
-            <th className="sd-text-right">
-              Thao tác
-            </th>
-          </tr>
-        </thead>
+    if (
+      deactivateEffectiveTo <
+      effectiveFrom
+    ) {
+      setDeactivateRateError(
+        'Ngày kết thúc không được trước ngày bắt đầu.'
+      );
 
-        <tbody>
-          {sortedRates.map((rate) => {
-            const totalRate =
-              Number(
-                rate.employeeRate || 0
-              ) +
-              Number(
-                rate.employerRate || 0
-              );
+      return;
+    }
 
-            return (
-              <tr key={rate.id}>
-                <td>
-                  <strong className="bhxh-rate-employee">
-                    {formatPercent(
-                      rate.employeeRate
-                    )}
-                  </strong>
-                </td>
+    setSavingKey('rate-deactivate');
+    setDeactivateRateError('');
 
-                <td>
-                  <strong className="bhxh-rate-employer">
-                    {formatPercent(
-                      rate.employerRate
-                    )}
-                  </strong>
-                </td>
+    try {
+      const response =
+        await deactivateSocialInsuranceRate(
+          rate.id,
+          {
+            effectiveTo:
+              deactivateEffectiveTo
+          }
+        );
 
-                <td>
-                  <strong>
-                    {formatPercent(totalRate)}
-                  </strong>
-                </td>
+      setDeactivateRateModal(null);
+      setDeactivateEffectiveTo('');
 
-                <td>
-                  {formatDate(
-                    rate.effectiveFrom
-                  )}
-                </td>
+      await loadOverview();
 
-                <td>
-                  {rate.effectiveTo
-                    ? formatDate(
-                        rate.effectiveTo
-                      )
-                    : 'Chưa xác định'}
-                </td>
-
-                <td>
-                  <span
-                    className={
-                      rate.isActive
-                        ? (
-                            'bhxh-rate-status ' +
-                            'bhxh-rate-status--active'
-                          )
-                        : (
-                            'bhxh-rate-status ' +
-                            'bhxh-rate-status--inactive'
-                          )
-                    }
-                  >
-                    {rate.isActive
-                      ? 'Đang áp dụng'
-                      : 'Đã ngừng'}
-                  </span>
-                </td>
-
-                <td>
-                  {rate.createdByUserName ||
-                    'Admin'}
-
-                  <span className="bhxh-secondary-text">
-                    Tạo lúc:{' '}
-                    {formatDate(rate.createdAt)}
-                  </span>
-                </td>
-
-                <td>
-  <div className="bhxh-rate-actions">
-    {/* Chỉ cấu hình đủ điều kiện mới có nút sửa. */}
-    {rate.canEdit && (
-      <button
-        type="button"
-        className="sd-btn-ghost"
-        disabled={saving}
-        onClick={() => {
-          openEditRateModal(rate);
-        }}
-      >
-        Chỉnh sửa
-      </button>
-    )}
-
-    {/* Cấu hình đang hoạt động có thể ngừng áp dụng. */}
-    {rate.isActive ? (
-      <button
-        type="button"
-        className="sd-btn-ghost"
-        disabled={saving}
-        onClick={() => {
-          openDeactivateRateModal(rate);
-        }}
-      >
-        Ngừng áp dụng
-      </button>
-    ) : (
-      <span className="bhxh-secondary-text">
-        Không có thao tác
-      </span>
-    )}
-  </div>
-</td>
-              </tr>
-            );
-          })}
-
-          {sortedRates.length === 0 && (
-            <tr>
-              <td
-                colSpan={8}
-                className="bhxh-empty"
-              >
-                Chưa có cấu hình tỷ lệ BHXH.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  )}
-</div>
+      setMessage({
+        type: 'success',
+        text:
+          response?.message ||
+          'Đã ngừng áp dụng cấu hình.'
+      });
+    } catch (error) {
+      setDeactivateRateError(
+        getApiErrorMessage(
+          error,
+          'Không thể ngừng cấu hình.'
+        )
+      );
+    } finally {
+      setSavingKey('');
+    }
+  }
 
 
-{/* ================================================== */}
-{/* MODAL TẠO CẤU HÌNH TỶ LỆ */}
-{/* ================================================== */}
+  // ==========================================================
+  // KHOẢN ĐÓNG HẰNG THÁNG
+  // ==========================================================
 
-{rateModal && (
-  <div
-    className="sd-overlay"
-    onClick={closeRateModal}
-  >
-    <div
-      className="sd-modal"
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      <div className="sd-modal-header">
-        <div>
-         <h2>
-  {selectedRate
-    ? 'Chỉnh sửa cấu hình tỷ lệ BHXH'
-    : 'Tạo cấu hình tỷ lệ BHXH'}
-</h2>
+  async function handleGenerateContributions() {
+    if (!selectedPeriodRate) {
+      setMessage({
+        type: 'error',
+        text:
+          `Không tìm thấy cấu hình tỷ lệ ` +
+          `có hiệu lực cho tháng ` +
+          `${selectedMonth}/${selectedYear}.`
+      });
 
-          <span className="bhxh-secondary-text">
-            Tỷ lệ nhập theo đơn vị phần trăm
-          </span>
-        </div>
+      return;
+    }
 
-        <button
-          type="button"
-          disabled={saving}
-          onClick={closeRateModal}
-        >
-          ✕
-        </button>
-      </div>
+    const accepted =
+      window.confirm(
+        `Sinh khoản đóng BHXH tháng ` +
+        `${selectedMonth}/${selectedYear}?\n\n` +
+        `Chỉ hồ sơ ACTIVE, Staff đã xác nhận ` +
+        `và nhân viên FULL_TIME mới được tạo.`
+      );
 
-      <div className="sd-modal-body">
-        <div className="sd-modal-grid">
-          <div className="sd-field">
-            <label>
-              Tỷ lệ nhân viên đóng (%) *
-            </label>
+    if (!accepted) {
+      return;
+    }
 
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={rateForm.employeeRate}
-              placeholder="Ví dụ: 8"
-              onChange={(event) => {
-                setRateForm(
-                  (current) => ({
-                    ...current,
+    setSavingKey('contribution-generate');
+    setMessage(null);
 
-                    employeeRate:
-                      event.target.value
-                  })
-                );
-              }}
-            />
-          </div>
+    try {
+      const response =
+        await generateSocialInsuranceContributions(
+          {
+            month:
+              Number(selectedMonth),
 
-          <div className="sd-field">
-            <label>
-              Tỷ lệ doanh nghiệp đóng (%) *
-            </label>
+            year:
+              Number(selectedYear)
+          }
+        );
 
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={rateForm.employerRate}
-              placeholder="Ví dụ: 17.5"
-              onChange={(event) => {
-                setRateForm(
-                  (current) => ({
-                    ...current,
+      await loadContributions(
+        selectedMonth,
+        selectedYear
+      );
 
-                    employerRate:
-                      event.target.value
-                  })
-                );
-              }}
-            />
-          </div>
+      setMessage({
+        type: 'success',
 
-          <div className="sd-field">
-            <label>
-              Ngày bắt đầu hiệu lực *
-            </label>
+        text:
+          response?.message ||
+          (
+            `Đã tạo ` +
+            `${response?.createdCount || 0} ` +
+            `khoản đóng BHXH.`
+          )
+      });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: getApiErrorMessage(
+          error,
+          'Không thể sinh khoản đóng BHXH.'
+        )
+      });
+    } finally {
+      setSavingKey('');
+    }
+  }
 
-            <input
-              type="date"
-              value={rateForm.effectiveFrom}
-              onChange={(event) => {
-                setRateForm(
-                  (current) => ({
-                    ...current,
+  async function handleConfirmContribution(
+    contribution
+  ) {
+    const accepted =
+      window.confirm(
+        `Xác nhận khoản đóng BHXH của ` +
+        `${contribution.fullName} ` +
+        `tháng ${contribution.month}/` +
+        `${contribution.year}?`
+      );
 
-                    effectiveFrom:
-                      event.target.value
-                  })
-                );
-              }}
-            />
-          </div>
+    if (!accepted) {
+      return;
+    }
 
-          <div className="sd-field">
-            <label>
-              Ngày kết thúc hiệu lực
-            </label>
+    setSavingKey(
+      `contribution-confirm-${contribution.id}`
+    );
 
-            <input
-              type="date"
-              min={
-                rateForm.effectiveFrom ||
-                undefined
-              }
-              value={rateForm.effectiveTo}
-              onChange={(event) => {
-                setRateForm(
-                  (current) => ({
-                    ...current,
+    try {
+      const response =
+        await confirmSocialInsuranceContribution(
+          contribution.id
+        );
 
-                    effectiveTo:
-                      event.target.value
-                  })
-                );
-              }}
-            />
-          </div>
-        </div>
+      await loadContributions(
+        selectedMonth,
+        selectedYear
+      );
 
-        <div className="bhxh-rate-preview">
-          <div>
-            <span>
-              Nhân viên đóng
+      setMessage({
+        type: 'success',
+        text:
+          response?.message ||
+          'Đã xác nhận khoản đóng BHXH.'
+      });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: getApiErrorMessage(
+          error,
+          'Không thể xác nhận khoản đóng.'
+        )
+      });
+    } finally {
+      setSavingKey('');
+    }
+  }
+
+  async function handleMarkPaid(
+    contribution
+  ) {
+    const accepted =
+      window.confirm(
+        `Đánh dấu khoản đóng của ` +
+        `${contribution.fullName} ` +
+        `tháng ${contribution.month}/` +
+        `${contribution.year} là đã nộp?`
+      );
+
+    if (!accepted) {
+      return;
+    }
+
+    setSavingKey(
+      `contribution-paid-${contribution.id}`
+    );
+
+    try {
+      const response =
+        await markSocialInsuranceContributionPaid(
+          contribution.id
+        );
+
+      await loadContributions(
+        selectedMonth,
+        selectedYear
+      );
+
+      setMessage({
+        type: 'success',
+        text:
+          response?.message ||
+          'Đã đánh dấu khoản đóng là PAID.'
+      });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: getApiErrorMessage(
+          error,
+          'Không thể đánh dấu khoản đóng đã nộp.'
+        )
+      });
+    } finally {
+      setSavingKey('');
+    }
+  }
+
+  function openCancelContributionModal(
+    contribution
+  ) {
+    setCancelContributionModal(
+      contribution
+    );
+
+    setCancelReason('');
+    setCancelContributionError('');
+    setMessage(null);
+  }
+
+  function closeCancelContributionModal() {
+    if (isSaving) {
+      return;
+    }
+
+    setCancelContributionModal(null);
+    setCancelReason('');
+    setCancelContributionError('');
+  }
+
+  async function handleCancelContribution() {
+    const contribution =
+      cancelContributionModal;
+
+    const normalizedReason =
+      cancelReason.trim();
+
+    if (!contribution?.id) {
+      setCancelContributionError(
+        'Không xác định được khoản đóng.'
+      );
+
+      return;
+    }
+
+    if (!normalizedReason) {
+      setCancelContributionError(
+        'Vui lòng nhập lý do hủy.'
+      );
+
+      return;
+    }
+
+    if (normalizedReason.length > 500) {
+      setCancelContributionError(
+        'Lý do hủy không được vượt quá 500 ký tự.'
+      );
+
+      return;
+    }
+
+    setSavingKey('contribution-cancel');
+    setCancelContributionError('');
+
+    try {
+      const response =
+        await cancelSocialInsuranceContribution(
+          contribution.id,
+          {
+            reason:
+              normalizedReason
+          }
+        );
+
+      setCancelContributionModal(null);
+      setCancelReason('');
+
+      await loadContributions(
+        selectedMonth,
+        selectedYear
+      );
+
+      setMessage({
+        type: 'success',
+        text:
+          response?.message ||
+          'Đã hủy khoản đóng BHXH.'
+      });
+    } catch (error) {
+      setCancelContributionError(
+        getApiErrorMessage(
+          error,
+          'Không thể hủy khoản đóng.'
+        )
+      );
+    } finally {
+      setSavingKey('');
+    }
+  }
+
+
+  // ==========================================================
+  // RENDER HỒ SƠ
+  // ==========================================================
+
+  function renderProfilesSection() {
+    return (
+      <>
+        <div className="bhxh-stat-grid bhxh-stat-grid--five">
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon">
+              👥
             </span>
 
-            <strong>
-              {formatPercent(
-                rateForm.employeeRate
-              )}
-            </strong>
+            <div>
+              <p>Nhân viên FULL_TIME</p>
+              <strong>
+                {profileStatistics.employees}
+              </strong>
+            </div>
           </div>
 
-          <div>
-            <span>
-              Doanh nghiệp đóng
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon">
+              📁
             </span>
 
-            <strong>
-              {formatPercent(
-                rateForm.employerRate
-              )}
-            </strong>
+            <div>
+              <p>Đã có hồ sơ</p>
+              <strong>
+                {profileStatistics.profiles}
+              </strong>
+            </div>
           </div>
 
-          <div>
-            <span>
-              Tổng tỷ lệ
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon bhxh-stat-icon--success">
+              ✓
             </span>
 
-            <strong>
-              {formatPercent(
-                Number(
-                  rateForm.employeeRate || 0
-                ) +
-                Number(
-                  rateForm.employerRate || 0
-                )
-              )}
-            </strong>
+            <div>
+              <p>Đang tham gia</p>
+              <strong>
+                {profileStatistics.active}
+              </strong>
+            </div>
           </div>
-        </div>
 
-        <p className="bhxh-modal-note bhxh-modal-note--info">
-  {selectedRate
-    ? (
-        <>
-          Chỉ cấu hình chưa đến ngày hiệu lực
-          và chưa được dùng để sinh khoản đóng
-          mới được chỉnh sửa.
-        </>
-      )
-    : (
-        <>
-          Cấu hình mới chỉ ảnh hưởng đến các
-          khoản đóng được sinh sau đó. Các khoản
-          đóng đã tạo vẫn giữ tỷ lệ đã lưu trước đây.
-        </>
-      )}
-</p>
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon bhxh-stat-icon--warning">
+              ⏳
+            </span>
 
-        {rateFormError && (
-          <p className="sd-status sd-status-error">
-            {rateFormError}
-          </p>
-        )}
-      </div>
-
-      <div className="sd-modal-footer">
-        <button
-          type="button"
-          className="sd-btn-ghost"
-          disabled={saving}
-          onClick={closeRateModal}
-        >
-          Hủy
-        </button>
-
-        <button
-  type="button"
-  className="sd-btn-primary"
-  disabled={saving}
-  onClick={handleSaveRate}
->
-  {saving
-    ? (
-        selectedRate
-          ? 'Đang cập nhật...'
-          : 'Đang tạo...'
-      )
-    : (
-        selectedRate
-          ? 'Lưu thay đổi'
-          : 'Tạo cấu hình'
-      )}
-</button>
-      </div>
-    </div>
-  </div>
-)}
-
-{/* ================================================== */}
-{/* MODAL NGỪNG CẤU HÌNH TỶ LỆ */}
-{/* ================================================== */}
-
-{deactivateRateModal && (
-  <div
-    className="sd-overlay"
-    onClick={closeDeactivateRateModal}
-  >
-    <div
-      className="sd-modal"
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      <div className="sd-modal-header">
-        <div>
-          <h2>
-            Ngừng áp dụng cấu hình
-          </h2>
-
-          <span className="bhxh-secondary-text">
-            Nhân viên{' '}
-            {formatPercent(
-              deactivateRateModal.employeeRate
-            )}
-            {' · '}
-            Doanh nghiệp{' '}
-            {formatPercent(
-              deactivateRateModal.employerRate
-            )}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          disabled={saving}
-          onClick={
-            closeDeactivateRateModal
-          }
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="sd-modal-body">
-        <div className="sd-field">
-          <label>
-            Ngày cuối cùng còn hiệu lực *
-          </label>
-
-          <input
-            type="date"
-            min={
-              String(
-                deactivateRateModal
-                  .effectiveFrom || ''
-              ).slice(0, 10)
-            }
-            value={deactivateEffectiveTo}
-            onChange={(event) => {
-              setDeactivateEffectiveTo(
-                event.target.value
-              );
-            }}
-          />
-        </div>
-
-        <p className="bhxh-modal-note bhxh-modal-note--warning">
-          Cấu hình sẽ không bị xóa khỏi hệ thống.
-          Các khoản đóng đã sử dụng cấu hình này
-          vẫn được giữ nguyên.
-        </p>
-
-        {deactivateRateError && (
-          <p className="sd-status sd-status-error">
-            {deactivateRateError}
-          </p>
-        )}
-      </div>
-
-      <div className="sd-modal-footer">
-        <button
-          type="button"
-          className="sd-btn-ghost"
-          disabled={saving}
-          onClick={
-            closeDeactivateRateModal
-          }
-        >
-          Hủy
-        </button>
-
-        <button
-          type="button"
-          className={
-            'sd-btn-primary ' +
-            'bhxh-danger-button'
-          }
-          disabled={saving}
-          onClick={handleDeactivateRate}
-        >
-          {saving
-            ? 'Đang cập nhật...'
-            : 'Xác nhận ngừng'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-      {/* ================================================== */}
-      {/* MODAL TẠO / CẬP NHẬT HỒ SƠ */}
-      {/* ================================================== */}
-
-      {profileModal && (
-        <div
-          className="sd-overlay"
-          onClick={
-            closeProfileModal
-          }
-        >
-          <div
-            className="sd-modal"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-          >
-            <div className="sd-modal-header">
-              <div>
-                <h2>
-                  {profileModal ===
-                  'create'
-                    ? 'Tạo hồ sơ BHXH'
-                    : 'Cập nhật hồ sơ BHXH'}
-                </h2>
-
-                <span className="bhxh-secondary-text">
-                  {profileModal ===
-                  'create'
-                    ? selectedEmployee
-                        ?.fullName
-                    : selectedProfile
-                        ?.fullName}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                disabled={saving}
-                onClick={
-                  closeProfileModal
+            <div>
+              <p>Chờ Staff xác nhận</p>
+              <strong>
+                {
+                  profileStatistics
+                    .waitingConfirmation
                 }
-              >
-                ✕
-              </button>
+              </strong>
+            </div>
+          </div>
+
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon bhxh-stat-icon--danger">
+              !
+            </span>
+
+            <div>
+              <p>Yêu cầu chỉnh sửa</p>
+              <strong>
+                {
+                  profileStatistics
+                    .changeRequested
+                }
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <section className="bhxh-panel">
+          <div className="bhxh-panel-header">
+            <div>
+              <p className="bhxh-kicker">
+                Hồ sơ tham gia
+              </p>
+
+              <h2>
+                Danh sách nhân viên
+              </h2>
+
+              <p>
+                Tạo hồ sơ, theo dõi xác nhận của
+                Staff và quản lý trạng thái tham gia.
+              </p>
             </div>
 
-            <div className="sd-modal-body">
-              <div className="sd-modal-grid">
-                <div className="sd-field">
-                  <label>
-                    Mã số BHXH
-                  </label>
+            <button
+              type="button"
+              className="bhxh-btn bhxh-btn--light"
+              disabled={loadingOverview}
+              onClick={() => {
+                loadOverview();
+              }}
+            >
+              ↻ Làm mới
+            </button>
+          </div>
 
-                  <input
-                    type="text"
-                    maxLength={20}
-                    value={
-                      profileForm
-                        .socialInsuranceNumber
-                    }
-                    placeholder="Có thể để trống khi PENDING"
-                    onChange={(event) => {
-                      setProfileForm(
-                        (current) => ({
-                          ...current,
+          <div className="bhxh-toolbar">
+            <div className="bhxh-search-box">
+              <span>⌕</span>
 
-                          socialInsuranceNumber:
-                            event.target.value
-                        })
+              <input
+                type="search"
+                value={searchText}
+                placeholder={
+                  'Tìm tên, email, mã số BHXH hoặc phản hồi...'
+                }
+                onChange={(event) => {
+                  setSearchText(
+                    event.target.value
+                  );
+                }}
+              />
+
+              {searchText && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchText('');
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <select
+              value={profileStatusFilter}
+              onChange={(event) => {
+                setProfileStatusFilter(
+                  event.target.value
+                );
+              }}
+            >
+              <option value="ALL">
+                Tất cả trạng thái hồ sơ
+              </option>
+
+              <option value="PENDING">
+                Chờ hoàn tất
+              </option>
+
+              <option value="ACTIVE">
+                Đang tham gia
+              </option>
+
+              <option value="SUSPENDED">
+                Tạm ngừng
+              </option>
+
+              <option value="STOPPED">
+                Đã kết thúc
+              </option>
+            </select>
+
+            <select
+              value={confirmationFilter}
+              onChange={(event) => {
+                setConfirmationFilter(
+                  event.target.value
+                );
+              }}
+            >
+              <option value="ALL">
+                Tất cả xác nhận Staff
+              </option>
+
+              <option value="PENDING">
+                Chờ Staff xác nhận
+              </option>
+
+              <option value="CONFIRMED">
+                Staff đã xác nhận
+              </option>
+
+              <option value="CHANGE_REQUESTED">
+                Yêu cầu chỉnh sửa
+              </option>
+            </select>
+
+            <span className="bhxh-result-count">
+              {employeeRows.length} nhân viên
+            </span>
+          </div>
+
+          {loadingOverview ? (
+            <div className="bhxh-loading">
+              Đang tải danh sách hồ sơ...
+            </div>
+          ) : employeeRows.length === 0 ? (
+            <EmptyState
+              icon="👤"
+              title="Không tìm thấy nhân viên"
+              description={
+                'Hãy thay đổi từ khóa hoặc bộ lọc.'
+              }
+            />
+          ) : (
+            <div className="bhxh-table-wrap">
+              <table className="bhxh-table bhxh-profile-table">
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Hồ sơ</th>
+                    <th>Xác nhận Staff</th>
+                    <th>Thông tin đóng</th>
+                    <th>Thời gian tham gia</th>
+                    <th className="bhxh-align-right">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {employeeRows.map(
+                    (employee) => {
+                      const profile =
+                        employee.profile;
+
+                      const status =
+                        normalizeStatus(
+                          profile?.status
+                        );
+
+                      const confirmationStatus =
+                        normalizeStatus(
+                          profile
+                            ?.staffConfirmationStatus
+                        );
+
+                      const canActivate =
+                        Boolean(profile) &&
+                        confirmationStatus ===
+                          STAFF_CONFIRMATION_STATUS
+                            .CONFIRMED;
+
+                      return (
+                        <tr
+                          key={employee.userId}
+                        >
+                          <td>
+                            <div className="bhxh-person">
+                              <div className="bhxh-person-avatar">
+                                {String(
+                                  employee.fullName ||
+                                  'NV'
+                                )
+                                  .split(' ')
+                                  .filter(Boolean)
+                                  .slice(-2)
+                                  .map(
+                                    (part) =>
+                                      part[0]
+                                  )
+                                  .join('')
+                                  .toUpperCase()}
+                              </div>
+
+                              <div>
+                                <strong>
+                                  {
+                                    employee.fullName ||
+                                    'Chưa có tên'
+                                  }
+                                </strong>
+
+                                <span>
+                                  {
+                                    employee.email ||
+                                    'Chưa có email'
+                                  }
+                                </span>
+
+                                <small>
+                                  {
+                                    formatEmploymentType(
+                                      employee
+                                        .employmentType
+                                    )
+                                  }
+                                </small>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td>
+                            {profile ? (
+                              <div className="bhxh-cell-stack">
+                                <ProfileStatusBadge
+                                  status={
+                                    profile.status
+                                  }
+                                />
+
+                                <span>
+                                  Mã hồ sơ #{profile.id}
+                                </span>
+                              </div>
+                            ) : (
+                              <Badge
+                                display={{
+                                  label:
+                                    'Chưa có hồ sơ',
+                                  className:
+                                    'bhxh-badge--neutral'
+                                }}
+                              />
+                            )}
+                          </td>
+
+                          <td>
+                            {profile ? (
+                              <div className="bhxh-cell-stack bhxh-confirmation-cell">
+                                <StaffConfirmationBadge
+                                  status={
+                                    profile
+                                      .staffConfirmationStatus
+                                  }
+                                />
+
+                                {profile.staffConfirmedAt && (
+                                  <span>
+                                    {
+                                      formatDateTime(
+                                        profile
+                                          .staffConfirmedAt
+                                      )
+                                    }
+                                  </span>
+                                )}
+
+                                {profile.staffConfirmationNote && (
+                                  <div className="bhxh-staff-note">
+                                    <strong>
+                                      Staff phản hồi:
+                                    </strong>
+
+                                    <p>
+                                      {
+                                        profile
+                                          .staffConfirmationNote
+                                      }
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="bhxh-muted">
+                                —
+                              </span>
+                            )}
+                          </td>
+
+                          <td>
+                            {profile ? (
+                              <div className="bhxh-cell-stack">
+                                <strong className="bhxh-code">
+                                  {
+                                    profile
+                                      .socialInsuranceNumber ||
+                                    'Chưa có mã BHXH'
+                                  }
+                                </strong>
+
+                                <span className="bhxh-money">
+                                  {
+                                    formatMoney(
+                                      profile
+                                        .insuranceSalaryBasis
+                                    )
+                                  }
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="bhxh-muted">
+                                —
+                              </span>
+                            )}
+                          </td>
+
+                          <td>
+                            {profile ? (
+                              <div className="bhxh-cell-stack">
+                                <span>
+                                  Từ{' '}
+                                  <strong>
+                                    {
+                                      formatDate(
+                                        profile
+                                          .startDate
+                                      )
+                                    }
+                                  </strong>
+                                </span>
+
+                                <span>
+                                  Đến{' '}
+                                  <strong>
+                                    {
+                                      profile.endDate
+                                        ? formatDate(
+                                            profile
+                                              .endDate
+                                          )
+                                        : 'Chưa xác định'
+                                    }
+                                  </strong>
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="bhxh-muted">
+                                —
+                              </span>
+                            )}
+                          </td>
+
+                          <td>
+                            <div className="bhxh-row-actions">
+                              {!profile && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--primary"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    openCreateProfile(
+                                      employee
+                                    );
+                                  }}
+                                >
+                                  Tạo hồ sơ
+                                </button>
+                              )}
+
+                              {profile && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--light"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    openEditProfile(
+                                      profile
+                                    );
+                                  }}
+                                >
+                                  ✎ Chỉnh sửa
+                                </button>
+                              )}
+
+                              {status ===
+                                PROFILE_STATUS.PENDING && (
+                                canActivate ? (
+                                  <button
+                                    type="button"
+                                    className="bhxh-btn bhxh-btn--success"
+                                    disabled={isSaving}
+                                    onClick={() => {
+                                      openStatusModal(
+                                        profile,
+                                        PROFILE_STATUS
+                                          .ACTIVE
+                                      );
+                                    }}
+                                  >
+                                    ✓ Kích hoạt
+                                  </button>
+                                ) : (
+                                  <span className="bhxh-action-hint">
+                                    {
+                                      confirmationStatus ===
+                                      STAFF_CONFIRMATION_STATUS
+                                        .CHANGE_REQUESTED
+                                        ? 'Cần chỉnh sửa hồ sơ'
+                                        : 'Chờ Staff xác nhận'
+                                    }
+                                  </span>
+                                )
+                              )}
+
+                              {status ===
+                                PROFILE_STATUS.ACTIVE && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="bhxh-btn bhxh-btn--warning"
+                                    disabled={isSaving}
+                                    onClick={() => {
+                                      openStatusModal(
+                                        profile,
+                                        PROFILE_STATUS
+                                          .SUSPENDED
+                                      );
+                                    }}
+                                  >
+                                    Tạm ngừng
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="bhxh-btn bhxh-btn--danger-light"
+                                    disabled={isSaving}
+                                    onClick={() => {
+                                      openStatusModal(
+                                        profile,
+                                        PROFILE_STATUS
+                                          .STOPPED
+                                      );
+                                    }}
+                                  >
+                                    Kết thúc
+                                  </button>
+                                </>
+                              )}
+
+                              {status ===
+                                PROFILE_STATUS.SUSPENDED && (
+                                <>
+                                  {canActivate ? (
+                                    <button
+                                      type="button"
+                                      className="bhxh-btn bhxh-btn--success"
+                                      disabled={isSaving}
+                                      onClick={() => {
+                                        openStatusModal(
+                                          profile,
+                                          PROFILE_STATUS
+                                            .ACTIVE
+                                        );
+                                      }}
+                                    >
+                                      Kích hoạt lại
+                                    </button>
+                                  ) : (
+                                    <span className="bhxh-action-hint">
+                                      Chưa được Staff xác nhận
+                                    </span>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    className="bhxh-btn bhxh-btn--danger-light"
+                                    disabled={isSaving}
+                                    onClick={() => {
+                                      openStatusModal(
+                                        profile,
+                                        PROFILE_STATUS
+                                          .STOPPED
+                                      );
+                                    }}
+                                  >
+                                    Kết thúc
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       );
-                    }}
-                  />
-                </div>
-
-                <div className="sd-field">
-                  <label>
-                    Mức lương làm căn cứ *
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1"
-                    step="1000"
-                    value={
-                      profileForm
-                        .insuranceSalaryBasis
                     }
-                    placeholder="Ví dụ: 6000000"
-                    onChange={(event) => {
-                      setProfileForm(
-                        (current) => ({
-                          ...current,
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </>
+    );
+  }
 
-                          insuranceSalaryBasis:
-                            event.target.value
-                        })
-                      );
-                    }}
-                  />
-                </div>
 
-                <div className="sd-field">
-                  <label>
-                    Ngày bắt đầu *
-                  </label>
+  // ==========================================================
+  // RENDER KHOẢN ĐÓNG
+  // ==========================================================
 
-                  <input
-                    type="date"
-                    value={
-                      profileForm.startDate
-                    }
-                    onChange={(event) => {
-                      setProfileForm(
-                        (current) => ({
-                          ...current,
+  function renderContributionsSection() {
+    return (
+      <>
+        <section className="bhxh-panel">
+          <div className="bhxh-panel-header bhxh-panel-header--period">
+            <div>
+              <p className="bhxh-kicker">
+                Kỳ đóng BHXH
+              </p>
 
-                          startDate:
-                            event.target.value
-                        })
-                      );
-                    }}
-                  />
-                </div>
+              <h2>
+                Tháng {selectedMonth}/{selectedYear}
+              </h2>
 
-                <div className="sd-field">
-                  <label>
-                    Ngày kết thúc
-                  </label>
+              <p>
+                Sinh và xử lý khoản đóng cho các
+                hồ sơ đủ điều kiện.
+              </p>
+            </div>
 
-                  <input
-                    type="date"
-                    min={
-                      profileForm.startDate ||
-                      undefined
-                    }
-                    value={
-                      profileForm.endDate
-                    }
-                    onChange={(event) => {
-                      setProfileForm(
-                        (current) => ({
-                          ...current,
+            <div className="bhxh-period-controls">
+              <label>
+                <span>Tháng</span>
 
-                          endDate:
-                            event.target.value
-                        })
-                      );
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="sd-field">
-                <label>
-                  Ghi chú
-                </label>
-
-                <textarea
-                  rows={4}
-                  maxLength={500}
-                  value={
-                    profileForm.note
-                  }
-                  placeholder="Thông tin bổ sung về hồ sơ..."
+                <select
+                  value={selectedMonth}
                   onChange={(event) => {
-                    setProfileForm(
-                      (current) => ({
-                        ...current,
+                    setSelectedMonth(
+                      Number(
+                        event.target.value
+                      )
+                    );
+                  }}
+                >
+                  {Array.from(
+                    {
+                      length: 12
+                    },
+                    (
+                      _,
+                      index
+                    ) => index + 1
+                  ).map((month) => (
+                    <option
+                      key={month}
+                      value={month}
+                    >
+                      Tháng {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                        note:
-                          event.target.value
-                      })
+              <label>
+                <span>Năm</span>
+
+                <input
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={selectedYear}
+                  onChange={(event) => {
+                    setSelectedYear(
+                      Number(
+                        event.target.value
+                      )
                     );
                   }}
                 />
-              </div>
+              </label>
 
-              {profileFormError && (
-                <p className="sd-status sd-status-error">
-                  {profileFormError}
-                </p>
-              )}
-            </div>
-
-            <div className="sd-modal-footer">
               <button
                 type="button"
-                className="sd-btn-ghost"
-                disabled={saving}
-                onClick={
-                  closeProfileModal
+                className="bhxh-btn bhxh-btn--light"
+                disabled={
+                  loadingContributions
                 }
+                onClick={() => {
+                  loadContributions(
+                    selectedMonth,
+                    selectedYear
+                  );
+                }}
+              >
+                ↻ Tải lại
+              </button>
+
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--primary"
+                disabled={isSaving}
+                onClick={
+                  handleGenerateContributions
+                }
+              >
+                {savingKey ===
+                'contribution-generate'
+                  ? 'Đang sinh...'
+                  : '＋ Sinh khoản đóng'}
+              </button>
+            </div>
+          </div>
+
+          {selectedPeriodRate ? (
+            <div className="bhxh-period-rate">
+              <div>
+                <span>
+                  Tỷ lệ áp dụng
+                </span>
+
+                <strong>
+                  {
+                    formatPercent(
+                      selectedPeriodRate
+                        .employeeRate
+                    )
+                  }
+                  {' + '}
+                  {
+                    formatPercent(
+                      selectedPeriodRate
+                        .employerRate
+                    )
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Nhân viên đóng
+                </span>
+
+                <strong>
+                  {
+                    formatPercent(
+                      selectedPeriodRate
+                        .employeeRate
+                    )
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Doanh nghiệp đóng
+                </span>
+
+                <strong>
+                  {
+                    formatPercent(
+                      selectedPeriodRate
+                        .employerRate
+                    )
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Hiệu lực từ
+                </span>
+
+                <strong>
+                  {
+                    formatDate(
+                      selectedPeriodRate
+                        .effectiveFrom
+                    )
+                  }
+                </strong>
+              </div>
+            </div>
+          ) : (
+            <div className="bhxh-inline-alert bhxh-inline-alert--warning">
+              Chưa có cấu hình tỷ lệ phù hợp cho
+              kỳ {selectedMonth}/{selectedYear}.
+              Không thể sinh khoản đóng mới.
+            </div>
+          )}
+        </section>
+
+        <div className="bhxh-stat-grid">
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon">
+              📄
+            </span>
+
+            <div>
+              <p>Tổng khoản đóng</p>
+              <strong>
+                {
+                  contributionStatistics
+                    .totalCount
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon bhxh-stat-icon--warning">
+              D
+            </span>
+
+            <div>
+              <p>Đang DRAFT</p>
+              <strong>
+                {
+                  contributionStatistics
+                    .draftCount
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon bhxh-stat-icon--blue">
+              C
+            </span>
+
+            <div>
+              <p>Đã xác nhận</p>
+              <strong>
+                {
+                  contributionStatistics
+                    .confirmedCount
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="bhxh-stat">
+            <span className="bhxh-stat-icon bhxh-stat-icon--success">
+              ✓
+            </span>
+
+            <div>
+              <p>Đã nộp</p>
+              <strong>
+                {
+                  contributionStatistics
+                    .paidCount
+                }
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <section className="bhxh-panel">
+          <div className="bhxh-money-summary">
+            <div>
+              <span>
+                Tổng nhân viên đóng
+              </span>
+
+              <strong>
+                {
+                  formatMoney(
+                    contributionStatistics
+                      .employeeAmount
+                  )
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Tổng doanh nghiệp đóng
+              </span>
+
+              <strong>
+                {
+                  formatMoney(
+                    contributionStatistics
+                      .employerAmount
+                  )
+                }
+              </strong>
+            </div>
+
+            <div className="bhxh-money-summary-total">
+              <span>Tổng cộng</span>
+
+              <strong>
+                {
+                  formatMoney(
+                    contributionStatistics
+                      .totalAmount
+                  )
+                }
+              </strong>
+            </div>
+          </div>
+
+          {loadingContributions ? (
+            <div className="bhxh-loading">
+              Đang tải khoản đóng BHXH...
+            </div>
+          ) : contributions.length === 0 ? (
+            <EmptyState
+              icon="📄"
+              title={
+                `Chưa có khoản đóng tháng ` +
+                `${selectedMonth}/${selectedYear}`
+              }
+              description={
+                'Nhấn “Sinh khoản đóng” để tạo các bản ghi DRAFT.'
+              }
+            />
+          ) : (
+            <div className="bhxh-table-wrap">
+              <table className="bhxh-table bhxh-contribution-table">
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Lương căn cứ</th>
+                    <th>Nhân viên đóng</th>
+                    <th>Doanh nghiệp đóng</th>
+                    <th>Tổng cộng</th>
+                    <th>Trạng thái</th>
+                    <th>Xử lý</th>
+                    <th className="bhxh-align-right">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {contributions.map(
+                    (contribution) => {
+                      const status =
+                        normalizeStatus(
+                          contribution.status
+                        );
+
+                      return (
+                        <tr
+                          key={contribution.id}
+                        >
+                          <td>
+                            <div className="bhxh-cell-stack">
+                              <strong>
+                                {
+                                  contribution
+                                    .fullName ||
+                                  'Nhân viên'
+                                }
+                              </strong>
+
+                              <span>
+                                Mã khoản #
+                                {contribution.id}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td>
+                            <strong className="bhxh-money">
+                              {
+                                formatMoney(
+                                  contribution
+                                    .insuranceSalaryBasis
+                                )
+                              }
+                            </strong>
+                          </td>
+
+                          <td>
+                            <div className="bhxh-cell-stack">
+                              <strong>
+                                {
+                                  formatMoney(
+                                    contribution
+                                      .employeeAmount
+                                  )
+                                }
+                              </strong>
+
+                              <span>
+                                {
+                                  formatPercent(
+                                    contribution
+                                      .employeeRate
+                                  )
+                                }
+                              </span>
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="bhxh-cell-stack">
+                              <strong>
+                                {
+                                  formatMoney(
+                                    contribution
+                                      .employerAmount
+                                  )
+                                }
+                              </strong>
+
+                              <span>
+                                {
+                                  formatPercent(
+                                    contribution
+                                      .employerRate
+                                  )
+                                }
+                              </span>
+                            </div>
+                          </td>
+
+                          <td>
+                            <strong className="bhxh-total-money">
+                              {
+                                formatMoney(
+                                  contribution
+                                    .totalAmount
+                                )
+                              }
+                            </strong>
+                          </td>
+
+                          <td>
+                            <ContributionStatusBadge
+                              status={
+                                contribution.status
+                              }
+                            />
+                          </td>
+
+                          <td>
+                            <div className="bhxh-cell-stack">
+                              {contribution.confirmedAt && (
+                                <span>
+                                  Xác nhận:{' '}
+                                  {
+                                    formatDateTime(
+                                      contribution
+                                        .confirmedAt
+                                    )
+                                  }
+                                </span>
+                              )}
+
+                              {contribution.paidAt && (
+                                <span>
+                                  Đã nộp:{' '}
+                                  {
+                                    formatDateTime(
+                                      contribution
+                                        .paidAt
+                                    )
+                                  }
+                                </span>
+                              )}
+
+                              {contribution.note && (
+                                <span className="bhxh-note-text">
+                                  {
+                                    contribution.note
+                                  }
+                                </span>
+                              )}
+
+                              {!contribution.confirmedAt &&
+                                !contribution.paidAt &&
+                                !contribution.note && (
+                                <span>
+                                  Chưa xử lý
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="bhxh-row-actions">
+                              {status ===
+                                CONTRIBUTION_STATUS
+                                  .DRAFT && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--blue"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    handleConfirmContribution(
+                                      contribution
+                                    );
+                                  }}
+                                >
+                                  {
+                                    savingKey ===
+                                    `contribution-confirm-${contribution.id}`
+                                      ? 'Đang xác nhận...'
+                                      : 'Xác nhận'
+                                  }
+                                </button>
+                              )}
+
+                              {status ===
+                                CONTRIBUTION_STATUS
+                                  .CONFIRMED && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--success"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    handleMarkPaid(
+                                      contribution
+                                    );
+                                  }}
+                                >
+                                  {
+                                    savingKey ===
+                                    `contribution-paid-${contribution.id}`
+                                      ? 'Đang cập nhật...'
+                                      : 'Đánh dấu PAID'
+                                  }
+                                </button>
+                              )}
+
+                              {status !==
+                                CONTRIBUTION_STATUS
+                                  .PAID &&
+                                status !==
+                                CONTRIBUTION_STATUS
+                                  .CANCELLED && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--danger-light"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    openCancelContributionModal(
+                                      contribution
+                                    );
+                                  }}
+                                >
+                                  Hủy khoản
+                                </button>
+                              )}
+
+                              {(status ===
+                                CONTRIBUTION_STATUS
+                                  .PAID ||
+                                status ===
+                                CONTRIBUTION_STATUS
+                                  .CANCELLED) && (
+                                <span className="bhxh-action-complete">
+                                  Không còn thao tác
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </>
+    );
+  }
+
+
+  // ==========================================================
+  // RENDER TỶ LỆ
+  // ==========================================================
+
+  function renderRatesSection() {
+    return (
+      <>
+        <section className="bhxh-panel">
+          <div className="bhxh-panel-header">
+            <div>
+              <p className="bhxh-kicker">
+                Cấu hình đóng BHXH
+              </p>
+
+              <h2>
+                Tỷ lệ đóng theo thời gian
+              </h2>
+
+              <p>
+                Cấu hình được lưu theo khoảng hiệu
+                lực để không làm thay đổi dữ liệu cũ.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="bhxh-btn bhxh-btn--primary"
+              disabled={isSaving}
+              onClick={openCreateRateModal}
+            >
+              ＋ Tạo cấu hình mới
+            </button>
+          </div>
+
+          {activeRate ? (
+            <div className="bhxh-active-rate">
+              <div className="bhxh-active-rate-main">
+                <span>
+                  Tỷ lệ đang áp dụng
+                </span>
+
+                <strong>
+                  {
+                    formatPercent(
+                      Number(
+                        activeRate.employeeRate ||
+                        0
+                      ) +
+                      Number(
+                        activeRate.employerRate ||
+                        0
+                      )
+                    )
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>Nhân viên</span>
+
+                <strong>
+                  {
+                    formatPercent(
+                      activeRate.employeeRate
+                    )
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>Doanh nghiệp</span>
+
+                <strong>
+                  {
+                    formatPercent(
+                      activeRate.employerRate
+                    )
+                  }
+                </strong>
+              </div>
+
+              <div>
+                <span>Hiệu lực từ</span>
+
+                <strong>
+                  {
+                    formatDate(
+                      activeRate.effectiveFrom
+                    )
+                  }
+                </strong>
+              </div>
+            </div>
+          ) : (
+            <div className="bhxh-inline-alert bhxh-inline-alert--warning">
+              Hiện chưa có cấu hình tỷ lệ đang
+              áp dụng tại ngày hôm nay.
+            </div>
+          )}
+        </section>
+
+        <section className="bhxh-panel">
+          <div className="bhxh-panel-header">
+            <div>
+              <p className="bhxh-kicker">
+                Lịch sử cấu hình
+              </p>
+
+              <h2>
+                Danh sách tỷ lệ
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              className="bhxh-btn bhxh-btn--light"
+              disabled={loadingOverview}
+              onClick={() => {
+                loadOverview();
+              }}
+            >
+              ↻ Làm mới
+            </button>
+          </div>
+
+          {loadingOverview ? (
+            <div className="bhxh-loading">
+              Đang tải cấu hình tỷ lệ...
+            </div>
+          ) : sortedRates.length === 0 ? (
+            <EmptyState
+              icon="⚙️"
+              title="Chưa có cấu hình tỷ lệ"
+              description={
+                'Tạo cấu hình đầu tiên để có thể sinh khoản đóng.'
+              }
+            />
+          ) : (
+            <div className="bhxh-table-wrap">
+              <table className="bhxh-table bhxh-rate-table">
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Doanh nghiệp</th>
+                    <th>Tổng tỷ lệ</th>
+                    <th>Khoảng hiệu lực</th>
+                    <th>Trạng thái</th>
+                    <th>Thông tin</th>
+                    <th className="bhxh-align-right">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {sortedRates.map(
+                    (rate) => {
+                      const totalRate =
+                        Number(
+                          rate.employeeRate ||
+                          0
+                        ) +
+                        Number(
+                          rate.employerRate ||
+                          0
+                        );
+
+                      return (
+                        <tr key={rate.id}>
+                          <td>
+                            <strong className="bhxh-rate-employee">
+                              {
+                                formatPercent(
+                                  rate.employeeRate
+                                )
+                              }
+                            </strong>
+                          </td>
+
+                          <td>
+                            <strong className="bhxh-rate-employer">
+                              {
+                                formatPercent(
+                                  rate.employerRate
+                                )
+                              }
+                            </strong>
+                          </td>
+
+                          <td>
+                            <strong>
+                              {
+                                formatPercent(
+                                  totalRate
+                                )
+                              }
+                            </strong>
+                          </td>
+
+                          <td>
+                            <div className="bhxh-cell-stack">
+                              <span>
+                                Từ{' '}
+                                <strong>
+                                  {
+                                    formatDate(
+                                      rate.effectiveFrom
+                                    )
+                                  }
+                                </strong>
+                              </span>
+
+                              <span>
+                                Đến{' '}
+                                <strong>
+                                  {
+                                    rate.effectiveTo
+                                      ? formatDate(
+                                          rate.effectiveTo
+                                        )
+                                      : 'Chưa xác định'
+                                  }
+                                </strong>
+                              </span>
+                            </div>
+                          </td>
+
+                          <td>
+                            <Badge
+                              display={{
+                                label:
+                                  rate.isActive
+                                    ? 'Đang hoạt động'
+                                    : 'Đã ngừng',
+
+                                className:
+                                  rate.isActive
+                                    ? 'bhxh-badge--success'
+                                    : 'bhxh-badge--neutral'
+                              }}
+                            />
+                          </td>
+
+                          <td>
+                            <div className="bhxh-cell-stack">
+                              <span>
+                                Tạo bởi:{' '}
+                                <strong>
+                                  {
+                                    rate.createdByUserName ||
+                                    'Admin'
+                                  }
+                                </strong>
+                              </span>
+
+                              <span>
+                                {
+                                  rate.hasBeenUsed
+                                    ? 'Đã được sử dụng'
+                                    : 'Chưa được sử dụng'
+                                }
+                              </span>
+                            </div>
+                          </td>
+
+                          <td>
+                            <div className="bhxh-row-actions">
+                              {rate.canEdit && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--light"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    openEditRateModal(
+                                      rate
+                                    );
+                                  }}
+                                >
+                                  ✎ Chỉnh sửa
+                                </button>
+                              )}
+
+                              {rate.isActive && (
+                                <button
+                                  type="button"
+                                  className="bhxh-btn bhxh-btn--danger-light"
+                                  disabled={isSaving}
+                                  onClick={() => {
+                                    openDeactivateRateModal(
+                                      rate
+                                    );
+                                  }}
+                                >
+                                  Ngừng áp dụng
+                                </button>
+                              )}
+
+                              {!rate.canEdit &&
+                                !rate.isActive && (
+                                <span className="bhxh-action-complete">
+                                  Không còn thao tác
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </>
+    );
+  }
+
+
+  // ==========================================================
+  // GIAO DIỆN CHÍNH
+  // ==========================================================
+
+  return (
+    <div className="bhxh-shell">
+      <section className="bhxh-hero">
+        <div className="bhxh-hero-content">
+          <div className="bhxh-hero-icon">
+            🛡️
+          </div>
+
+          <div>
+            <p className="bhxh-hero-kicker">
+              Quản trị phúc lợi nhân viên
+            </p>
+
+            <h1>
+              Bảo hiểm xã hội
+            </h1>
+
+            <p>
+              Quản lý hồ sơ, xác nhận của Staff,
+              cấu hình tỷ lệ và khoản đóng hằng tháng
+              trong cùng một quy trình.
+            </p>
+          </div>
+        </div>
+
+        <div className="bhxh-flow">
+          <span>Admin tạo hồ sơ</span>
+          <b>→</b>
+          <span>Staff xác nhận</span>
+          <b>→</b>
+          <span>Admin kích hoạt</span>
+          <b>→</b>
+          <span>Sinh khoản đóng</span>
+        </div>
+      </section>
+
+      <nav className="bhxh-tabs">
+        <button
+          type="button"
+          className={
+            activeSection === 'profiles'
+              ? 'active'
+              : ''
+          }
+          onClick={() => {
+            setActiveSection('profiles');
+            setMessage(null);
+          }}
+        >
+          <span>👥</span>
+
+          <div>
+            <strong>Hồ sơ nhân viên</strong>
+            <small>
+              {profiles.length} hồ sơ
+            </small>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={
+            activeSection ===
+            'contributions'
+              ? 'active'
+              : ''
+          }
+          onClick={() => {
+            setActiveSection(
+              'contributions'
+            );
+
+            setMessage(null);
+          }}
+        >
+          <span>💳</span>
+
+          <div>
+            <strong>Khoản đóng</strong>
+            <small>
+              Tháng {selectedMonth}/
+              {selectedYear}
+            </small>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={
+            activeSection === 'rates'
+              ? 'active'
+              : ''
+          }
+          onClick={() => {
+            setActiveSection('rates');
+            setMessage(null);
+          }}
+        >
+          <span>⚙️</span>
+
+          <div>
+            <strong>Cấu hình tỷ lệ</strong>
+            <small>
+              {rates.length} cấu hình
+            </small>
+          </div>
+        </button>
+      </nav>
+
+      {message && (
+        <div
+          className={
+            `bhxh-page-message ` +
+            `bhxh-page-message--${message.type}`
+          }
+          role="alert"
+        >
+          <span>
+            {message.type === 'success'
+              ? '✓'
+              : '!'}
+          </span>
+
+          <p>{message.text}</p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMessage(null);
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      <main className="bhxh-section-content">
+        {activeSection === 'profiles' &&
+          renderProfilesSection()}
+
+        {activeSection ===
+          'contributions' &&
+          renderContributionsSection()}
+
+        {activeSection === 'rates' &&
+          renderRatesSection()}
+      </main>
+
+
+      {/* ================================================== */}
+      {/* MODAL TẠO / SỬA HỒ SƠ */}
+      {/* ================================================== */}
+
+      {profileModal && (
+        <Modal
+          title={
+            profileModal === 'create'
+              ? 'Tạo hồ sơ BHXH'
+              : 'Cập nhật hồ sơ BHXH'
+          }
+          subtitle={
+            profileModal === 'create'
+              ? selectedEmployee?.fullName
+              : selectedProfile?.fullName
+          }
+          disabled={isSaving}
+          onClose={closeProfileModal}
+          footer={
+            <>
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--light"
+                disabled={isSaving}
+                onClick={closeProfileModal}
               >
                 Hủy
               </button>
 
               <button
                 type="button"
-                className="sd-btn-primary"
-                disabled={saving}
-                onClick={
-                  handleSaveProfile
-                }
+                className="bhxh-btn bhxh-btn--primary"
+                disabled={isSaving}
+                onClick={handleSaveProfile}
               >
-                {saving
+                {savingKey ===
+                'profile-save'
                   ? 'Đang lưu...'
                   : profileModal ===
                     'create'
                     ? 'Tạo hồ sơ'
                     : 'Lưu thay đổi'}
               </button>
-            </div>
+            </>
+          }
+        >
+          <div className="bhxh-form-grid">
+            <label className="bhxh-field">
+              <span>Mã số BHXH</span>
+
+              <input
+                type="text"
+                maxLength={20}
+                value={
+                  profileForm
+                    .socialInsuranceNumber
+                }
+                placeholder="Ví dụ: BHXH0000123"
+                onChange={(event) => {
+                  setProfileForm(
+                    (current) => ({
+                      ...current,
+
+                      socialInsuranceNumber:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+
+            <label className="bhxh-field">
+              <span>
+                Mức lương làm căn cứ *
+              </span>
+
+              <input
+                type="number"
+                min="1"
+                step="1000"
+                value={
+                  profileForm
+                    .insuranceSalaryBasis
+                }
+                placeholder="Ví dụ: 6000000"
+                onChange={(event) => {
+                  setProfileForm(
+                    (current) => ({
+                      ...current,
+
+                      insuranceSalaryBasis:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+
+            <label className="bhxh-field">
+              <span>Ngày bắt đầu *</span>
+
+              <input
+                type="date"
+                value={profileForm.startDate}
+                onChange={(event) => {
+                  setProfileForm(
+                    (current) => ({
+                      ...current,
+
+                      startDate:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+
+            <label className="bhxh-field">
+              <span>Ngày kết thúc</span>
+
+              <input
+                type="date"
+                min={
+                  profileForm.startDate ||
+                  undefined
+                }
+                value={profileForm.endDate}
+                onChange={(event) => {
+                  setProfileForm(
+                    (current) => ({
+                      ...current,
+
+                      endDate:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
           </div>
-        </div>
+
+          <label className="bhxh-field">
+            <span>Ghi chú nội bộ Admin</span>
+
+            <textarea
+              rows={4}
+              maxLength={500}
+              value={profileForm.note}
+              placeholder={
+                'Thông tin bổ sung dành cho Admin...'
+              }
+              onChange={(event) => {
+                setProfileForm(
+                  (current) => ({
+                    ...current,
+                    note:
+                      event.target.value
+                  })
+                );
+              }}
+            />
+          </label>
+
+          {profileModal === 'edit' && (
+            <div className="bhxh-inline-alert bhxh-inline-alert--warning">
+              Thay đổi mã số BHXH, lương căn cứ,
+              ngày bắt đầu hoặc ngày kết thúc sẽ đưa
+              hồ sơ về PENDING và Staff phải xác
+              nhận lại. Chỉ sửa ghi chú thì không
+              reset xác nhận.
+            </div>
+          )}
+
+          {profileFormError && (
+            <div className="bhxh-form-error">
+              {profileFormError}
+            </div>
+          )}
+        </Modal>
       )}
 
 
       {/* ================================================== */}
-      {/* MODAL ĐỔI TRẠNG THÁI */}
+      {/* MODAL ĐỔI TRẠNG THÁI HỒ SƠ */}
       {/* ================================================== */}
 
       {statusModal && (
-        <div
-          className="sd-overlay"
-          onClick={
-            closeStatusModal
+        <Modal
+          title="Cập nhật trạng thái hồ sơ"
+          subtitle={
+            statusModal.profile.fullName
+          }
+          disabled={isSaving}
+          onClose={closeStatusModal}
+          footer={
+            <>
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--light"
+                disabled={isSaving}
+                onClick={closeStatusModal}
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--primary"
+                disabled={isSaving}
+                onClick={handleUpdateStatus}
+              >
+                {savingKey ===
+                'profile-status'
+                  ? 'Đang cập nhật...'
+                  : 'Xác nhận'}
+              </button>
+            </>
           }
         >
-          <div
-            className="sd-modal"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-          >
-            <div className="sd-modal-header">
-              <div>
-                <h2>
-                  Cập nhật trạng thái hồ sơ
-                </h2>
+          <div className="bhxh-status-change">
+            <span>Trạng thái mới</span>
 
-                <span className="bhxh-secondary-text">
-                  {statusModal
-                    .profile
-                    .fullName}
-                </span>
-              </div>
+            <ProfileStatusBadge
+              status={
+                statusModal.targetStatus
+              }
+            />
+          </div>
 
-              <button
-                type="button"
-                disabled={saving}
-                onClick={
-                  closeStatusModal
-                }
-              >
-                ✕
-              </button>
-            </div>
+          {statusModal.targetStatus ===
+            PROFILE_STATUS.ACTIVE && (
+            <div className="bhxh-requirement-card">
+              <h3>
+                Điều kiện kích hoạt
+              </h3>
 
-            <div className="sd-modal-body">
-              <p>
-                Chuyển hồ sơ sang:
-              </p>
+              <ul>
+                <li>
+                  Nhân viên vẫn là FULL_TIME.
+                </li>
 
-              <StatusBadge
+                <li>
+                  Staff đã xác nhận thông tin.
+                </li>
+
+                <li>
+                  Có mã số BHXH.
+                </li>
+
+                <li>
+                  Lương căn cứ lớn hơn 0.
+                </li>
+              </ul>
+
+              <StaffConfirmationBadge
                 status={
-                  statusModal.targetStatus
+                  statusModal.profile
+                    .staffConfirmationStatus
                 }
               />
-
-              {statusModal.targetStatus ===
-                PROFILE_STATUS.ACTIVE && (
-                <p
-                  className={
-                    'bhxh-modal-note ' +
-                    'bhxh-modal-note--info'
-                  }
-                >
-                  Hồ sơ phải có mã số BHXH và mức lương căn cứ hợp lệ trước khi kích hoạt.
-                </p>
-              )}
-
-              {statusModal.targetStatus ===
-                PROFILE_STATUS.SUSPENDED && (
-                <p
-                  className={
-                    'bhxh-modal-note ' +
-                    'bhxh-modal-note--warning'
-                  }
-                >
-                  Hồ sơ sẽ tạm ngừng sinh khoản đóng BHXH nhưng vẫn được giữ lại trong hệ thống.
-                </p>
-              )}
-
-              {statusModal.targetStatus ===
-                PROFILE_STATUS.STOPPED && (
-                <p
-                  className={
-                    'bhxh-modal-note ' +
-                    'bhxh-modal-note--warning'
-                  }
-                >
-                  Hệ thống sẽ kết thúc hồ sơ nhưng vẫn giữ toàn bộ lịch sử.
-                </p>
-              )}
-
-              <div className="sd-field">
-                <label>
-                  Ghi chú
-                </label>
-
-                <textarea
-                  rows={4}
-                  maxLength={500}
-                  value={statusNote}
-                  placeholder="Nhập lý do hoặc nội dung ghi chú..."
-                  onChange={(event) => {
-                    setStatusNote(
-                      event.target.value
-                    );
-                  }}
-                />
-              </div>
-
-              {statusFormError && (
-                <p className="sd-status sd-status-error">
-                  {statusFormError}
-                </p>
-              )}
             </div>
+          )}
 
-            <div className="sd-modal-footer">
+          {statusModal.targetStatus ===
+            PROFILE_STATUS.SUSPENDED && (
+            <div className="bhxh-inline-alert bhxh-inline-alert--warning">
+              Hồ sơ sẽ tạm ngừng sinh khoản đóng,
+              nhưng toàn bộ dữ liệu vẫn được giữ lại.
+            </div>
+          )}
+
+          {statusModal.targetStatus ===
+            PROFILE_STATUS.STOPPED && (
+            <div className="bhxh-inline-alert bhxh-inline-alert--danger">
+              Hồ sơ sẽ kết thúc tham gia. Hệ thống
+              không xóa lịch sử đã phát sinh.
+            </div>
+          )}
+
+          <label className="bhxh-field">
+            <span>Ghi chú</span>
+
+            <textarea
+              rows={4}
+              maxLength={500}
+              value={statusNote}
+              placeholder={
+                'Nhập lý do hoặc nội dung ghi chú...'
+              }
+              onChange={(event) => {
+                setStatusNote(
+                  event.target.value
+                );
+              }}
+            />
+          </label>
+
+          {statusFormError && (
+            <div className="bhxh-form-error">
+              {statusFormError}
+            </div>
+          )}
+        </Modal>
+      )}
+
+
+      {/* ================================================== */}
+      {/* MODAL TẠO / SỬA TỶ LỆ */}
+      {/* ================================================== */}
+
+      {rateModalOpen && (
+        <Modal
+          title={
+            selectedRate
+              ? 'Chỉnh sửa cấu hình tỷ lệ'
+              : 'Tạo cấu hình tỷ lệ'
+          }
+          subtitle={
+            'Tỷ lệ nhập theo đơn vị phần trăm'
+          }
+          disabled={isSaving}
+          onClose={closeRateModal}
+          footer={
+            <>
               <button
                 type="button"
-                className="sd-btn-ghost"
-                disabled={saving}
+                className="bhxh-btn bhxh-btn--light"
+                disabled={isSaving}
+                onClick={closeRateModal}
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--primary"
+                disabled={isSaving}
+                onClick={handleSaveRate}
+              >
+                {savingKey === 'rate-save'
+                  ? 'Đang lưu...'
+                  : selectedRate
+                    ? 'Lưu thay đổi'
+                    : 'Tạo cấu hình'}
+              </button>
+            </>
+          }
+        >
+          <div className="bhxh-form-grid">
+            <label className="bhxh-field">
+              <span>
+                Nhân viên đóng (%) *
+              </span>
+
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={
+                  rateForm.employeeRate
+                }
+                onChange={(event) => {
+                  setRateForm(
+                    (current) => ({
+                      ...current,
+
+                      employeeRate:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+
+            <label className="bhxh-field">
+              <span>
+                Doanh nghiệp đóng (%) *
+              </span>
+
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={
+                  rateForm.employerRate
+                }
+                onChange={(event) => {
+                  setRateForm(
+                    (current) => ({
+                      ...current,
+
+                      employerRate:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+
+            <label className="bhxh-field">
+              <span>
+                Ngày bắt đầu hiệu lực *
+              </span>
+
+              <input
+                type="date"
+                value={
+                  rateForm.effectiveFrom
+                }
+                onChange={(event) => {
+                  setRateForm(
+                    (current) => ({
+                      ...current,
+
+                      effectiveFrom:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+
+            <label className="bhxh-field">
+              <span>
+                Ngày kết thúc hiệu lực
+              </span>
+
+              <input
+                type="date"
+                min={
+                  rateForm.effectiveFrom ||
+                  undefined
+                }
+                value={
+                  rateForm.effectiveTo
+                }
+                onChange={(event) => {
+                  setRateForm(
+                    (current) => ({
+                      ...current,
+
+                      effectiveTo:
+                        event.target.value
+                    })
+                  );
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="bhxh-rate-preview">
+            <div>
+              <span>Nhân viên</span>
+
+              <strong>
+                {
+                  formatPercent(
+                    rateForm.employeeRate
+                  )
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>Doanh nghiệp</span>
+
+              <strong>
+                {
+                  formatPercent(
+                    rateForm.employerRate
+                  )
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>Tổng tỷ lệ</span>
+
+              <strong>
+                {
+                  formatPercent(
+                    Number(
+                      rateForm.employeeRate ||
+                      0
+                    ) +
+                    Number(
+                      rateForm.employerRate ||
+                      0
+                    )
+                  )
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="bhxh-inline-alert bhxh-inline-alert--info">
+            Các khoản đóng đã tạo sẽ giữ nguyên
+            tỷ lệ snapshot cũ. Cấu hình mới chỉ
+            áp dụng cho khoản được sinh sau đó.
+          </div>
+
+          {rateFormError && (
+            <div className="bhxh-form-error">
+              {rateFormError}
+            </div>
+          )}
+        </Modal>
+      )}
+
+
+      {/* ================================================== */}
+      {/* MODAL NGỪNG TỶ LỆ */}
+      {/* ================================================== */}
+
+      {deactivateRateModal && (
+        <Modal
+          title="Ngừng áp dụng cấu hình"
+          subtitle={
+            `Nhân viên ` +
+            `${formatPercent(
+              deactivateRateModal
+                .employeeRate
+            )} · Doanh nghiệp ` +
+            `${formatPercent(
+              deactivateRateModal
+                .employerRate
+            )}`
+          }
+          disabled={isSaving}
+          onClose={
+            closeDeactivateRateModal
+          }
+          footer={
+            <>
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--light"
+                disabled={isSaving}
                 onClick={
-                  closeStatusModal
+                  closeDeactivateRateModal
                 }
               >
                 Hủy
@@ -2865,19 +4177,169 @@ async function handleDeactivateRate() {
 
               <button
                 type="button"
-                className="sd-btn-primary"
-                disabled={saving}
+                className="bhxh-btn bhxh-btn--danger"
+                disabled={isSaving}
                 onClick={
-                  handleUpdateStatus
+                  handleDeactivateRate
                 }
               >
-                {saving
+                {savingKey ===
+                'rate-deactivate'
                   ? 'Đang cập nhật...'
-                  : 'Xác nhận'}
+                  : 'Xác nhận ngừng'}
               </button>
+            </>
+          }
+        >
+          <label className="bhxh-field">
+            <span>
+              Ngày cuối cùng còn hiệu lực *
+            </span>
+
+            <input
+              type="date"
+              min={
+                String(
+                  deactivateRateModal
+                    .effectiveFrom || ''
+                ).slice(0, 10)
+              }
+              value={
+                deactivateEffectiveTo
+              }
+              onChange={(event) => {
+                setDeactivateEffectiveTo(
+                  event.target.value
+                );
+              }}
+            />
+          </label>
+
+          <div className="bhxh-inline-alert bhxh-inline-alert--warning">
+            Cấu hình không bị xóa. Các khoản đóng
+            đã sử dụng cấu hình này vẫn được giữ
+            nguyên.
+          </div>
+
+          {deactivateRateError && (
+            <div className="bhxh-form-error">
+              {deactivateRateError}
+            </div>
+          )}
+        </Modal>
+      )}
+
+
+      {/* ================================================== */}
+      {/* MODAL HỦY KHOẢN ĐÓNG */}
+      {/* ================================================== */}
+
+      {cancelContributionModal && (
+        <Modal
+          title="Hủy khoản đóng BHXH"
+          subtitle={
+            `${cancelContributionModal.fullName} · ` +
+            `Tháng ${cancelContributionModal.month}/` +
+            `${cancelContributionModal.year}`
+          }
+          disabled={isSaving}
+          onClose={
+            closeCancelContributionModal
+          }
+          footer={
+            <>
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--light"
+                disabled={isSaving}
+                onClick={
+                  closeCancelContributionModal
+                }
+              >
+                Đóng
+              </button>
+
+              <button
+                type="button"
+                className="bhxh-btn bhxh-btn--danger"
+                disabled={
+                  isSaving ||
+                  !cancelReason.trim()
+                }
+                onClick={
+                  handleCancelContribution
+                }
+              >
+                {savingKey ===
+                'contribution-cancel'
+                  ? 'Đang hủy...'
+                  : 'Xác nhận hủy'}
+              </button>
+            </>
+          }
+        >
+          <div className="bhxh-contribution-preview">
+            <div>
+              <span>Lương căn cứ</span>
+
+              <strong>
+                {
+                  formatMoney(
+                    cancelContributionModal
+                      .insuranceSalaryBasis
+                  )
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>Tổng khoản đóng</span>
+
+              <strong>
+                {
+                  formatMoney(
+                    cancelContributionModal
+                      .totalAmount
+                  )
+                }
+              </strong>
             </div>
           </div>
-        </div>
+
+          <label className="bhxh-field">
+            <span>Lý do hủy *</span>
+
+            <textarea
+              rows={5}
+              maxLength={500}
+              value={cancelReason}
+              placeholder={
+                'Ví dụ: Khoản đóng được tạo sai mức lương căn cứ.'
+              }
+              onChange={(event) => {
+                setCancelReason(
+                  event.target.value
+                );
+              }}
+            />
+
+            <small className="bhxh-character-count">
+              {cancelReason.length}/500
+            </small>
+          </label>
+
+          <div className="bhxh-inline-alert bhxh-inline-alert--danger">
+            Khoản đóng sẽ chuyển sang CANCELLED và
+            được giữ lại để truy vết. Khoản đã PAID
+            không thể hủy.
+          </div>
+
+          {cancelContributionError && (
+            <div className="bhxh-form-error">
+              {cancelContributionError}
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   );

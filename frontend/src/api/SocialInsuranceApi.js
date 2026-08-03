@@ -439,3 +439,85 @@ export async function getMySocialInsuranceContributions() {
 
   return response.data;
 }
+
+/*
+  Staff xác nhận hoặc yêu cầu Admin chỉnh sửa
+  hồ sơ BHXH của chính mình.
+
+  Không truyền userId vì Backend lấy UserId từ JWT.
+
+  payload xác nhận:
+
+  {
+    confirmationStatus: 'CONFIRMED',
+    note: null
+  }
+
+  payload yêu cầu chỉnh sửa:
+
+  {
+    confirmationStatus: 'CHANGE_REQUESTED',
+    note: 'Mã số BHXH của tôi chưa chính xác.'
+  }
+*/
+export async function
+  updateMySocialInsuranceProfileConfirmation(
+    payload
+  ) {
+  const normalizedStatus =
+    String(
+      payload?.confirmationStatus || ''
+    )
+      .trim()
+      .toUpperCase();
+
+  const allowedStatuses = [
+    'CONFIRMED',
+    'CHANGE_REQUESTED'
+  ];
+
+  if (
+    !allowedStatuses.includes(
+      normalizedStatus
+    )
+  ) {
+    throw new Error(
+      'Trạng thái xác nhận hồ sơ không hợp lệ.'
+    );
+  }
+
+  const normalizedNote =
+    typeof payload?.note === 'string'
+      ? payload.note.trim()
+      : '';
+
+  // Khi yêu cầu chỉnh sửa,
+  // Staff bắt buộc phải nhập nội dung.
+  if (
+    normalizedStatus ===
+      'CHANGE_REQUESTED' &&
+    !normalizedNote
+  ) {
+    throw new Error(
+      'Vui lòng nhập nội dung cần Admin chỉnh sửa.'
+    );
+  }
+
+  const response =
+    await axios.put(
+      `${BASE_URL}/my-profile/confirmation`,
+      {
+        confirmationStatus:
+          normalizedStatus,
+
+        // CONFIRMED không cần gửi ghi chú.
+        note:
+          normalizedStatus ===
+            'CHANGE_REQUESTED'
+            ? normalizedNote
+            : null
+      }
+    );
+
+  return response.data;
+}
