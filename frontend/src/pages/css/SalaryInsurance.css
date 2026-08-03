@@ -92,7 +92,7 @@
 .sd-table.sd-salary-insurance-table,
 .sd-salary-admin-page--admin
 .sd-table.sd-salary-insurance-table {
-  min-width: 1380px;
+  min-width: 1510px;
   table-layout: fixed;
 }
 
@@ -113,7 +113,11 @@ th:nth-child(2),
 .sd-salary-admin-page
 .sd-salary-insurance-table
 td:nth-child(2) {
-  width: 150px;
+  width: 230px;
+  padding-right: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Tháng. */
@@ -123,7 +127,8 @@ th:nth-child(3),
 .sd-salary-admin-page
 .sd-salary-insurance-table
 td:nth-child(3) {
-  width: 90px;
+  width: 110px;
+  padding-left: 24px;
   white-space: nowrap;
 }
 
@@ -347,7 +352,7 @@ td:nth-child(9) {
   .sd-salary-admin-page
   .sd-table.sd-salary-insurance-table {
     display: table !important;
-    min-width: 1180px !important;
+    min-width: 1510px !important;
     table-layout: fixed !important;
   }
 

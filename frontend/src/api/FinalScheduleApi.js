@@ -42,6 +42,14 @@ export async function getFinalScheduleByPeriod(
   return response.data
 }
 
+export async function getAutomaticFullTimeStaff(branchId) {
+  const response = await axios.get(
+    `/api/FinalSchedule/automatic-full-time/${branchId}`
+  )
+
+  return response.data
+}
+
 /**
  * Ghi nhận Staff nghỉ có phép.
  */

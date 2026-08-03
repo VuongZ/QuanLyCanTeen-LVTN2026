@@ -6,6 +6,7 @@ import {
   getSalaryByUser,
   getSalaryWorkDetails,
 } from '../../api/SalaryApi';
+import { formatVietnamTime } from '../../utils/vietnamDateTime';
 
 function formatMoney(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -32,17 +33,7 @@ function formatDate(value) {
 }
 
 function formatTime(value) {
-  if (!value) return '—';
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return '—';
-
-  return date.toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  return formatVietnamTime(value);
 }
 
 function formatWorkStatus(status) {
@@ -175,6 +166,9 @@ const selectedSalary = useMemo(() => {
   ) || null;
 }, [salaries, selectedYear, selectedMonth]);
 
+  const isTemporarySalary =
+    (selectedSalary?.status || 'PENDING').toUpperCase() === 'PENDING';
+
   const selectedComplaint = useMemo(
     () => complaints.find((item) => item.salaryId === selectedSalary?.id) || null,
     [complaints, selectedSalary?.id],
@@ -293,6 +287,13 @@ const selectedSalary = useMemo(() => {
         />
       </div>
 
+      {selectedSalary && isTemporarySalary && (
+        <p className="sd-status">
+          Đây là bảng lương tạm tính. Tổng giờ, hệ số lương theo ngày,
+          thưởng, phạt và số tiền có thể thay đổi trước khi Manager chốt lương.
+        </p>
+      )}
+
       <div className="sd-card sd-work-detail-card">
         <div className="sd-card-header sd-salary-header">
           <div>
@@ -364,8 +365,7 @@ const selectedSalary = useMemo(() => {
           </p>
         ) : !selectedSalary ? (
           <p className="sd-salary-empty">
-            Chưa có bảng lương đã chốt. Dữ liệu lương sẽ hiển thị
-            sau khi Manager chốt lương cho cơ sở.
+            Chưa có bảng lương tạm hoặc bảng lương đã chốt.
           </p>
         ) : workDetails.length === 0 ? (
           <p className="sd-salary-empty">
@@ -492,7 +492,11 @@ const selectedSalary = useMemo(() => {
               </button>
             </form>
           ) : (
-            <p className="sd-salary-empty">Kỳ lương này đã được Admin chốt hoặc đã thanh toán nên không còn nhận khiếu nại mới.</p>
+            <p className="sd-salary-empty">
+              {isTemporarySalary
+                ? 'Đây là bảng lương tạm. Bạn có thể gửi khiếu nại sau khi Manager chốt lương.'
+                : 'Kỳ lương này đã được Admin chốt hoặc đã thanh toán nên không còn nhận khiếu nại mới.'}
+            </p>
           )}
         </div>
       )}

@@ -4,7 +4,8 @@ import { getAllPeriods } from '../../api/PeriodApi';
 import { getAllShifts } from '../../api/ShiftApi';
 // Lịch đã công bố thuộc FinalScheduleApi.
 import {
-  getFinalScheduleByPeriod
+  getFinalScheduleByPeriod,
+  getAutomaticFullTimeStaff
 } from '../../api/FinalScheduleApi'
 import {
   getScheduleUserName,
@@ -832,6 +833,7 @@ function PublishedScheduleView({ period, user }) {
 function RegistrationView({ period, user }) {
   const [shifts, setShifts] = useState([]);
   const [shiftConfigs, setShiftConfigs] = useState([]);
+  const [fullTimeStaff, setFullTimeStaff] = useState([]);
   const [allRegistrations, setAllRegistrations] = useState([]);
   const [dates, setDates] = useState([]);
 
@@ -862,6 +864,16 @@ function RegistrationView({ period, user }) {
     isClosed ||
     isPublished ||
     isDeadlineReached;
+
+  const normalizedEmploymentType =
+    String(user.employmentType || '').toUpperCase();
+  const isFullTimeUser =
+    normalizedEmploymentType === 'FULL_TIME' ||
+    normalizedEmploymentType === 'MATERNITY';
+
+  const isRegistrationDisabled =
+    isLocked ||
+    isFullTimeUser;
 
   const isOverdue =
     !isPublished &&
@@ -926,7 +938,7 @@ function RegistrationView({ period, user }) {
       setRegistrationError('');
 
       try {
-        const [allShifts, configRes, periodRegRes, myRegRes] =
+        const [allShifts, configRes, periodRegRes, myRegRes, automaticStaff] =
           await Promise.all([
             getAllShifts(),
             axios.get('/api/BranchShiftConfig'),
@@ -936,6 +948,7 @@ function RegistrationView({ period, user }) {
             axios.get(
               `/api/StaffRegistration/my-schedule/${user.id}/${period.id}`
             ),
+            getAutomaticFullTimeStaff(user.branchId),
           ]);
 
         if (!isMounted) return;
@@ -948,7 +961,12 @@ function RegistrationView({ period, user }) {
           branchShifts.map((shift) => shift.id)
         );
 
+        const branchFullTimeStaff = Array.isArray(automaticStaff)
+          ? automaticStaff
+          : [];
+
         setShifts(branchShifts);
+        setFullTimeStaff(branchFullTimeStaff);
         setShiftConfigs(
           (configRes.data || []).filter((config) => {
             return branchShiftIds.has(config.shiftId);
@@ -1070,14 +1088,17 @@ function RegistrationView({ period, user }) {
     return Number(config?.maxStaff ?? shift?.maxStaff ?? 0);
   }
 
-  // Manager chiếm một vị trí nên slot Staff = MaxStaff - 1.
+  // Manager và FULL_TIME được tự động xếp lịch nên giữ chỗ trước.
   function getStaffSlotForShiftDate(shiftId, dateObj) {
     const totalMaxStaff = getTotalMaxStaffForShiftDate(
       shiftId,
       dateObj
     );
 
-    return Math.max(totalMaxStaff - 1, 0);
+    return Math.max(
+      totalMaxStaff - 1 - fullTimeStaff.length,
+      0
+    );
   }
 
   // Chỉ đếm REGISTERED; WAITLIST không chiếm vị trí chính thức.
@@ -1086,7 +1107,10 @@ function RegistrationView({ period, user }) {
       return (
         item.workDate?.slice(0, 10) === dateString &&
         Number(item.shiftId) === Number(shiftId) &&
-        isOfficialRegistrationStatus(item.status)
+        isOfficialRegistrationStatus(item.status) &&
+        !fullTimeStaff.some((staff) => {
+          return String(staff.id) === String(item.userId);
+        })
       );
     }).length;
   }
@@ -1364,6 +1388,7 @@ function RegistrationView({ period, user }) {
           </div>
         )}
 
+
         <p
           style={{
             fontSize: 13,
@@ -1449,7 +1474,7 @@ function RegistrationView({ period, user }) {
                         dbRegistrations[dateString]?.[shift.id];
 
                       const isCellLocked =
-                        isLocked ||
+                        isRegistrationDisabled ||
                         (
                           dbItem &&
                           !isCancellableRegistrationStatus(
@@ -1493,7 +1518,10 @@ function RegistrationView({ period, user }) {
                       });
 
                       const savedOfficialRows = savedRows.filter((item) => {
-                        return isOfficialRegistrationStatus(item.status);
+                        return isOfficialRegistrationStatus(item.status) &&
+                          !fullTimeStaff.some((staff) => {
+                            return String(staff.id) === String(item.userId);
+                          });
                       });
 
                       const savedWaitlistRows = savedRows
@@ -1639,6 +1667,26 @@ function RegistrationView({ period, user }) {
                                 </div>
                               )}
 
+                              {totalMaxStaff > 0 && fullTimeStaff.map((staff) => (
+                                <div
+                                  key={`full-time-${staff.id}`}
+                                  className={`sd-slot-person ${
+                                    String(staff.id) === String(user.id)
+                                      ? 'sd-slot-me'
+                                      : 'sd-slot-staff'
+                                  }`}
+                                >
+                                  <span className="sd-slot-name">
+                                    {String(staff.id) === String(user.id)
+                                      ? user.fullName || 'Bạn'
+                                      : staff.fullName || staff.username || 'Nhân viên'}
+                                  </span>
+                                  <span className="sd-slot-saved">
+                                    Full-time
+                                  </span>
+                                </div>
+                              ))}
+
                               {/* Các Staff đang giữ vị trí chính thức */}
                               {displayStaffList.map((staff) => (
                                 <div
@@ -1778,7 +1826,7 @@ function RegistrationView({ period, user }) {
 
         <button
           className="sd-btn-primary"
-          disabled={saving || totalChanges === 0 || isLocked}
+          disabled={saving || totalChanges === 0 || isRegistrationDisabled}
           onClick={handleSave}
           type="button"
         >

@@ -114,6 +114,7 @@ public class CreateBhxhRateConfigRequest
         typeof(decimal),
         "0",
         "100",
+        ParseLimitsInInvariantCulture = true,
         ErrorMessage =
             "Tỷ lệ nhân viên phải nằm trong khoảng từ 0 đến 100.")]
     public decimal EmployeeRate { get; set; }
@@ -126,6 +127,7 @@ public class CreateBhxhRateConfigRequest
         typeof(decimal),
         "0",
         "100",
+        ParseLimitsInInvariantCulture = true,
         ErrorMessage =
             "Tỷ lệ doanh nghiệp phải nằm trong khoảng từ 0 đến 100.")]
     public decimal EmployerRate { get; set; }
@@ -160,6 +162,7 @@ public class UpdateBhxhRateConfigRequest
         typeof(decimal),
         "0",
         "100",
+        ParseLimitsInInvariantCulture = true,
         ErrorMessage =
             "Tỷ lệ nhân viên phải nằm trong khoảng từ 0 đến 100.")]
     public decimal EmployeeRate { get; set; }
@@ -174,6 +177,7 @@ public class UpdateBhxhRateConfigRequest
         typeof(decimal),
         "0",
         "100",
+        ParseLimitsInInvariantCulture = true,
         ErrorMessage =
             "Tỷ lệ doanh nghiệp phải nằm trong khoảng từ 0 đến 100.")]
     public decimal EmployerRate { get; set; }
@@ -276,6 +280,7 @@ public class CreateBhxhEmployeeProfileRequest
         typeof(decimal),
         "0.01",
         "9999999999999.99",
+        ParseLimitsInInvariantCulture = true,
         ErrorMessage =
             "Mức lương làm căn cứ đóng phải lớn hơn 0.")]
     public decimal InsuranceSalaryBasis { get; set; }
@@ -311,6 +316,7 @@ public class UpdateBhxhEmployeeProfileRequest
         typeof(decimal),
         "0.01",
         "9999999999999.99",
+        ParseLimitsInInvariantCulture = true,
         ErrorMessage =
             "Mức lương làm căn cứ đóng phải lớn hơn 0.")]
     public decimal InsuranceSalaryBasis { get; set; }

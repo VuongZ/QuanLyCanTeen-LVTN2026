@@ -46,7 +46,8 @@ public class SocialInsuranceRepo : ISocialInsuranceRepo
             // và có loại lao động FULL_TIME.
             .Where(user =>
                 user.IsDeleted != true &&
-                user.EmploymentType == "FULL_TIME")
+                (user.EmploymentType == "FULL_TIME" ||
+                 user.EmploymentType == "MATERNITY"))
 
             // Sắp xếp theo tên để giao diện dễ xem.
             .OrderBy(user => user.FullName)
@@ -306,8 +307,8 @@ public async Task<bool>
 
                 // Nhân viên vẫn phải là FULL_TIME
                 // tại thời điểm sinh khoản đóng.
-                profile.User.EmploymentType ==
-                    "FULL_TIME" &&
+                (profile.User.EmploymentType == "FULL_TIME" ||
+                 profile.User.EmploymentType == "MATERNITY") &&
 
                 // Không tính cho nhân viên đã bị xóa.
                 profile.User.IsDeleted != true &&

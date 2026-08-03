@@ -21,7 +21,8 @@ public class CheckoutRequestService
 
     public async Task<int> CreateMissingCheckoutRequestsAsync(DateTime utcNow)
     {
-        var localToday = DateOnly.FromDateTime(utcNow.Add(VietnamOffset));
+        var vietnamNow = ToVietnamFromUtc(utcNow);
+        var localToday = DateOnly.FromDateTime(vietnamNow);
         var fromDate = localToday.AddDays(-7);
 
         var schedules = await _context.CaFinalSchedules
@@ -38,17 +39,17 @@ public class CheckoutRequestService
             if (attendance?.CheckInTime == null || attendance.CheckOutTime != null || attendance.CheckoutRequests.Count != 0)
                 continue;
 
-            var shiftEndUtc = GetShiftEndUtc(schedule);
-            if (utcNow < shiftEndUtc.AddMinutes(30))
+            var shiftEndLocal = GetShiftEndLocal(schedule);
+            if (vietnamNow < shiftEndLocal.AddMinutes(30))
                 continue;
 
-            attendance.CheckOutTime = shiftEndUtc;
+            attendance.CheckOutTime = shiftEndLocal;
             attendance.Status = AutoCheckoutPending;
             var request = new CaCheckoutRequest
             {
                 Attendance = attendance,
                 RequestedByUserId = schedule.UserId,
-                ProposedCheckOutTime = shiftEndUtc,
+                ProposedCheckOutTime = shiftEndLocal,
                 Status = AwaitingEmployee,
                 CreatedAt = utcNow,
                 UpdatedAt = utcNow
@@ -87,33 +88,47 @@ public class CheckoutRequestService
         if (request.Status != AwaitingEmployee && request.Status != Rejected)
             throw new InvalidOperationException("Yêu cầu này đã được gửi hoặc đã xử lý.");
 
-        var requestedUtc = dto.CheckOutTime.HasValue
-            ? VietnamLocalToUtc(dto.CheckOutTime.Value)
-            : request.ProposedCheckOutTime;
-        var checkIn = request.Attendance.CheckInTime
+        var usesLegacyUtc = UsesLegacyUtcAttendance(request);
+        var proposedLocal = NormalizeAttendanceTime(
+            request.ProposedCheckOutTime,
+            usesLegacyUtc);
+        var requestedLocal = dto.CheckOutTime.HasValue
+            ? AsVietnamLocal(dto.CheckOutTime.Value)
+            : proposedLocal;
+        var checkInValue = request.Attendance.CheckInTime
             ?? throw new InvalidOperationException("Ca làm chưa có giờ check-in.");
+        var checkIn = NormalizeAttendanceTime(
+            checkInValue,
+            usesLegacyUtc);
 
-        if (requestedUtc < checkIn)
+        if (requestedLocal < checkIn)
             throw new InvalidOperationException("Giờ checkout không được trước giờ check-in.");
-        if (requestedUtc > DateTime.UtcNow.AddMinutes(15))
+        if (requestedLocal > ToVietnamFromUtc(DateTime.UtcNow).AddMinutes(15))
             throw new InvalidOperationException("Giờ checkout không được nằm trong tương lai.");
-        if (requestedUtc > checkIn.AddHours(18))
+        if (requestedLocal > checkIn.AddHours(18))
             throw new InvalidOperationException("Thời lượng ca làm không được vượt quá 18 giờ.");
 
         var reason = dto.Reason?.Trim();
         if (reason?.Length > 500)
             throw new InvalidOperationException("Lý do không được vượt quá 500 ký tự.");
-        if (Math.Abs((requestedUtc - request.ProposedCheckOutTime).TotalMinutes) > 1 && string.IsNullOrWhiteSpace(reason))
+        if (Math.Abs((requestedLocal - proposedLocal).TotalMinutes) > 1 && string.IsNullOrWhiteSpace(reason))
             throw new InvalidOperationException("Vui lòng nhập lý do khi thay đổi giờ checkout tạm.");
 
-        request.RequestedCheckOutTime = requestedUtc;
+        if (usesLegacyUtc)
+        {
+            request.Attendance.CheckInTime = checkIn;
+            request.Attendance.CheckOutTime = proposedLocal;
+            request.ProposedCheckOutTime = proposedLocal;
+        }
+
+        request.RequestedCheckOutTime = requestedLocal;
         request.Reason = string.IsNullOrWhiteSpace(reason) ? "Xác nhận giờ kết thúc ca" : reason;
         request.Status = Pending;
         request.RejectReason = null;
         request.ReviewedAt = null;
         request.ReviewedByUserId = null;
         request.UpdatedAt = DateTime.UtcNow;
-        AddHistory(request, userId, "SUBMITTED", $"Giờ đề nghị: {requestedUtc:O}. Lý do: {request.Reason}");
+        AddHistory(request, userId, "SUBMITTED", $"Giờ đề nghị: {requestedLocal:O}. Lý do: {request.Reason}");
         await _context.SaveChangesAsync();
     }
 
@@ -142,14 +157,25 @@ public class CheckoutRequestService
     public async Task ApproveAsync(int reviewerId, int requestId)
     {
         var request = await GetRequestForReviewAsync(reviewerId, requestId);
-        var checkout = request.RequestedCheckOutTime ?? request.ProposedCheckOutTime;
-        var checkIn = request.Attendance.CheckInTime
+        var usesLegacyUtc = UsesLegacyUtcAttendance(request);
+        var checkout = NormalizeAttendanceTime(
+            request.RequestedCheckOutTime ?? request.ProposedCheckOutTime,
+            usesLegacyUtc);
+        var checkInValue = request.Attendance.CheckInTime
             ?? throw new InvalidOperationException("Ca làm chưa có giờ check-in.");
-        var workedHours = Math.Round((decimal)(checkout - checkIn).TotalHours, 2);
+        var checkIn = NormalizeAttendanceTime(
+            checkInValue,
+            usesLegacyUtc);
+        var workedHours = AttendanceWorkHourPolicy.CalculateCreditedHours(
+            request.RequestedByUser,
+            request.Attendance.Schedule,
+            checkIn,
+            checkout);
         if (workedHours < 0 || workedHours > 18)
             throw new InvalidOperationException("Thời lượng làm việc không hợp lệ.");
 
         await AddApprovedHoursToSalaryAsync(request, workedHours);
+        request.Attendance.CheckInTime = checkIn;
         request.Attendance.CheckOutTime = checkout;
         request.Attendance.Status = "Đã CheckOut";
         request.Status = Approved;
@@ -247,27 +273,57 @@ public class CheckoutRequestService
         await _context.NsUsers.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id)
         ?? throw new InvalidOperationException("Không tìm thấy người dùng.");
 
-    private static CheckoutRequestDto ToDto(CaCheckoutRequest r) => new()
+    private static CheckoutRequestDto ToDto(CaCheckoutRequest request)
     {
-        Id = r.Id, AttendanceId = r.AttendanceId, ScheduleId = r.Attendance.ScheduleId,
-        UserId = r.RequestedByUserId, FullName = r.RequestedByUser.FullName,
-        RoleName = r.RequestedByUser.Role?.RoleName, BranchName = r.Attendance.Schedule.Shift.Branch?.Name,
-        ShiftName = r.Attendance.Schedule.Shift.ShiftName, WorkDate = r.Attendance.Schedule.WorkDate.ToString("yyyy-MM-dd"),
-        StartTime = r.Attendance.Schedule.Shift.StartTime.ToString("HH:mm"), EndTime = r.Attendance.Schedule.Shift.EndTime.ToString("HH:mm"),
-        CheckInTime = ToVietnam(r.Attendance.CheckInTime), ProposedCheckOutTime = ToVietnam(r.ProposedCheckOutTime)!.Value,
-        RequestedCheckOutTime = ToVietnam(r.RequestedCheckOutTime), Reason = r.Reason, Status = r.Status,
-        RejectReason = r.RejectReason, ReviewerName = r.ReviewedByUser?.FullName, UpdatedAt = ToVietnam(r.UpdatedAt)!.Value
-    };
+        var usesLegacyUtc = UsesLegacyUtcAttendance(request);
 
-    private static DateTime GetShiftEndUtc(CaFinalSchedule schedule)
+        return new CheckoutRequestDto
+        {
+            Id = request.Id,
+            AttendanceId = request.AttendanceId,
+            ScheduleId = request.Attendance.ScheduleId,
+            UserId = request.RequestedByUserId,
+            FullName = request.RequestedByUser.FullName,
+            RoleName = request.RequestedByUser.Role?.RoleName,
+            BranchName = request.Attendance.Schedule.Shift.Branch?.Name,
+            ShiftName = request.Attendance.Schedule.Shift.ShiftName,
+            WorkDate = request.Attendance.Schedule.WorkDate.ToString("yyyy-MM-dd"),
+            StartTime = request.Attendance.Schedule.Shift.StartTime.ToString("HH:mm"),
+            EndTime = request.Attendance.Schedule.Shift.EndTime.ToString("HH:mm"),
+            CheckInTime = NormalizeAttendanceTime(request.Attendance.CheckInTime, usesLegacyUtc),
+            ProposedCheckOutTime = NormalizeAttendanceTime(request.ProposedCheckOutTime, usesLegacyUtc),
+            RequestedCheckOutTime = NormalizeAttendanceTime(request.RequestedCheckOutTime, usesLegacyUtc),
+            Reason = request.Reason,
+            Status = request.Status,
+            RejectReason = request.RejectReason,
+            ReviewerName = request.ReviewedByUser?.FullName,
+            UpdatedAt = ToVietnamFromUtc(request.UpdatedAt)
+        };
+    }
+
+    private static DateTime GetShiftEndLocal(CaFinalSchedule schedule)
     {
         var localEnd = schedule.WorkDate.ToDateTime(schedule.Shift.EndTime);
         if (schedule.Shift.EndTime < schedule.Shift.StartTime) localEnd = localEnd.AddDays(1);
-        return localEnd.Subtract(VietnamOffset);
+        return localEnd;
     }
 
-    private static DateTime VietnamLocalToUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified).Subtract(VietnamOffset);
-    private static DateTime? ToVietnam(DateTime? value) => value?.Add(VietnamOffset);
+    private static DateTime AsVietnamLocal(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+    private static DateTime? AsVietnamLocal(DateTime? value) => value == null ? null : AsVietnamLocal(value.Value);
+    private static DateTime NormalizeAttendanceTime(DateTime value, bool usesLegacyUtc) =>
+        AsVietnamLocal(usesLegacyUtc ? value.Add(VietnamOffset) : value);
+    private static DateTime? NormalizeAttendanceTime(DateTime? value, bool usesLegacyUtc) =>
+        value == null ? null : NormalizeAttendanceTime(value.Value, usesLegacyUtc);
+    private static bool UsesLegacyUtcAttendance(CaCheckoutRequest request)
+    {
+        var expectedLocalEnd = GetShiftEndLocal(request.Attendance.Schedule);
+        var legacyUtcEnd = expectedLocalEnd.Subtract(VietnamOffset);
+
+        return Math.Abs(
+            (request.ProposedCheckOutTime - legacyUtcEnd).TotalMinutes) <= 1;
+    }
+    private static DateTime ToVietnamFromUtc(DateTime value) => DateTime.SpecifyKind(value.Add(VietnamOffset), DateTimeKind.Unspecified);
+    private static DateTime? ToVietnamFromUtc(DateTime? value) => value == null ? null : ToVietnamFromUtc(value.Value);
 
     private static void AddHistory(CaCheckoutRequest request, int actorUserId, string action, string? detail)
     {

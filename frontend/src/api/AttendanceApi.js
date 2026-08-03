@@ -30,3 +30,17 @@ export async function scanAttendance(payload) {
 
   return response.data
 }
+
+export async function getDailyAttendanceHistory(workDate, shiftId) {
+  const response = await axios.get(
+    '/api/Attendance/history/daily',
+    {
+      params: {
+        workDate,
+        shiftId: shiftId ? Number(shiftId) : undefined
+      }
+    }
+  )
+
+  return response.data
+}

@@ -6,7 +6,7 @@ using System.Text;
 
 namespace LuanVanTotNghiep.Services;
 
-public class AttendanceService
+public partial class AttendanceService
 {
     private readonly AttendanceRepo _repo;
     private readonly ShiftDelegationService _shiftDelegationService;
@@ -60,10 +60,12 @@ public class AttendanceService
         }
     }
 
-    private static DateTime GetUtcNowForDatabase()
+    private static DateTime GetVietnamNowForDatabase()
     {
         return DateTime.SpecifyKind(
-            DateTime.UtcNow,
+            TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.UtcNow,
+                GetVietnamTimeZone()),
             DateTimeKind.Unspecified);
     }
 
@@ -74,29 +76,9 @@ public class AttendanceService
             return null;
         }
 
-        var vietnamTimeZone = GetVietnamTimeZone();
-
-        var converted = DateTime.SpecifyKind(
-            TimeZoneInfo.ConvertTimeFromUtc(
-                DateTime.SpecifyKind(
-                    value.Value,
-                    DateTimeKind.Utc),
-                vietnamTimeZone),
+        return DateTime.SpecifyKind(
+            value.Value,
             DateTimeKind.Unspecified);
-
-        var vietnamNow = TimeZoneInfo.ConvertTimeFromUtc(
-            DateTime.UtcNow,
-            vietnamTimeZone);
-
-        // Một số dữ liệu cũ có thể đã lưu theo giờ Việt Nam.
-        if (converted > vietnamNow.AddMinutes(5))
-        {
-            return DateTime.SpecifyKind(
-                value.Value,
-                DateTimeKind.Unspecified);
-        }
-
-        return converted;
     }
 
     // Manager quét QR để điểm danh vào hoặc ra ca.
@@ -216,7 +198,7 @@ public class AttendanceService
             }
         }
 
-        var scanTime = GetUtcNowForDatabase();
+        var scanTime = GetVietnamNowForDatabase();
 
         // 6. Lấy hoặc tạo dữ liệu điểm danh.
         var attendance =
@@ -279,12 +261,13 @@ public class AttendanceService
             {
                 attendance.CheckOutTime = scanTime;
 
-                workedHours = Math.Round(
-                    (decimal)(
-                        attendance.CheckOutTime.Value -
-                        attendance.CheckInTime.Value
-                    ).TotalHours,
-                    2);
+                workedHours = AttendanceWorkHourPolicy.CalculateCreditedHours(
+                    employee.EmploymentType,
+                    schedule.WorkDate,
+                    shift.StartTime,
+                    shift.EndTime,
+                    attendance.CheckInTime.Value,
+                    attendance.CheckOutTime.Value);
 
                 if (workedHours < 0)
                 {
@@ -354,12 +337,13 @@ public class AttendanceService
         if (attendance.CheckInTime != null &&
             attendance.CheckOutTime != null)
         {
-            workedHours = Math.Round(
-                (decimal)(
-                    attendance.CheckOutTime.Value -
-                    attendance.CheckInTime.Value
-                ).TotalHours,
-                2);
+            workedHours = AttendanceWorkHourPolicy.CalculateCreditedHours(
+                employee.EmploymentType,
+                schedule.WorkDate,
+                shift.StartTime,
+                shift.EndTime,
+                attendance.CheckInTime.Value,
+                attendance.CheckOutTime.Value);
         }
 
         // 9. Lưu toàn bộ thay đổi.

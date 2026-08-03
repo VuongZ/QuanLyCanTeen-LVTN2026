@@ -101,4 +101,32 @@ public class AttendanceController : ControllerBase
             });
         }
     }
+
+    [HttpGet("history/daily")]
+    public async Task<IActionResult> GetDailyHistory(
+        [FromQuery] DateOnly workDate,
+        [FromQuery] int? shiftId)
+    {
+        try
+        {
+            var result = await _attendanceService.GetDailyHistoryAsync(
+                GetCurrentUserId(),
+                workDate,
+                shiftId);
+
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

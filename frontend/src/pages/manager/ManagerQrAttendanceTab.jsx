@@ -3,8 +3,10 @@ import { useState, useEffect, useRef } from 'react'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { getAllShifts } from '../../api/ShiftApi'
 import {
+  getDailyAttendanceHistory,
   scanAttendance
 } from '../../api/AttendanceApi'
+import { formatVietnamDateTime } from '../../utils/vietnamDateTime'
 
 function formatDate(value) {
   if (!value) return '—'
@@ -22,27 +24,6 @@ function getVietnamDateString(date = new Date()) {
   return `${values.year}-${values.month}-${values.day}`
 }
 
-function formatVietnamDateTime(value) {
-  if (!value) return '---'
-  const text = String(value)
-  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
-  if (match) {
-    const [, year, month, day, hour, minute, second] = match
-    return `${hour}:${minute}:${second} ${day}/${month}/${year}`
-  }
-
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour12: false,
-  }).format(new Date(value))
-}
-
 function InfoRow({ label, value }) {
   return <div className="sd-info-row"><dt>{label}</dt><dd>{value}</dd></div>
 }
@@ -57,6 +38,9 @@ export function ManagerQrAttendanceTab({ delegatedShiftId, user }) {
   const [scanResult, setScanResult] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [attendanceHistory, setAttendanceHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
   const lastQrTextRef = useRef('')
   const scannerRef = useRef(null)
 
@@ -69,6 +53,35 @@ export function ManagerQrAttendanceTab({ delegatedShiftId, user }) {
       setShiftId((current) => current || branchShifts[0]?.id?.toString() || '')
     }).catch(() => setShifts([]))
   }, [delegatedShiftId, user.branchId])
+
+  async function loadAttendanceHistory() {
+    if (!shiftId) {
+      setAttendanceHistory([])
+      return
+    }
+
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const data = await getDailyAttendanceHistory(
+        getVietnamDateString(),
+        shiftId
+      )
+      setAttendanceHistory(Array.isArray(data) ? data : [])
+    } catch (error) {
+      setAttendanceHistory([])
+      setHistoryError(
+        error.response?.data?.message ||
+        'Không tải được lịch sử chấm công trong ngày.'
+      )
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAttendanceHistory()
+  }, [shiftId])
 
   useEffect(() => {
     if (!notification) return undefined
@@ -139,6 +152,7 @@ export function ManagerQrAttendanceTab({ delegatedShiftId, user }) {
 })
 
 setScanResult(result)
+      await loadAttendanceHistory()
       setStatus({ type: 'success', msg: 'Đã lưu chấm công thành công.' })
     } catch (err) { setStatus({ type: 'error', msg: err.response?.data?.message || err.message || 'Không đọc được mã QR.' }) } finally { setIsSubmitting(false) }
   }
@@ -194,6 +208,65 @@ setScanResult(result)
           <button className="sd-btn-primary" disabled={isSubmitting || !shiftId} type="submit">{isSubmitting ? 'Đang lưu...' : 'Lưu dữ liệu QR'}</button>
         </form>
         {status && <p className={`sd-status sd-status-${status.type}`}>{status.msg}</p>}
+      </div>
+
+      <div className="sd-card sd-work-detail-card">
+        <div className="sd-card-header">
+          <div>
+            <p className="sd-eyebrow">Trong ngày</p>
+            <h2>Lịch sử check-in/check-out</h2>
+          </div>
+          <button
+            className="sd-btn-ghost"
+            disabled={historyLoading || !shiftId}
+            onClick={loadAttendanceHistory}
+            type="button"
+          >
+            {historyLoading ? 'Đang tải...' : 'Làm mới'}
+          </button>
+        </div>
+
+        {historyError && (
+          <p className="sd-status sd-status-error">{historyError}</p>
+        )}
+
+        {!shiftId ? (
+          <p className="sd-salary-empty">Vui lòng chọn ca làm.</p>
+        ) : historyLoading && attendanceHistory.length === 0 ? (
+          <p className="sd-salary-empty">Đang tải lịch sử chấm công...</p>
+        ) : attendanceHistory.length === 0 ? (
+          <p className="sd-salary-empty">Chưa có lượt chấm công trong ca này hôm nay.</p>
+        ) : (
+          <div className="sd-salary-table-wrap">
+            <table className="sd-salary-table sd-work-detail-table">
+              <thead>
+                <tr>
+                  <th>Nhân viên</th>
+                  <th>Ca</th>
+                  <th>Check-in</th>
+                  <th>Check-out</th>
+                  <th>Số giờ</th>
+                  <th>Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attendanceHistory.map((item) => (
+                  <tr key={item.attendanceId}>
+                    <td>
+                      <strong>{item.employeeName}</strong>
+                      {item.roleName && <small>{item.roleName}</small>}
+                    </td>
+                    <td>{item.shiftName}</td>
+                    <td>{formatVietnamDateTime(item.checkInTime)}</td>
+                    <td>{formatVietnamDateTime(item.checkOutTime)}</td>
+                    <td>{Number(item.workedHours || 0).toLocaleString('vi-VN')} giờ</td>
+                    <td>{item.status || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {scanResult && (

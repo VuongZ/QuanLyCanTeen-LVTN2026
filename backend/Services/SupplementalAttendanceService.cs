@@ -60,7 +60,7 @@ public class SupplementalAttendanceService
                 StartTime = schedule.Shift.StartTime.ToString("HH:mm"),
                 EndTime = schedule.Shift.EndTime.ToString("HH:mm"),
                 PreviousRequestId = previous?.Id,
-                PreviousCheckInTime = previous == null ? null : ToVietnam(previous.ProposedCheckInTime).ToString("yyyy-MM-ddTHH:mm"),
+                PreviousCheckInTime = previous == null ? null : AsVietnamLocal(previous.ProposedCheckInTime).ToString("yyyy-MM-ddTHH:mm"),
                 PreviousRejectReason = previous?.RejectReason
             };
         }).ToList();
@@ -135,8 +135,8 @@ public class SupplementalAttendanceService
             }
 
             existing.RequestedByManagerId = managerId;
-            existing.ProposedCheckInTime = VietnamLocalToUtc(checkInLocal);
-            existing.ProposedCheckOutTime = VietnamLocalToUtc(checkOutLocal);
+            existing.ProposedCheckInTime = checkInLocal;
+            existing.ProposedCheckOutTime = checkOutLocal;
             existing.Reason = string.IsNullOrWhiteSpace(reason) ? "Quản lý đề nghị chấm công bổ sung" : reason;
             existing.Status = Pending;
             existing.ReviewedByAdminId = null;
@@ -188,7 +188,11 @@ public class SupplementalAttendanceService
         if (request.Schedule.CaAttendances.Count != 0)
             throw new InvalidOperationException("Ca làm đã có chấm công, không thể duyệt yêu cầu bổ sung.");
 
-        var workedHours = Math.Round((decimal)(request.ProposedCheckOutTime - request.ProposedCheckInTime).TotalHours, 2);
+        var workedHours = AttendanceWorkHourPolicy.CalculateCreditedHours(
+            request.Schedule.User,
+            request.Schedule,
+            request.ProposedCheckInTime,
+            request.ProposedCheckOutTime);
         if (workedHours <= 0 || workedHours > 18)
             throw new InvalidOperationException("Thời lượng làm việc bổ sung không hợp lệ.");
 
@@ -308,15 +312,19 @@ public class SupplementalAttendanceService
         WorkDate = request.Schedule.WorkDate.ToString("yyyy-MM-dd"),
         StartTime = request.Schedule.Shift.StartTime.ToString("HH:mm"),
         EndTime = request.Schedule.Shift.EndTime.ToString("HH:mm"),
-        ProposedCheckInTime = ToVietnam(request.ProposedCheckInTime),
-        ProposedCheckOutTime = ToVietnam(request.ProposedCheckOutTime),
-        WorkedHours = Math.Round((decimal)(request.ProposedCheckOutTime - request.ProposedCheckInTime).TotalHours, 2),
+        ProposedCheckInTime = AsVietnamLocal(request.ProposedCheckInTime),
+        ProposedCheckOutTime = AsVietnamLocal(request.ProposedCheckOutTime),
+        WorkedHours = AttendanceWorkHourPolicy.CalculateCreditedHours(
+            request.Schedule.User,
+            request.Schedule,
+            request.ProposedCheckInTime,
+            request.ProposedCheckOutTime),
         Reason = request.Reason,
         Status = request.Status,
         ManagerName = DisplayName(request.RequestedByManager),
         AdminName = request.ReviewedByAdmin == null ? null : DisplayName(request.ReviewedByAdmin),
         RejectReason = request.RejectReason,
-        UpdatedAt = ToVietnam(request.UpdatedAt)
+        UpdatedAt = ToVietnamFromUtc(request.UpdatedAt)
     };
 
     private static string DisplayName(NsUser user) => user.FullName ?? user.Email ?? user.PhoneNumber ?? $"Người dùng {user.Id}";
@@ -326,8 +334,8 @@ public class SupplementalAttendanceService
         var value = schedule.WorkDate.ToDateTime(schedule.Shift.EndTime);
         return schedule.Shift.EndTime <= schedule.Shift.StartTime ? value.AddDays(1) : value;
     }
-    private static DateTime VietnamLocalToUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified).Subtract(VietnamOffset);
-    private static DateTime ToVietnam(DateTime value) => DateTime.SpecifyKind(value.Add(VietnamOffset), DateTimeKind.Unspecified);
+    private static DateTime AsVietnamLocal(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+    private static DateTime ToVietnamFromUtc(DateTime value) => DateTime.SpecifyKind(value.Add(VietnamOffset), DateTimeKind.Unspecified);
     private static bool IsSalaryLocked(string? status) =>
         string.Equals(status, "FINALIZED", StringComparison.OrdinalIgnoreCase)
         || string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase);

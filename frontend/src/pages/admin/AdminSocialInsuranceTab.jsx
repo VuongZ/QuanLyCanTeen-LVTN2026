@@ -158,6 +158,10 @@ function formatEmploymentType(value) {
     return 'Full-time';
   }
 
+  if (normalizedValue === 'MATERNITY') {
+    return 'Thai sản';
+  }
+
   if (normalizedValue === 'PART_TIME') {
     return 'Part-time';
   }
@@ -1519,7 +1523,7 @@ async function handleDeactivateRate() {
       <div className="bhxh-stats">
         <div className="sd-card bhxh-stat-card">
           <p className="bhxh-stat-label">
-            Nhân viên FULL_TIME
+            Nhân viên
           </p>
 
           <strong className="bhxh-stat-value">

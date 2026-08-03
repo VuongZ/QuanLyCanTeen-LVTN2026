@@ -1,5 +1,6 @@
 using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.DTOs;
+using LuanVanTotNghiep.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +50,10 @@ public class DashboardController(AppDbContext context) : ControllerBase
                 BranchName = attendance.Schedule.User.Branch != null
                     ? attendance.Schedule.User.Branch.Name
                     : null,
+                attendance.Schedule.User.EmploymentType,
+                attendance.Schedule.WorkDate,
+                ShiftStart = attendance.Schedule.Shift.StartTime,
+                ShiftEnd = attendance.Schedule.Shift.EndTime,
                 CheckInTime = attendance.CheckInTime!.Value,
                 CheckOutTime = attendance.CheckOutTime!.Value
             })
@@ -71,7 +76,13 @@ public class DashboardController(AppDbContext context) : ControllerBase
                 BranchName = group.Key.BranchName,
                 TotalHours = Math.Round(
                     group.Sum(attendance =>
-                        (decimal)(attendance.CheckOutTime - attendance.CheckInTime).TotalHours),
+                        AttendanceWorkHourPolicy.CalculateCreditedHours(
+                            attendance.EmploymentType,
+                            attendance.WorkDate,
+                            attendance.ShiftStart,
+                            attendance.ShiftEnd,
+                            attendance.CheckInTime,
+                            attendance.CheckOutTime)),
                     2),
                 ShiftCount = group.Count()
             })

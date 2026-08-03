@@ -139,6 +139,63 @@ public async Task<List<CaFinalSchedule>>
     }
 
     /// <summary>
+    /// Lấy các nhân viên FULL_TIME đang hoạt động thuộc chi nhánh.
+    /// </summary>
+    public async Task<List<NsUser>>
+        GetBranchFullTimeStaffAsync(
+            int? branchId)
+    {
+        return await Context.NsUsers
+            .AsNoTracking()
+            .Include(user =>
+                user.Role)
+            .Where(user =>
+                user.BranchId == branchId &&
+                user.IsDeleted != true &&
+                (user.EmploymentType == "FULL_TIME" ||
+                 user.EmploymentType == "MATERNITY") &&
+                user.Role != null &&
+                user.Role.RoleName != null)
+            .Where(user =>
+                user.Role!.RoleName!.Contains("Staff") ||
+                user.Role.RoleName.Contains("STAFF") ||
+                user.Role.RoleName.Contains("Nhan vien") ||
+                user.Role.RoleName.Contains("Nhân viên"))
+            .OrderBy(user =>
+                user.Id)
+            .ToListAsync();
+    }
+
+    public async Task<List<NsUser>> GetActiveBranchStaffAsync(
+        int branchId)
+    {
+        return await Context.NsUsers
+            .AsNoTracking()
+            .Include(user => user.Role)
+            .Where(user =>
+                user.BranchId == branchId &&
+                user.IsDeleted != true &&
+                user.Role != null &&
+                user.Role.RoleName != null)
+            .Where(user =>
+                user.Role!.RoleName!.Contains("Staff") ||
+                user.Role.RoleName.Contains("STAFF") ||
+                user.Role.RoleName.Contains("Nhan vien") ||
+                user.Role.RoleName.Contains("Nhân viên"))
+            .OrderBy(user => user.Id)
+            .ToListAsync();
+    }
+
+    public async Task<string?> GetBranchNameAsync(int branchId)
+    {
+        return await Context.DmBranches
+            .AsNoTracking()
+            .Where(branch => branch.Id == branchId)
+            .Select(branch => branch.Name)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>
     /// Chỉ lấy các phiếu đang giữ vị trí chính thức.
     ///
     /// WAITLIST không được lấy vào lịch công bố.

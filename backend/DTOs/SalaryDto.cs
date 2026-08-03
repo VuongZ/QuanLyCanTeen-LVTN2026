@@ -19,6 +19,8 @@ public class SalaryDto
 
     public string? BranchName { get; set; }
 
+    public string EmploymentType { get; set; } = "PART_TIME";
+
     public string? BankName { get; set; }
 
     public string? BankAccountNumber { get; set; }

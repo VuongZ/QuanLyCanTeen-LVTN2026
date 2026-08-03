@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axios from 'axios'
 import {
   getAllPeriods,
   createPeriod,
@@ -18,6 +19,7 @@ import {
 // Lịch chính thức và nghiệp vụ thay ca.
 import {
   getFinalScheduleByPeriod,
+  getAutomaticFullTimeStaff,
   publishSchedule,
   markApprovedLeave,
   markAbsent,
@@ -500,9 +502,13 @@ export function ManagerPeriodTab({ user, isManager, branches }) {
 function PeriodReviewScreen({ period, onBack, user }) {
   const [registrations, setRegistrations] = useState([])
   const [shifts, setShifts] = useState([])
+  const [shiftConfigs, setShiftConfigs] = useState([])
+  const [fullTimeStaff, setFullTimeStaff] = useState([])
   const [dates, setDates] = useState([])
   const [loading, setLoading] = useState(true)
   const [reviewError, setReviewError] = useState('')
+  const [publishDialog, setPublishDialog] = useState(null)
+  const [publishLoading, setPublishLoading] = useState(false)
 
   const [currentStatus, setCurrentStatus] = useState(
     String(period?.status || 'OPEN').toUpperCase()
@@ -554,9 +560,11 @@ function PeriodReviewScreen({ period, onBack, user }) {
           ? getFinalScheduleByPeriod(period.id)
           : getRegistrationsByPeriod(period.id)
 
-        const [scheduleRows, shiftRows] = await Promise.all([
+        const [scheduleRows, shiftRows, automaticStaff, configRes] = await Promise.all([
           schedulePromise,
-          getAllShifts()
+          getAllShifts(),
+          getAutomaticFullTimeStaff(period.branchId),
+          axios.get('/api/BranchShiftConfig')
         ])
 
         if (!isMounted) return
@@ -571,6 +579,19 @@ function PeriodReviewScreen({ period, onBack, user }) {
             : []
         )
         setShifts(branchShifts)
+        const branchShiftIds = new Set(
+          branchShifts.map((shift) => Number(shift.id))
+        )
+        setShiftConfigs(
+          (configRes.data || []).filter((config) => {
+            return branchShiftIds.has(Number(config.shiftId))
+          })
+        )
+        setFullTimeStaff(
+          Array.isArray(automaticStaff)
+            ? automaticStaff
+            : []
+        )
 
         const dateArray = []
         let currentDate = new Date(period.startDate)
@@ -627,6 +648,20 @@ function PeriodReviewScreen({ period, onBack, user }) {
     return String(value || '')
       .trim()
       .toUpperCase()
+  }
+
+  function getMaxStaffForShiftDate(shift, dateObj) {
+    const dayName = dateObj.toLocaleDateString(
+      'en-US',
+      { weekday: 'long' }
+    )
+
+    const config = shiftConfigs.find((item) => {
+      return Number(item.shiftId) === Number(shift.id) &&
+        String(item.dayOfWeek).toLowerCase() === dayName.toLowerCase()
+    })
+
+    return Number(config?.maxStaff ?? shift.maxStaff ?? 0)
   }
 
   function isActiveRegistration(row) {
@@ -824,23 +859,42 @@ function PeriodReviewScreen({ period, onBack, user }) {
   }
 
   async function handlePublish() {
-    if (!window.confirm('Bạn có chắc chắn muốn công bố lịch làm?')) {
-      return
-    }
+    setPublishDialog({
+      mode: 'confirm',
+      message: 'Bạn có chắc chắn muốn công bố lịch làm?'
+    })
+  }
 
+  async function confirmPublish() {
+    setPublishLoading(true)
     try {
-      await publishSchedule(period.id)
-      alert('Đã công bố lịch làm việc thành công!')
+      const result = await publishSchedule(period.id)
       setCurrentStatus('PUBLISHED')
-      await onBack()
+      setPublishDialog({
+        mode: 'success',
+        message:
+          result?.message ||
+          'Đã công bố lịch làm việc thành công!'
+      })
     } catch (error) {
-      alert(
-        getApiErrorMessage(
+      setPublishDialog({
+        mode: 'error',
+        message: getApiErrorMessage(
           error,
           'Không thể công bố lịch.'
         )
-      )
+      })
+    } finally {
+      setPublishLoading(false)
     }
+  }
+
+  async function closePublishDialog() {
+    if (publishLoading) return
+
+    const wasSuccessful = publishDialog?.mode === 'success'
+    setPublishDialog(null)
+    if (wasSuccessful) await onBack()
   }
 
   // ========================================================================
@@ -1056,6 +1110,69 @@ function PeriodReviewScreen({ period, onBack, user }) {
         ← Quay lại danh sách đợt
       </button>
 
+      {publishDialog && (
+        <div className="sd-overlay" onClick={closePublishDialog}>
+          <div
+            className="sd-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sd-modal-header">
+              <h2>
+                {publishDialog.mode === 'confirm'
+                  ? 'Xác nhận công bố lịch'
+                  : publishDialog.mode === 'success'
+                    ? 'Công bố thành công'
+                    : 'Không thể công bố lịch'}
+              </h2>
+              {!publishLoading && (
+                <button type="button" onClick={closePublishDialog}>✕</button>
+              )}
+            </div>
+            <div className="sd-modal-body">
+              <p className={
+                publishDialog.mode === 'error'
+                  ? 'sd-status sd-status-error'
+                  : publishDialog.mode === 'success'
+                    ? 'sd-status sd-status-success'
+                    : ''
+              }>
+                {publishDialog.message}
+              </p>
+            </div>
+            <div className="sd-modal-footer">
+              {publishDialog.mode === 'confirm' ? (
+                <>
+                  <button
+                    className="sd-btn-ghost"
+                    disabled={publishLoading}
+                    onClick={closePublishDialog}
+                    type="button"
+                  >
+                    Huỷ
+                  </button>
+                  <button
+                    className="sd-btn-primary"
+                    disabled={publishLoading}
+                    onClick={confirmPublish}
+                    type="button"
+                  >
+                    {publishLoading ? 'Đang công bố...' : 'Công bố lịch'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="sd-btn-primary"
+                  onClick={closePublishDialog}
+                  type="button"
+                >
+                  Đóng
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className="sd-publish-banner"
         style={{
@@ -1231,7 +1348,15 @@ function PeriodReviewScreen({ period, onBack, user }) {
                       const cellRows =
                         boardMatrix[dateString][shift.id] || []
 
-                      const max = Number(shift.maxStaff || 0)
+                      const visibleCellRows = isPublished
+                        ? cellRows
+                        : cellRows.filter((row) => {
+                            return !fullTimeStaff.some((staff) => {
+                              return String(staff.id) === String(row.userId)
+                            })
+                          })
+
+                      const max = getMaxStaffForShiftDate(shift, dateObj)
 
                       // Sau công bố:
                       // - PUBLISHED mới là người đang thực sự chiếm vị trí.
@@ -1241,12 +1366,12 @@ function PeriodReviewScreen({ period, onBack, user }) {
                       // - REGISTERED chiếm vị trí.
                       // - WAITLIST không chiếm vị trí.
                       const occupiedCount = isPublished
-                        ? cellRows.filter((row) => {
+                        ? visibleCellRows.filter((row) => {
                             return normalizeStatus(row.status) === 'PUBLISHED'
                           }).length
-                        : cellRows.filter((row) => {
+                        : visibleCellRows.filter((row) => {
                             return isOfficialRegistrationStatus(row.status)
-                          }).length + (max > 0 ? 1 : 0)
+                          }).length + (max > 0 ? 1 + fullTimeStaff.length : 0)
 
                       const remainingSlots = Math.max(
                         max - occupiedCount,
@@ -1285,7 +1410,22 @@ function PeriodReviewScreen({ period, onBack, user }) {
                                 </div>
                               )}
 
-                              {cellRows.map((row) => {
+                              {!isPublished && fullTimeStaff.map((staff) => (
+                                <div
+                                  key={`full-time-${staff.id}`}
+                                  className="sd-slot-person sd-slot-staff"
+                                >
+                                  <span className="sd-slot-name">
+                                    {staff.fullName || staff.username || 'Nhân viên'}
+                                  </span>
+
+                                  <span className="sd-slot-role">
+                                    Full-time
+                                  </span>
+                                </div>
+                              ))}
+
+                              {visibleCellRows.map((row) => {
                                 const managerRow =
                                   isPublished && isManagerRow(row)
 

@@ -97,6 +97,29 @@ public class StaffRegistrationRepo
     }
 
     /// <summary>
+    /// Đếm nhân viên FULL_TIME được tự động xếp vào mọi ca của chi nhánh.
+    /// </summary>
+    public async Task<int>
+        CountBranchFullTimeStaffAsync(
+            int? branchId)
+    {
+        return await Context.NsUsers
+            .Where(user =>
+                user.BranchId == branchId &&
+                user.IsDeleted != true &&
+                (user.EmploymentType == "FULL_TIME" ||
+                 user.EmploymentType == "MATERNITY") &&
+                user.Role != null &&
+                user.Role.RoleName != null)
+            .Where(user =>
+                user.Role!.RoleName!.Contains("Staff") ||
+                user.Role.RoleName.Contains("STAFF") ||
+                user.Role.RoleName.Contains("Nhan vien") ||
+                user.Role.RoleName.Contains("Nhân viên"))
+            .CountAsync();
+    }
+
+    /// <summary>
     /// Lấy người đăng ký chờ sớm nhất.
     /// ID được dùng để phân xử khi hai dòng có cùng thời gian.
     /// </summary>

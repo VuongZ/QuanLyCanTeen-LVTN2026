@@ -47,6 +47,34 @@ public class EmailService(IConfiguration configuration)
         await client.SendMailAsync(mail);
     }
 
+    public async Task SendSchedulePublishedEmailAsync(
+        string toEmail,
+        string? fullName,
+        string branchName,
+        DateOnly startDate,
+        DateOnly endDate)
+    {
+        var fromName = configuration["Smtp:FromName"]
+            ?? "Hệ Thống Quản Lý Nhân Viên";
+        using var client = CreateSmtpClient(out var smtpUser);
+
+        using var mail = new MailMessage
+        {
+            From = new MailAddress(smtpUser, fromName),
+            Subject = $"Lịch làm việc mới tại {branchName}",
+            Body =
+                $"Xin chào {fullName ?? "bạn"},\n\n" +
+                $"Lịch làm việc tại {branchName} cho tuần " +
+                $"từ {startDate:dd/MM/yyyy} đến {endDate:dd/MM/yyyy} " +
+                "đã được công bố.\n\n" +
+                "Vui lòng đăng nhập vào hệ thống để xem ca làm cụ thể của bạn.",
+            IsBodyHtml = false
+        };
+
+        mail.To.Add(toEmail);
+        await client.SendMailAsync(mail);
+    }
+
     private SmtpClient CreateSmtpClient(out string smtpUser)
     {
         var smtpHost = configuration["Smtp:Host"];

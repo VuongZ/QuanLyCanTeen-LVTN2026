@@ -6,6 +6,7 @@ public static class SalaryWagePolicy
 {
     public const string PartTime = "PART_TIME";
     public const string FullTime = "FULL_TIME";
+    public const string Maternity = "MATERNITY";
     public const decimal DefaultCoefficient = 1.00m;
     public const decimal SixMonthCoefficient = 1.20m;
     public const decimal TwelveMonthCoefficient = 1.50m;
@@ -43,7 +44,7 @@ public static class SalaryWagePolicy
         DateOnly referenceDate,
         string? employmentType)
     {
-        if (NormalizeEmploymentType(employmentType) == FullTime)
+        if (IsFullTimeEquivalent(employmentType))
         {
             var completedYears = hireDate == null || referenceDate < hireDate.Value
                 ? 0
@@ -63,12 +64,19 @@ public static class SalaryWagePolicy
 
     public static string NormalizeEmploymentType(string? employmentType)
     {
-        return string.Equals(
-            employmentType?.Trim(),
-            FullTime,
-            StringComparison.OrdinalIgnoreCase)
-            ? FullTime
-            : PartTime;
+        var normalized = employmentType?.Trim().ToUpperInvariant();
+        return normalized switch
+        {
+            FullTime => FullTime,
+            Maternity => Maternity,
+            _ => PartTime
+        };
+    }
+
+    public static bool IsFullTimeEquivalent(string? employmentType)
+    {
+        var normalized = NormalizeEmploymentType(employmentType);
+        return normalized == FullTime || normalized == Maternity;
     }
 
     private static int GetCompletedYears(DateOnly hireDate, DateOnly referenceDate)

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { formatVietnamDateTime } from '../../utils/vietnamDateTime';
 import './checkout-request.css';
 
 const STATUS = {
@@ -11,13 +12,10 @@ const STATUS = {
 
 function localInputValue(value) {
   if (!value) return '';
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-function formatDateTime(value) {
-  return value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '—';
+  const match = String(value).match(
+    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/
+  );
+  return match ? `${match[1]}T${match[2]}` : '';
 }
 
 function RequestCard({ item, mode, onChanged }) {
@@ -50,9 +48,9 @@ function RequestCard({ item, mode, onChanged }) {
       </div>
 
       <div className="co-times">
-        <div><span>Check-in</span><strong>{formatDateTime(item.checkInTime)}</strong></div>
-        <div><span>Checkout tạm</span><strong>{formatDateTime(item.proposedCheckOutTime)}</strong></div>
-        {item.requestedCheckOutTime && <div><span>Giờ đề nghị</span><strong>{formatDateTime(item.requestedCheckOutTime)}</strong></div>}
+        <div><span>Check-in</span><strong>{formatVietnamDateTime(item.checkInTime)}</strong></div>
+        <div><span>Checkout tạm</span><strong>{formatVietnamDateTime(item.proposedCheckOutTime)}</strong></div>
+        {item.requestedCheckOutTime && <div><span>Giờ đề nghị</span><strong>{formatVietnamDateTime(item.requestedCheckOutTime)}</strong></div>}
       </div>
 
       {mode === 'review' && <p className="co-meta">{item.roleName} · {item.branchName || 'Chưa rõ cơ sở'} · Lý do: {item.reason || 'Xác nhận giờ tạm'}</p>}

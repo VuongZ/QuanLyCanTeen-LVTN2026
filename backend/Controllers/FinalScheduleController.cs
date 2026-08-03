@@ -65,6 +65,24 @@ public class FinalScheduleController : ControllerBase
     // PHẦN 1: CÔNG BỐ VÀ ĐỌC LỊCH CHÍNH THỨC
     // ============================================================
 
+    [HttpGet("automatic-full-time/{branchId:int}")]
+    public async Task<IActionResult> GetAutomaticFullTimeStaff(
+        int branchId)
+    {
+        if (branchId <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "Chi nhánh không hợp lệ."
+            });
+        }
+
+        return Ok(
+            await _finalScheduleService
+                .GetAutomaticFullTimeStaffAsync(
+                    branchId));
+    }
+
     /// <summary>
     /// Manager công bố lịch chính thức.
     ///
@@ -83,13 +101,18 @@ public class FinalScheduleController : ControllerBase
     {
         try
         {
-            await _finalScheduleService
+            var result = await _finalScheduleService
                 .PublishScheduleAsync(dto);
 
             return Ok(new
             {
                 message =
-                    "Đã công bố lịch làm việc thành công!"
+                    result.EmailFailedCount == 0
+                        ? $"Đã công bố lịch và gửi email cho {result.EmailSentCount} nhân viên."
+                        : $"Đã công bố lịch. Gửi thành công {result.EmailSentCount} email, thất bại {result.EmailFailedCount} email.",
+                emailSentCount = result.EmailSentCount,
+                emailFailedCount = result.EmailFailedCount,
+                emailSkippedCount = result.EmailSkippedCount
             });
         }
         catch (KeyNotFoundException ex)

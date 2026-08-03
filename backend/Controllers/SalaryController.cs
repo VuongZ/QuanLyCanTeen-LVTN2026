@@ -92,11 +92,9 @@ public class SalaryController : ControllerBase
                 return Forbid();
         }
 
-        var finalizedOnly =
-            currentUser.Id == userId
-            && role != "MANAGER"
-            && role != "ADMIN";
-        var salaries = await _salaryService.GetByUserAsync(userId, finalizedOnly);
+        // Nhân viên được xem cả bảng lương PENDING của chính mình.
+        // Các quyền xem người khác vẫn được kiểm tra ở phía trên.
+        var salaries = await _salaryService.GetByUserAsync(userId);
         return Ok(salaries);
     }
 
@@ -251,14 +249,12 @@ public class SalaryController : ControllerBase
                 .AnyAsync(s =>
                     s.UserId == userId
                     && s.Month == month
-                    && s.Year == year
-                    && ((s.Status ?? "").ToUpper() == "FINALIZED"
-                        || (s.Status ?? "").ToUpper() == "PAID"));
+                    && s.Year == year);
             if (!salaryIsVisible)
             {
                 return NotFound(new
                 {
-                    message = "Bảng lương chưa được Manager chốt."
+                    message = "Chưa có bảng lương tạm cho kỳ này."
                 });
             }
         }
@@ -293,10 +289,11 @@ public class SalaryController : ControllerBase
             if (attendance.CheckInTime.HasValue &&
                 attendance.CheckOutTime.HasValue)
             {
-                workedHours = Math.Round(
-                    (decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime.Value)
-                        .TotalHours,
-                    2);
+                workedHours = AttendanceWorkHourPolicy.CalculateCreditedHours(
+                    targetUser,
+                    attendance.Schedule,
+                    attendance.CheckInTime.Value,
+                    attendance.CheckOutTime.Value);
             }
 
             string displayStatus;

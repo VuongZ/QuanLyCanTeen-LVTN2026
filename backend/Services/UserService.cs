@@ -101,6 +101,17 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         var us1 = await userRepo.GetbyId(user.Id);
         if (us1 != null)
         {
+            var oldEmploymentType =
+                SalaryWagePolicy.NormalizeEmploymentType(
+                    us1.EmploymentType);
+
+            var newEmploymentType =
+                SalaryWagePolicy.NormalizeEmploymentType(
+                    user.EmploymentType);
+
+            var employmentTypeChanged =
+                oldEmploymentType != newEmploymentType;
+
             if (!string.IsNullOrWhiteSpace(user.Password))
                 us1.Password = HashPassword(user.Password);
             us1.Email = Normalize(user.Email);
@@ -109,9 +120,11 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             us1.BranchId = user.BranchId;
             us1.RoleId = user.RoleId;
             us1.HireDate = user.HireDate;
-            us1.EmploymentType =
-                SalaryWagePolicy.NormalizeEmploymentType(user.EmploymentType);
-            if (user.SalaryCoefficientIsManual)
+            us1.EmploymentType = newEmploymentType;
+
+            // Khi đổi loại lao động phải trở về hệ số tự động của loại mới.
+            // Không giữ hệ số thủ công/cũ do frontend gửi lên.
+            if (!employmentTypeChanged && user.SalaryCoefficientIsManual)
             {
                 if (user.SalaryCoefficient <= 0 || user.SalaryCoefficient > 999.99m)
                     throw new ArgumentException("Hệ số lương phải từ 0,01 đến 999,99.");
@@ -128,8 +141,102 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
                 us1.SalaryCoefficientIsManual = false;
             }
             await userRepo.Update(us1);
+
+            await SynchronizeCurrentPendingSalaryAsync(
+                us1);
+
             await UpsertBankAccountAsync(us1.Id, user.BankName, user.BankAccountNumber, user.BankAccountName);
         }
+    }
+
+    private async Task SynchronizeCurrentPendingSalaryAsync(
+        NsUser user)
+    {
+        var today =
+            DateOnly.FromDateTime(
+                DateTime.UtcNow.AddHours(7));
+
+        var salary =
+            await context.LuongMonthlySalaries
+                .FirstOrDefaultAsync(item =>
+                    item.UserId == user.Id &&
+                    item.Month == today.Month &&
+                    item.Year == today.Year &&
+                    (item.Status == null ||
+                     item.Status.ToUpper() == "PENDING"));
+
+        if (salary == null)
+        {
+            return;
+        }
+
+        var completedAttendances =
+            await context.CaAttendances
+                .AsNoTracking()
+                .Include(attendance => attendance.Schedule)
+                    .ThenInclude(schedule => schedule.Shift)
+                .Where(attendance =>
+                    attendance.Schedule.UserId == user.Id &&
+                    attendance.Schedule.WorkDate.Month == today.Month &&
+                    attendance.Schedule.WorkDate.Year == today.Year &&
+                    attendance.CheckInTime != null &&
+                    attendance.CheckOutTime != null &&
+                    attendance.Status != CheckoutRequestService.AutoCheckoutPending)
+                .ToListAsync();
+
+        salary.TotalHours = completedAttendances.Sum(attendance =>
+            AttendanceWorkHourPolicy.CalculateCreditedHours(
+                user,
+                attendance.Schedule,
+                attendance.CheckInTime!.Value,
+                attendance.CheckOutTime!.Value));
+
+        var baseHourlyWage =
+            await context.NsRoles
+                .Where(role =>
+                    role.Id == user.RoleId)
+                .Select(role =>
+                    role.HourlyWage)
+                .FirstOrDefaultAsync() ?? 0m;
+
+        salary.HourlyWageAtTime =
+            baseHourlyWage * user.SalaryCoefficient;
+
+        salary.TotalSalary =
+            salary.TotalHours * salary.HourlyWageAtTime +
+            (salary.TotalBonus ?? 0) -
+            (salary.TotalPenalty ?? 0);
+
+        if (!SalaryWagePolicy.IsFullTimeEquivalent(user.EmploymentType))
+        {
+            salary.BhxhContributionId = null;
+            salary.SocialInsuranceDeduction = 0;
+        }
+        else
+        {
+            var contribution =
+                await context.BhxhMonthlyContributions
+                    .AsNoTracking()
+                    .Where(item =>
+                        item.UserId == user.Id &&
+                        item.Month == today.Month &&
+                        item.Year == today.Year &&
+                        (item.Status.ToUpper() == "CONFIRMED" ||
+                         item.Status.ToUpper() == "PAID"))
+                    .OrderByDescending(item =>
+                        item.Status.ToUpper() == "PAID")
+                    .ThenByDescending(item =>
+                        item.Id)
+                    .FirstOrDefaultAsync();
+
+            salary.BhxhContributionId =
+                contribution?.Id;
+
+            salary.SocialInsuranceDeduction =
+                contribution?.EmployeeAmount ?? 0;
+        }
+
+        await context.SaveChangesAsync();
     }
 
     public async Task DeleteUser(int id)

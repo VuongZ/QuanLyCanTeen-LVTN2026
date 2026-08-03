@@ -18,10 +18,11 @@ import {
 } from '../../api/SalaryApi';
 
 import '../css/SalaryInsurance.css';
+import { formatVietnamDateTime } from '../../utils/vietnamDateTime';
 
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0));
 const number = (value) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(value || 0));
-const date = (value) => value ? new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value)) : '—';
+const date = (value) => formatVietnamDateTime(value);
 const periodKey = (item) => `${item.year}-${String(item.month).padStart(2, '0')}`;
 /*
   Lấy phần BHXH do nhân viên đóng.
@@ -770,6 +771,14 @@ export function AdminSalaryTab({ isAdmin = true }) {
     Chỉ phần BHXH của nhân viên được khấu trừ
     khỏi lương.
   </p>
+) : ['FULL_TIME', 'MATERNITY'].includes(
+  String(selected.employmentType || '').toUpperCase()
+) ? (
+  <p className="salary-insurance-note salary-insurance-note--empty">
+    Nhân viên này thuộc diện FULL_TIME/Thai sản nhưng chưa có khoản đóng BHXH đã xác nhận
+    cho tháng {selected.month}/{selected.year}. Hãy kiểm tra hồ sơ BHXH ACTIVE,
+    sinh khoản đóng tháng và xác nhận khoản đóng trước khi chốt lương.
+  </p>
 ) : (
   <p className="salary-insurance-note salary-insurance-note--empty">
     Bảng lương này không có khoản khấu trừ
@@ -969,7 +978,7 @@ function SalaryEmployeeTable({
                     </strong>
                   </td>
 
-                  <td>
+                  <td title={item.branchName || 'Chưa gán cơ sở'}>
                     {item.branchName ||
                       'Chưa gán cơ sở'}
                   </td>

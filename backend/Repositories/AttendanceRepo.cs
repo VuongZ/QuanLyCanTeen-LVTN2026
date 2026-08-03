@@ -104,6 +104,35 @@ public class AttendanceRepo : Repository<CaAttendance>
                 salary.Year == year);
     }
 
+    public async Task<List<CaAttendance>> GetDailyHistoryAsync(
+        int branchId,
+        DateOnly workDate,
+        int? shiftId)
+    {
+        var query = Context.CaAttendances
+            .AsNoTracking()
+            .Include(attendance => attendance.Schedule)
+                .ThenInclude(schedule => schedule.User)
+                    .ThenInclude(user => user.Role)
+            .Include(attendance => attendance.Schedule)
+                .ThenInclude(schedule => schedule.Shift)
+            .Include(attendance => attendance.CheckoutRequests)
+            .Where(attendance =>
+                attendance.Schedule.WorkDate == workDate &&
+                attendance.Schedule.User.BranchId == branchId);
+
+        if (shiftId.HasValue)
+        {
+            query = query.Where(attendance =>
+                attendance.Schedule.ShiftId == shiftId.Value);
+        }
+
+        return await query
+            .OrderByDescending(attendance => attendance.CheckInTime)
+            .ThenByDescending(attendance => attendance.Id)
+            .ToListAsync();
+    }
+
     // Chỉ thêm điểm danh vào Context, chưa lưu ngay.
     public void AddAttendance(CaAttendance attendance)
     {
