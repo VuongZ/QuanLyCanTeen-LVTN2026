@@ -78,59 +78,147 @@ public class CheckoutRequestService
         return requests.Select(ToDto).ToList();
     }
 
-    public async Task SubmitAsync(int userId, int requestId, SubmitCheckoutRequestDto dto)
+    public async Task SubmitAsync(
+    int userId,
+    int requestId,
+    SubmitCheckoutRequestDto dto)
+{
+    var request =
+        await _context.CaCheckoutRequests
+            .Include(r => r.Attendance)
+                .ThenInclude(a => a.Schedule)
+                    .ThenInclude(s => s.Shift)
+            .FirstOrDefaultAsync(r =>
+                r.Id == requestId &&
+                r.RequestedByUserId == userId)
+        ?? throw new InvalidOperationException(
+            "Không tìm thấy yêu cầu checkout của bạn.");
+
+    if (request.Status != AwaitingEmployee &&
+        request.Status != Rejected)
     {
-        var request = await _context.CaCheckoutRequests
-            .Include(r => r.Attendance).ThenInclude(a => a.Schedule)
-            .FirstOrDefaultAsync(r => r.Id == requestId && r.RequestedByUserId == userId)
-            ?? throw new InvalidOperationException("Không tìm thấy yêu cầu checkout của bạn.");
+        throw new InvalidOperationException(
+            "Yêu cầu này đã được gửi hoặc đã xử lý.");
+    }
 
-        if (request.Status != AwaitingEmployee && request.Status != Rejected)
-            throw new InvalidOperationException("Yêu cầu này đã được gửi hoặc đã xử lý.");
+    var usesLegacyUtc =
+        UsesLegacyUtcAttendance(request);
 
-        var usesLegacyUtc = UsesLegacyUtcAttendance(request);
-        var proposedLocal = NormalizeAttendanceTime(
+    var proposedLocal =
+        NormalizeAttendanceTime(
             request.ProposedCheckOutTime,
             usesLegacyUtc);
-        var requestedLocal = dto.CheckOutTime.HasValue
-            ? AsVietnamLocal(dto.CheckOutTime.Value)
+
+    var requestedLocal =
+        dto.CheckOutTime.HasValue
+            ? AsVietnamLocal(
+                dto.CheckOutTime.Value)
             : proposedLocal;
-        var checkInValue = request.Attendance.CheckInTime
-            ?? throw new InvalidOperationException("Ca làm chưa có giờ check-in.");
-        var checkIn = NormalizeAttendanceTime(
+
+    var checkInValue =
+        request.Attendance.CheckInTime
+        ?? throw new InvalidOperationException(
+            "Ca làm chưa có giờ check-in.");
+
+    var checkIn =
+        NormalizeAttendanceTime(
             checkInValue,
             usesLegacyUtc);
 
-        if (requestedLocal < checkIn)
-            throw new InvalidOperationException("Giờ checkout không được trước giờ check-in.");
-        if (requestedLocal > ToVietnamFromUtc(DateTime.UtcNow).AddMinutes(15))
-            throw new InvalidOperationException("Giờ checkout không được nằm trong tương lai.");
-        if (requestedLocal > checkIn.AddHours(18))
-            throw new InvalidOperationException("Thời lượng ca làm không được vượt quá 18 giờ.");
-
-        var reason = dto.Reason?.Trim();
-        if (reason?.Length > 500)
-            throw new InvalidOperationException("Lý do không được vượt quá 500 ký tự.");
-        if (Math.Abs((requestedLocal - proposedLocal).TotalMinutes) > 1 && string.IsNullOrWhiteSpace(reason))
-            throw new InvalidOperationException("Vui lòng nhập lý do khi thay đổi giờ checkout tạm.");
-
-        if (usesLegacyUtc)
-        {
-            request.Attendance.CheckInTime = checkIn;
-            request.Attendance.CheckOutTime = proposedLocal;
-            request.ProposedCheckOutTime = proposedLocal;
-        }
-
-        request.RequestedCheckOutTime = requestedLocal;
-        request.Reason = string.IsNullOrWhiteSpace(reason) ? "Xác nhận giờ kết thúc ca" : reason;
-        request.Status = Pending;
-        request.RejectReason = null;
-        request.ReviewedAt = null;
-        request.ReviewedByUserId = null;
-        request.UpdatedAt = DateTime.UtcNow;
-        AddHistory(request, userId, "SUBMITTED", $"Giờ đề nghị: {requestedLocal:O}. Lý do: {request.Reason}");
-        await _context.SaveChangesAsync();
+    if (requestedLocal < checkIn)
+    {
+        throw new InvalidOperationException(
+            "Giờ checkout không được trước giờ check-in.");
     }
+
+    var vietnamNow =
+        ToVietnamFromUtc(
+            DateTime.UtcNow);
+
+    if (requestedLocal >
+        vietnamNow.AddMinutes(15))
+    {
+        throw new InvalidOperationException(
+            "Giờ checkout không được nằm trong tương lai.");
+    }
+
+    if (requestedLocal >
+        checkIn.AddHours(18))
+    {
+        throw new InvalidOperationException(
+            "Thời lượng ca làm không được vượt quá 18 giờ.");
+    }
+
+    var reason =
+        dto.Reason?.Trim();
+
+    if (reason?.Length > 500)
+    {
+        throw new InvalidOperationException(
+            "Lý do không được vượt quá 500 ký tự.");
+    }
+
+    var checkoutWasChanged =
+        Math.Abs(
+            (
+                requestedLocal -
+                proposedLocal
+            ).TotalMinutes
+        ) > 1;
+
+    if (checkoutWasChanged &&
+        string.IsNullOrWhiteSpace(reason))
+    {
+        throw new InvalidOperationException(
+            "Vui lòng nhập lý do khi thay đổi giờ checkout tạm.");
+    }
+
+    // Chuyển dữ liệu cũ đang lưu theo UTC
+    // sang giờ Việt Nam trước khi cập nhật.
+    if (usesLegacyUtc)
+    {
+        request.Attendance.CheckInTime =
+            checkIn;
+
+        request.Attendance.CheckOutTime =
+            proposedLocal;
+
+        request.ProposedCheckOutTime =
+            proposedLocal;
+    }
+
+    request.RequestedCheckOutTime =
+        requestedLocal;
+
+    request.Reason =
+        string.IsNullOrWhiteSpace(reason)
+            ? "Xác nhận giờ kết thúc ca"
+            : reason;
+
+    request.Status =
+        Pending;
+
+    request.RejectReason =
+        null;
+
+    request.ReviewedAt =
+        null;
+
+    request.ReviewedByUserId =
+        null;
+
+    request.UpdatedAt =
+        DateTime.UtcNow;
+
+    AddHistory(
+        request,
+        userId,
+        "SUBMITTED",
+        $"Giờ đề nghị: {requestedLocal:O}. " +
+        $"Lý do: {request.Reason}");
+
+    await _context.SaveChangesAsync();
+}
 
     public async Task<List<CheckoutRequestDto>> GetForReviewAsync(int reviewerId)
     {
