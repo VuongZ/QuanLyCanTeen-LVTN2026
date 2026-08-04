@@ -1846,8 +1846,7 @@ function RegistrationView({ period, user }) {
             textAlign: 'center',
           }}
         >
-          ✅ Dữ liệu đã được đồng bộ. REGISTERED và WAITLIST được Backend
-          phân loại theo số chỗ còn lại tại thời điểm lưu.
+          Đăng Ký Ca Thành Công
         </p>
       )}
     </>

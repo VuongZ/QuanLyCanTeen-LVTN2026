@@ -141,15 +141,11 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 maxStaff - 1 - fullTimeStaffCount,
                 0);
 
-        if (staffSlot <= 0)
-        {
-            throw new InvalidOperationException(
-                "Ca làm này đã hết vị trí sau khi xếp Quản lý và " +
-                "nhân viên FULL_TIME; nhân viên PART_TIME không thể đăng ký.");
-        }
-
         // Chỉ đếm REGISTERED.
         // WAITLIST không chiếm vị trí chính thức.
+        // Kể cả khi Quản lý và FULL_TIME đã giữ hết chỗ
+        // (staffSlot = 0), PART_TIME vẫn được đăng ký WAITLIST
+        // để có thể thay thế khi nhân viên chính thức nghỉ.
         var registeredCount =
             await _repo.CountRegisteredAsync(
                 dto.PeriodId,
