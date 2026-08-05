@@ -145,6 +145,20 @@ public partial class SocialInsuranceService
                         rateConfig.EmployerRate,
                     EmployeeAmount =
                         employeeAmount,
+
+                    // Ban đầu chưa khấu trừ từ bảng lương.
+                    EmployeeDeductedAmount =
+                        0,
+
+                    // Toàn bộ phần nhân viên đóng đang chờ
+                    // được xử lý khi bảng lương được chốt.
+                    EmployeeOutstandingAmount =
+                        employeeAmount,
+
+                    // NONE / PARTIAL / FULL.
+                    DeductionStatus =
+                        "NONE",
+
                     EmployerAmount =
                         employerAmount,
                     TotalAmount =
@@ -257,7 +271,7 @@ public partial class SocialInsuranceService
 
         var entity =
             await _repo
-                .GetContributionByIdForUpdateAsync(
+                .GetContributionByIdAsync(
                     contributionId);
 
         if (entity == null)
@@ -266,34 +280,14 @@ public partial class SocialInsuranceService
                 "Không tìm thấy khoản đóng BHXH.");
         }
 
-        if (!string.Equals(
-                entity.Status,
-                DraftStatus,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                "Chỉ khoản đóng ở trạng thái DRAFT " +
-                "mới được xác nhận.");
-        }
-
-        var now = GetVietnamNow();
-
-        entity.Status =
-            ConfirmedStatus;
-        entity.ConfirmedByUserId =
-            adminUserId;
-        entity.ConfirmedAt = now;
-        entity.UpdatedAt = now;
-
-        await _repo.SaveChangesAsync();
-
-        var savedEntity =
-            await _repo
-                .GetContributionByIdAsync(
-                    entity.Id)
-            ?? entity;
-
-        return MapContribution(savedEntity);
+        // Theo luồng mới, khoản đóng được tự động chuyển
+        // từ DRAFT sang CONFIRMED khi bảng lương được chốt.
+        // Admin không xác nhận thủ công để tránh ghi nhận
+        // "đã khấu trừ" khi tiền chưa thực tế được trừ.
+        throw new InvalidOperationException(
+            "Khoản đóng BHXH được tự động xác nhận " +
+            "khi bảng lương được chốt. " +
+            "Quản trị viên không cần xác nhận thủ công.");
     }
 
     public async Task<BhxhMonthlyContributionDto>
@@ -321,8 +315,30 @@ public partial class SocialInsuranceService
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Chỉ khoản đóng đã CONFIRMED " +
-                "mới được chuyển sang PAID.");
+                "Chỉ khoản đóng đang ở trạng thái Chờ nộp " +
+                "mới được xác nhận đã nộp.");
+        }
+
+        var monthlySalary =
+            entity.MonthlySalary;
+
+        if (monthlySalary == null)
+        {
+            throw new InvalidOperationException(
+                "Khoản đóng chưa được liên kết với bảng lương.");
+        }
+
+        var salaryStatus =
+            (monthlySalary.Status ?? string.Empty)
+                .Trim()
+                .ToUpperInvariant();
+
+        if (salaryStatus != "FINALIZED" &&
+            salaryStatus != "PAID")
+        {
+            throw new InvalidOperationException(
+                "Bảng lương chưa được chốt nên chưa thể " +
+                "xác nhận doanh nghiệp đã nộp BHXH.");
         }
 
         var now = GetVietnamNow();
@@ -399,8 +415,31 @@ public partial class SocialInsuranceService
                 "Khoản đóng này đã bị hủy trước đó.");
         }
 
+        // Chỉ khoản DRAFT chưa được xử lý trong bảng lương
+        // mới được phép hủy. Khoản CONFIRMED đã được khấu trừ
+        // hoặc đã ghi nhận doanh nghiệp tạm ứng nên không thể hủy.
+        if (!string.Equals(
+                entity.Status,
+                DraftStatus,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Chỉ khoản đóng DRAFT chưa được xử lý " +
+                "trong bảng lương mới được phép hủy.");
+        }
+
         entity.Status =
             CancelledStatus;
+
+        // Khoản DRAFT bị hủy chưa phát sinh khấu trừ thực tế.
+        entity.EmployeeDeductedAmount = 0;
+        entity.EmployeeOutstandingAmount =
+            entity.EmployeeAmount;
+        entity.DeductionStatus = "NONE";
+        entity.ConfirmedByUserId = null;
+        entity.ConfirmedAt = null;
+        entity.PaidByUserId = null;
+        entity.PaidAt = null;
 
         // Bảng hiện tại chưa có cancelled_by_user_id
         // và cancelled_at, nên tạm lưu người hủy cùng lý do
@@ -429,4 +468,3 @@ public partial class SocialInsuranceService
         return MapContribution(savedEntity);
     }
 }
-

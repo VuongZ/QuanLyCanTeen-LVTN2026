@@ -418,6 +418,14 @@ public partial class SocialInsuranceService
 
             EmployeeAmount =
                 entity.EmployeeAmount,
+                EmployeeDeductedAmount =
+    entity.EmployeeDeductedAmount,
+
+EmployeeOutstandingAmount =
+    entity.EmployeeOutstandingAmount,
+
+DeductionStatus =
+    entity.DeductionStatus,
 
             EmployerAmount =
                 entity.EmployerAmount,

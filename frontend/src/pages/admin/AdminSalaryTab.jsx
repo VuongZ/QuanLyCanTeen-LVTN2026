@@ -36,6 +36,25 @@ function getInsuranceDeduction(item) {
   );
 }
 
+/*
+  BHXH phát sinh trong chính tháng lương.
+*/
+function getCurrentInsuranceDeduction(item) {
+  return Number(
+    item?.currentBhxhDeduction || 0
+  );
+}
+
+/*
+  Khoản doanh nghiệp đã ứng trước ở tháng cũ
+  được thu hồi trong bảng lương hiện tại.
+*/
+function getPreviousInsuranceRecovery(item) {
+  return Number(
+    item?.previousBhxhRecovery || 0
+  );
+}
+
 
 /*
   Lấy lương thực nhận.
@@ -737,19 +756,47 @@ export function AdminSalaryTab({ isAdmin = true }) {
     </strong>
   </div>
 
-  <div className="salary-insurance-deduction">
-    <span>
-      BHXH nhân viên đóng
-    </span>
+  <div>
+  <span>
+    BHXH tháng hiện tại
+  </span>
 
-    <strong>
-      − {money(
-        getInsuranceDeduction(
-          selected
-        )
-      )}
-    </strong>
-  </div>
+  <strong>
+    − {money(
+      getCurrentInsuranceDeduction(
+        selected
+      )
+    )}
+  </strong>
+</div>
+
+<div>
+  <span>
+    Thu hồi khoản ứng cũ
+  </span>
+
+  <strong>
+    − {money(
+      getPreviousInsuranceRecovery(
+        selected
+      )
+    )}
+  </strong>
+</div>
+
+<div className="salary-insurance-deduction">
+  <span>
+    Tổng khấu trừ BHXH
+  </span>
+
+  <strong>
+    − {money(
+      getInsuranceDeduction(
+        selected
+      )
+    )}
+  </strong>
+</div>
 
   <div className="total salary-net">
     <span>
@@ -764,26 +811,49 @@ export function AdminSalaryTab({ isAdmin = true }) {
   </div>
 </div>
 
-{selected.bhxhContributionId ? (
+{getInsuranceDeduction(selected) > 0 ? (
   <p className="salary-insurance-note">
-    Bảng lương đã liên kết với khoản đóng
-    BHXH #{selected.bhxhContributionId}.
-    Chỉ phần BHXH của nhân viên được khấu trừ
-    khỏi lương.
+    Bảng lương đã khấu trừ{' '}
+    {money(
+      getCurrentInsuranceDeduction(selected)
+    )}{' '}
+    BHXH của tháng hiện tại
+    {getPreviousInsuranceRecovery(selected) > 0
+      ? (
+          <>
+            {' '}và thu hồi{' '}
+            {money(
+              getPreviousInsuranceRecovery(
+                selected
+              )
+            )}{' '}
+            khoản doanh nghiệp đã ứng trước.
+          </>
+        )
+      : '.'}
+    {' '}Tổng khấu trừ là{' '}
+    {money(
+      getInsuranceDeduction(selected)
+    )}.
   </p>
-) : ['FULL_TIME', 'MATERNITY'].includes(
-  String(selected.employmentType || '').toUpperCase()
-) ? (
+) : selected.bhxhContributionId ? (
   <p className="salary-insurance-note salary-insurance-note--empty">
-    Nhân viên này thuộc diện FULL_TIME/Thai sản nhưng chưa có khoản đóng BHXH đã xác nhận
-    cho tháng {selected.month}/{selected.year}. Hãy kiểm tra hồ sơ BHXH ACTIVE,
-    sinh khoản đóng tháng và xác nhận khoản đóng trước khi chốt lương.
+    Khoản đóng BHXH #{selected.bhxhContributionId} đã được
+    tạo nhưng chưa khấu trừ được từ lương. Phần nhân viên
+    phải đóng được ghi nhận là khoản doanh nghiệp ứng trước.
+  </p>
+) : String(
+  selected.employmentType || ''
+).toUpperCase() === 'FULL_TIME' ? (
+  <p className="salary-insurance-note salary-insurance-note--empty">
+    Khi Manager chốt lương, hệ thống sẽ tự tạo và liên kết
+    khoản đóng BHXH tháng {selected.month}/{selected.year}.
+    Hồ sơ BHXH phải đang ACTIVE và có tỷ lệ còn hiệu lực.
   </p>
 ) : (
   <p className="salary-insurance-note salary-insurance-note--empty">
-    Bảng lương này không có khoản khấu trừ
-    BHXH. Trường hợp này phù hợp với nhân viên
-    PART_TIME hoặc bảng lương chưa được chốt.
+    Nhân viên này không phát sinh khoản BHXH của tháng
+    hiện tại.
   </p>
 )}
 
@@ -900,7 +970,7 @@ function SalaryEmployeeTable({
             </th>
 
             <th>
-              Khấu trừ BHXH
+              Tổng khấu trừ BHXH
             </th>
 
             <th>
@@ -1000,13 +1070,26 @@ function SalaryEmployeeTable({
                     )}
                   </td>
 
-                  <td className="sd-salary-insurance-value">
-                    {insuranceDeduction > 0
-                      ? `− ${money(
-                          insuranceDeduction
-                        )}`
-                      : money(0)}
-                  </td>
+                  <td
+  className="sd-salary-insurance-value"
+  title={
+    `BHXH tháng hiện tại: ${
+      money(
+        getCurrentInsuranceDeduction(item)
+      )
+    } | Thu hồi khoản ứng cũ: ${
+      money(
+        getPreviousInsuranceRecovery(item)
+      )
+    }`
+  }
+>
+  {insuranceDeduction > 0
+    ? `− ${money(
+        insuranceDeduction
+      )}`
+    : money(0)}
+</td>
 
                   <td className="sd-salary-net-value">
                     {money(netSalary)}

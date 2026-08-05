@@ -849,6 +849,7 @@ export function StaffSocialInsuranceTab() {
                   }
                 />
               </div>
+              
 
               <div>
                 <span>
@@ -862,6 +863,51 @@ export function StaffSocialInsuranceTab() {
                 </strong>
               </div>
             </div>
+            {/* Thông tin Staff cần đối chiếu trước khi xác nhận */}
+{canReviewProfile && (
+  <div className="staff-bhxh-review-details">
+    <p className="staff-bhxh-review-title">
+      Thông tin cần xác nhận
+    </p>
+
+    <dl className="staff-bhxh-review-list">
+      <ProfileInfoRow
+        label="Mã số BHXH"
+        value={
+          <strong className="staff-bhxh-code">
+            {profile.socialInsuranceNumber ||
+              'Chưa cập nhật'}
+          </strong>
+        }
+      />
+
+      <ProfileInfoRow
+        label="Mức lương làm căn cứ"
+        value={
+          <strong className="staff-bhxh-money">
+            {formatMoney(
+              profile.insuranceSalaryBasis
+            )}
+          </strong>
+        }
+      />
+
+      <ProfileInfoRow
+        label="Ngày bắt đầu"
+        value={formatDate(
+          profile.startDate
+        )}
+      />
+
+      <ProfileInfoRow
+        label="Ngày kết thúc"
+        value={formatDate(
+          profile.endDate
+        )}
+      />
+    </dl>
+  </div>
+)}
 
 
             {/* Hồ sơ đang chờ Staff xác nhận */}

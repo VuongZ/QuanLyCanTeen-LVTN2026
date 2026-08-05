@@ -256,36 +256,103 @@ const selectedSalary = useMemo(() => {
     loadAdjustmentHistory();
   }, [user?.id, selectedSalary]);
 
-  const summary = useMemo(() => ({
-    hours: Number(selectedSalary?.totalHours || 0),
-    salary: Number(selectedSalary?.totalSalary || 0),
-    bonus: Number(selectedSalary?.totalBonus || 0),
-    penalty: Number(selectedSalary?.totalPenalty || 0),
-  }), [selectedSalary]);
+  const summary = useMemo(() => {
+  const salary =
+    Number(selectedSalary?.totalSalary || 0);
+
+  const currentBhxh =
+    Number(
+      selectedSalary?.currentBhxhDeduction || 0
+    );
+
+  const previousBhxhRecovery =
+    Number(
+      selectedSalary?.previousBhxhRecovery || 0
+    );
+
+  const totalBhxh =
+    Number(
+      selectedSalary?.socialInsuranceDeduction || 0
+    );
+
+  const backendNetSalary =
+    Number(selectedSalary?.netSalary);
+
+  const netSalary =
+    Number.isFinite(backendNetSalary)
+      ? backendNetSalary
+      : Math.max(
+          0,
+          salary - totalBhxh
+        );
+
+  return {
+    hours:
+      Number(selectedSalary?.totalHours || 0),
+
+    salary,
+
+    bonus:
+      Number(selectedSalary?.totalBonus || 0),
+
+    penalty:
+      Number(selectedSalary?.totalPenalty || 0),
+
+    currentBhxh,
+
+    previousBhxhRecovery,
+
+    totalBhxh,
+
+    netSalary,
+  };
+}, [selectedSalary]);
 
   return (
     <div className="sd-profile-layout sd-salary-layout">
       <div className="sd-salary-summary">
-        <SalaryMetric
-          label="Tổng giờ làm"
-          value={`${formatNumber(summary.hours)} giờ`}
-        />
+  <SalaryMetric
+    label="Tổng giờ làm"
+    value={`${formatNumber(summary.hours)} giờ`}
+  />
 
-        <SalaryMetric
-          label="Tổng lương"
-          value={formatMoney(summary.salary)}
-        />
+  <SalaryMetric
+    label="Lương trước BHXH"
+    value={formatMoney(summary.salary)}
+  />
 
-        <SalaryMetric
-          label="Thưởng"
-          value={formatMoney(summary.bonus)}
-        />
+  <SalaryMetric
+    label="Thưởng"
+    value={formatMoney(summary.bonus)}
+  />
 
-        <SalaryMetric
-          label="Phạt"
-          value={formatMoney(summary.penalty)}
-        />
-      </div>
+  <SalaryMetric
+    label="Phạt"
+    value={formatMoney(summary.penalty)}
+  />
+
+  <SalaryMetric
+    label="BHXH tháng hiện tại"
+    value={`− ${formatMoney(summary.currentBhxh)}`}
+  />
+
+  <SalaryMetric
+    label="Thu hồi khoản ứng cũ"
+    value={`− ${formatMoney(
+      summary.previousBhxhRecovery
+    )}`}
+  />
+
+  <SalaryMetric
+    label="Tổng khấu trừ BHXH"
+    value={`− ${formatMoney(summary.totalBhxh)}`}
+  />
+
+  <SalaryMetric
+    label="Lương thực nhận"
+    value={formatMoney(summary.netSalary)}
+  />
+</div>
 
       {selectedSalary && isTemporarySalary && (
         <p className="sd-status">

@@ -48,43 +48,48 @@ public class SalaryDto
     public decimal TotalPenalty { get; set; }
 
     // ========================================================
-    // THÔNG TIN KHẤU TRỪ BHXH
-    // ========================================================
+// THÔNG TIN KHẤU TRỪ BHXH
+// ========================================================
 
-    /// <summary>
-    /// ID khoản đóng BHXH được sử dụng
-    /// cho bảng lương tháng này.
-    ///
-    /// Giá trị NULL khi:
-    /// - Nhân viên là PART_TIME.
-    /// - Bảng lương chưa liên kết khoản đóng BHXH.
-    /// </summary>
-    public int? BhxhContributionId { get; set; }
+/// <summary>
+/// ID khoản đóng BHXH phát sinh trong chính tháng lương.
+///
+/// Giá trị NULL khi:
+/// - Nhân viên không thuộc diện tham gia BHXH.
+/// - Bảng lương chưa liên kết với khoản đóng BHXH.
+/// </summary>
+public int? BhxhContributionId { get; set; }
 
-    /// <summary>
-    /// Phần BHXH do nhân viên đóng và bị khấu trừ
-    /// khỏi lương thực nhận.
-    ///
-    /// Giá trị này được lấy từ:
-    /// BhxhMonthlyContribution.EmployeeAmount.
-    ///
-    /// Không bao gồm phần doanh nghiệp đóng.
-    /// </summary>
-    public decimal SocialInsuranceDeduction { get; set; }
+/// <summary>
+/// Số tiền BHXH của chính tháng lương
+/// được khấu trừ từ lương nhân viên.
+/// </summary>
+public decimal CurrentBhxhDeduction { get; set; }
 
-    /// <summary>
-    /// Lương thực nhận sau khi trừ BHXH.
-    ///
-    /// Không cần lưu thêm vào database vì có thể tính từ:
-    /// TotalSalary - SocialInsuranceDeduction.
-    /// </summary>
-    public decimal NetSalary =>
-        Math.Max(
-            0m,
-            TotalSalary -
-            SocialInsuranceDeduction
-        );
+/// <summary>
+/// Số tiền doanh nghiệp đã ứng trước ở các tháng cũ
+/// và được thu hồi trong bảng lương hiện tại.
+/// </summary>
+public decimal PreviousBhxhRecovery { get; set; }
 
+/// <summary>
+/// Tổng số tiền BHXH bị trừ trên bảng lương.
+///
+/// Bao gồm:
+/// - BHXH của tháng hiện tại.
+/// - Khoản doanh nghiệp ứng trước được thu hồi.
+/// </summary>
+public decimal SocialInsuranceDeduction { get; set; }
+
+/// <summary>
+/// Lương thực nhận sau khi trừ toàn bộ khoản BHXH.
+/// </summary>
+public decimal NetSalary =>
+    Math.Max(
+        0m,
+        TotalSalary -
+        SocialInsuranceDeduction
+    );
     // ========================================================
     // TRẠNG THÁI BẢNG LƯƠNG
     // ========================================================
@@ -100,6 +105,7 @@ public class SalaryDto
     public string? FinalizedByName { get; set; }
 
     public DateTime? CreatedAt { get; set; }
+    
 }
 
 
@@ -178,4 +184,5 @@ public decimal TotalNetSalary { get; set; }
     public DateTime? TransferredAt { get; set; }
 
     public string? TransferredByName { get; set; }
+    
 }

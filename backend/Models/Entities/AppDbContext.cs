@@ -47,6 +47,8 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<BhxhMonthlyContribution> BhxhMonthlyContributions { get; set; }
 
+    public virtual DbSet<BhxhDeductionRecovery> BhxhDeductionRecoveries { get; set; }
+
     public virtual DbSet<DmBranch> DmBranches { get; set; }
 
     public virtual DbSet<KhoBranchFrontStock> KhoBranchFrontStocks { get; set; }
@@ -900,6 +902,31 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.EmployeeAmount)
                 .HasPrecision(15, 2)
                 .HasColumnName("employee_amount");
+                entity.Property(e =>
+        e.EmployeeDeductedAmount)
+    .HasPrecision(15, 2)
+    .HasDefaultValueSql("'0.00'")
+    .HasColumnName(
+        "employee_deducted_amount");
+
+entity.Property(e =>
+        e.EmployeeOutstandingAmount)
+    .HasPrecision(15, 2)
+    .HasDefaultValueSql("'0.00'")
+    .HasColumnName(
+        "employee_outstanding_amount");
+
+entity.Property(e =>
+        e.DeductionStatus)
+    .HasDefaultValueSql("'NONE'")
+    .HasColumnType(
+        "enum(" +
+        "'NONE'," +
+        "'PARTIAL'," +
+        "'FULL'" +
+        ")")
+    .HasColumnName(
+        "deduction_status");
 
             entity.Property(e => e.EmployerAmount)
                 .HasPrecision(15, 2)
@@ -987,6 +1014,83 @@ public partial class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName(
                     "fk_bhxh_contribution_paid_by");
+        });
+
+
+        modelBuilder.Entity<BhxhDeductionRecovery>(entity =>
+        {
+            entity.HasKey(e => e.Id)
+                .HasName("PRIMARY");
+
+            entity
+                .ToTable("bhxh_deduction_recovery")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.HasIndex(
+                e => e.UserId,
+                "idx_bhxh_recovery_user");
+
+            entity.HasIndex(
+                e => e.SourceContributionId,
+                "idx_bhxh_recovery_source");
+
+            entity.HasIndex(
+                e => e.RecoverySalaryId,
+                "idx_bhxh_recovery_salary");
+
+            entity.HasIndex(
+                    e => new
+                    {
+                        e.SourceContributionId,
+                        e.RecoverySalaryId
+                    },
+                    "uq_bhxh_recovery_contribution_salary")
+                .IsUnique();
+
+            entity.Property(e => e.Id)
+                .HasColumnName("id");
+
+            entity.Property(e => e.UserId)
+                .HasColumnName("user_id");
+
+            entity.Property(e => e.SourceContributionId)
+                .HasColumnName("source_contribution_id");
+
+            entity.Property(e => e.RecoverySalaryId)
+                .HasColumnName("recovery_salary_id");
+
+            entity.Property(e => e.RecoveryAmount)
+                .HasPrecision(15, 2)
+                .HasColumnName("recovery_amount");
+
+            entity.Property(e => e.Note)
+                .HasMaxLength(500)
+                .HasColumnName("note");
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName(
+                    "fk_bhxh_recovery_user");
+
+            entity.HasOne(d => d.SourceContribution)
+                .WithMany(p => p.DeductionRecoveries)
+                .HasForeignKey(d => d.SourceContributionId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName(
+                    "fk_bhxh_recovery_source");
+
+            entity.HasOne(d => d.RecoverySalary)
+                .WithMany(p => p.BhxhDeductionRecoveries)
+                .HasForeignKey(d => d.RecoverySalaryId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName(
+                    "fk_bhxh_recovery_salary");
         });
 
         modelBuilder.Entity<DmBranch>(entity =>
@@ -1460,6 +1564,16 @@ public partial class AppDbContext : DbContext
         .HasPrecision(15, 2)
         .HasDefaultValueSql("'0.00'")
         .HasColumnName("social_insurance_deduction");
+
+    entity.Property(e => e.CurrentBhxhDeduction)
+        .HasPrecision(15, 2)
+        .HasDefaultValueSql("'0.00'")
+        .HasColumnName("current_bhxh_deduction");
+
+    entity.Property(e => e.PreviousBhxhRecovery)
+        .HasPrecision(15, 2)
+        .HasDefaultValueSql("'0.00'")
+        .HasColumnName("previous_bhxh_recovery");
 
     entity.Property(e => e.Status)
         .HasMaxLength(20)

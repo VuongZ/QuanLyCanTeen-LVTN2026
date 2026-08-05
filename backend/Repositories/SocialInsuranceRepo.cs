@@ -436,6 +436,8 @@ public async Task<BhxhEmployeeProfile?>
                 contribution.ConfirmedByUser)
             .Include(contribution =>
                 contribution.PaidByUser)
+            .Include(contribution =>
+                contribution.MonthlySalary)
 
             .FirstOrDefaultAsync(contribution =>
                 contribution.Id == contributionId);
@@ -455,6 +457,8 @@ public async Task<BhxhEmployeeProfile?>
                 contribution.ConfirmedByUser)
             .Include(contribution =>
                 contribution.PaidByUser)
+            .Include(contribution =>
+                contribution.MonthlySalary)
 
             .FirstOrDefaultAsync(contribution =>
                 contribution.Id == contributionId);

@@ -207,7 +207,7 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             (salary.TotalBonus ?? 0) -
             (salary.TotalPenalty ?? 0);
 
-        if (!SalaryWagePolicy.IsFullTimeEquivalent(user.EmploymentType))
+        if (!SalaryWagePolicy.IsSocialInsuranceEligible(user.EmploymentType))
         {
             salary.BhxhContributionId = null;
             salary.SocialInsuranceDeduction = 0;

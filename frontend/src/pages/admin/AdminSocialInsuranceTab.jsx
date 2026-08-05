@@ -7,7 +7,6 @@ import {
 
 import {
   cancelSocialInsuranceContribution,
-  confirmSocialInsuranceContribution,
   createSocialInsuranceProfile,
   createSocialInsuranceRate,
   deactivateSocialInsuranceRate,
@@ -85,11 +84,11 @@ const STAFF_CONFIRMATION_DISPLAY = {
 
 const CONTRIBUTION_STATUS_DISPLAY = {
   DRAFT: {
-    label: 'Tạm tính',
+    label: 'Dự kiến',
     className: 'bhxh-badge--warning'
   },
   CONFIRMED: {
-    label: 'Đã xác nhận',
+    label: 'Chờ nộp',
     className: 'bhxh-badge--blue'
   },
   PAID: {
@@ -999,6 +998,12 @@ export function AdminSocialInsuranceTab() {
         employeeAmount:
           0,
 
+        employeeDeductedAmount:
+          0,
+
+        employeeOutstandingAmount:
+          0,
+
         employerAmount:
           0,
 
@@ -1041,6 +1046,18 @@ export function AdminSocialInsuranceTab() {
             result.employeeAmount +=
               Number(
                 contribution.employeeAmount ||
+                0
+              );
+
+            result.employeeDeductedAmount +=
+              Number(
+                contribution.employeeDeductedAmount ||
+                0
+              );
+
+            result.employeeOutstandingAmount +=
+              Number(
+                contribution.employeeOutstandingAmount ||
                 0
               );
 
@@ -1815,64 +1832,15 @@ export function AdminSocialInsuranceTab() {
     }
   }
 
-  async function handleConfirmContribution(
-    contribution
-  ) {
-    const accepted =
-      window.confirm(
-        `Xác nhận khoản đóng BHXH của ` +
-        `${contribution.fullName} ` +
-        `tháng ${contribution.month}/` +
-        `${contribution.year}?`
-      );
-
-    if (!accepted) {
-      return;
-    }
-
-    setSavingKey(
-      `contribution-confirm-${contribution.id}`
-    );
-
-    try {
-      const response =
-        await confirmSocialInsuranceContribution(
-          contribution.id
-        );
-
-      await loadContributions(
-        selectedMonth,
-        selectedYear
-      );
-
-      setMessage({
-        type: 'success',
-        text:
-          response?.message ||
-          'Đã xác nhận khoản đóng BHXH.'
-      });
-    } catch (error) {
-      setMessage({
-        type: 'error',
-        text: getApiErrorMessage(
-          error,
-          'Không thể xác nhận khoản đóng.'
-        )
-      });
-    } finally {
-      setSavingKey('');
-    }
-  }
-
   async function handleMarkPaid(
     contribution
   ) {
     const accepted =
       window.confirm(
-        `Đánh dấu khoản đóng của ` +
+        `Xác nhận doanh nghiệp đã nộp khoản BHXH của ` +
         `${contribution.fullName} ` +
         `tháng ${contribution.month}/` +
-        `${contribution.year} là đã nộp?`
+        `${contribution.year} cho cơ quan BHXH?`
       );
 
     if (!accepted) {
@@ -1898,14 +1866,14 @@ export function AdminSocialInsuranceTab() {
         type: 'success',
         text:
           response?.message ||
-          'Đã đánh dấu khoản đóng là PAID.'
+          'Đã xác nhận doanh nghiệp đã nộp BHXH.'
       });
     } catch (error) {
       setMessage({
         type: 'error',
         text: getApiErrorMessage(
           error,
-          'Không thể đánh dấu khoản đóng đã nộp.'
+          'Không thể xác nhận khoản BHXH đã nộp.'
         )
       });
     } finally {
@@ -2795,7 +2763,7 @@ export function AdminSocialInsuranceTab() {
             </span>
 
             <div>
-              <p>Đang DRAFT</p>
+              <p>Dự kiến</p>
               <strong>
                 {
                   contributionStatistics
@@ -2811,7 +2779,7 @@ export function AdminSocialInsuranceTab() {
             </span>
 
             <div>
-              <p>Đã xác nhận</p>
+              <p>Chờ nộp</p>
               <strong>
                 {
                   contributionStatistics
@@ -2850,6 +2818,36 @@ export function AdminSocialInsuranceTab() {
                   formatMoney(
                     contributionStatistics
                       .employeeAmount
+                  )
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Đã khấu trừ từ lương
+              </span>
+
+              <strong>
+                {
+                  formatMoney(
+                    contributionStatistics
+                      .employeeDeductedAmount
+                  )
+                }
+              </strong>
+            </div>
+
+            <div>
+              <span>
+                Doanh nghiệp tạm ứng
+              </span>
+
+              <strong>
+                {
+                  formatMoney(
+                    contributionStatistics
+                      .employeeOutstandingAmount
                   )
                 }
               </strong>
@@ -2969,11 +2967,54 @@ export function AdminSocialInsuranceTab() {
                               </strong>
 
                               <span>
+                                Tỷ lệ:{' '}
                                 {
                                   formatPercent(
                                     contribution
                                       .employeeRate
                                   )
+                                }
+                              </span>
+
+                              <span>
+                                Đã trừ:{' '}
+                                {
+                                  formatMoney(
+                                    contribution
+                                      .employeeDeductedAmount
+                                  )
+                                }
+                              </span>
+
+                              {Number(
+                                contribution
+                                  .employeeOutstandingAmount ||
+                                0
+                              ) > 0 && (
+                                <span className="bhxh-note-text">
+                                  Doanh nghiệp tạm ứng:{' '}
+                                  {
+                                    formatMoney(
+                                      contribution
+                                        .employeeOutstandingAmount
+                                    )
+                                  }
+                                </span>
+                              )}
+
+                              <span>
+                                {
+                                  normalizeStatus(
+                                    contribution
+                                      .deductionStatus
+                                  ) === 'FULL'
+                                    ? 'Đã khấu trừ đủ'
+                                    : normalizeStatus(
+                                        contribution
+                                          .deductionStatus
+                                      ) === 'PARTIAL'
+                                      ? 'Khấu trừ một phần'
+                                      : 'Chưa khấu trừ'
                                 }
                               </span>
                             </div>
@@ -3069,23 +3110,9 @@ export function AdminSocialInsuranceTab() {
                               {status ===
                                 CONTRIBUTION_STATUS
                                   .DRAFT && (
-                                <button
-                                  type="button"
-                                  className="bhxh-btn bhxh-btn--blue"
-                                  disabled={isSaving}
-                                  onClick={() => {
-                                    handleConfirmContribution(
-                                      contribution
-                                    );
-                                  }}
-                                >
-                                  {
-                                    savingKey ===
-                                    `contribution-confirm-${contribution.id}`
-                                      ? 'Đang xác nhận...'
-                                      : 'Xác nhận'
-                                  }
-                                </button>
+                                <span className="bhxh-action-complete">
+                                  Chờ chốt bảng lương
+                                </span>
                               )}
 
                               {status ===
@@ -3105,7 +3132,7 @@ export function AdminSocialInsuranceTab() {
                                     savingKey ===
                                     `contribution-paid-${contribution.id}`
                                       ? 'Đang cập nhật...'
-                                      : 'Đánh dấu PAID'
+                                      : 'Xác nhận đã nộp'
                                   }
                                 </button>
                               )}

@@ -250,119 +250,184 @@ public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branc
             .ToListAsync();
     }
 
-    public async Task<List<SalaryDto>> FinalizeBranchPeriodAsync(
+   public async Task<List<SalaryDto>>
+    FinalizeBranchPeriodAsync(
         int branchId,
         int month,
         int year,
         int managerUserId)
-    {
-        if (month < 1 || month > 12 || year < 2000 || year > 2100)
-            throw new InvalidOperationException("Kỳ lương không hợp lệ.");
-
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-
-        var salaries = await _context.LuongMonthlySalaries
-            .Include(s => s.User)
-                .ThenInclude(u => u.Branch)
-            .Include(s => s.User)
-                .ThenInclude(u => u.Role)
-            .Include(s => s.User)
-                .ThenInclude(u => u.NsUserBankAccounts)
-            .Include(s => s.FinalizedByUser)
-            .Where(s =>
-                s.User.BranchId == branchId
-                && s.Month == month
-                && s.Year == year
-                && (s.User.Role == null
-                    || (s.User.Role.RoleName != "ADMIN"
-                        && s.User.Role.RoleName != "MANAGER")))
-            .OrderBy(s => s.User.FullName ?? s.User.Email ?? s.User.PhoneNumber)
-            .ToListAsync();
-
-        if (salaries.Count == 0)
-            throw new InvalidOperationException("Không có bảng lương nhân viên trong kỳ đã chọn.");
-
-        var salaryIds = salaries.Select(s => s.Id).ToList();
-        var pendingEmployee = await _context.LuongSalaryAdjustmentHistories
-            .AsNoTracking()
-            .Where(h => salaryIds.Contains(h.SalaryId) && h.Status == AdjustmentPending)
-            .Select(h => h.User.FullName ?? h.User.Email ?? h.User.PhoneNumber)
-            .FirstOrDefaultAsync();
-        if (pendingEmployee != null)
-        {
-            throw new InvalidOperationException(
-                $"Nhân viên {pendingEmployee} còn yêu cầu thưởng/phạt đang chờ Admin duyệt.");
-        }
-
-        var rule = await _context.LuongSalaryRules
-            .AsNoTracking()
-            .Where(r => r.BranchId == branchId)
-            .OrderByDescending(r => r.Id)
-            .FirstOrDefaultAsync();
-
-        foreach (var salary in salaries)
 {
-    var status =
-        (salary.Status ?? "PENDING")
-            .ToUpperInvariant();
-
-    if (status == "PAID")
-    {
-        continue;
-    }
-
-    if (
-        status != "PENDING" &&
-        status != "FINALIZED"
-    )
+    if (month < 1 ||
+        month > 12 ||
+        year < 2000 ||
+        year > 2100)
     {
         throw new InvalidOperationException(
-            $"Bảng lương của {salary.User.FullName} " +
-            "có trạng thái không hợp lệ.");
+            "Kỳ lương không hợp lệ.");
     }
 
-    /*
-      Liên kết và lấy khoản khấu trừ BHXH.
-    */
-    await ApplySocialInsuranceDeductionAsync(
-        salary
-    );
+    await using var transaction =
+        await _context.Database
+            .BeginTransactionAsync();
 
-    /*
-      Nếu bảng lương đã chốt từ trước,
-      chỉ cập nhật thông tin BHXH rồi bỏ qua
-      việc chốt trạng thái lần nữa.
-    */
-    if (status == "FINALIZED")
+    var salaries =
+        await _context.LuongMonthlySalaries
+            .Include(salary =>
+                salary.User)
+                .ThenInclude(user =>
+                    user.Branch)
+            .Include(salary =>
+                salary.User)
+                .ThenInclude(user =>
+                    user.Role)
+            .Include(salary =>
+                salary.User)
+                .ThenInclude(user =>
+                    user.NsUserBankAccounts)
+            .Include(salary =>
+                salary.FinalizedByUser)
+            .Where(salary =>
+                salary.User.BranchId == branchId &&
+                salary.Month == month &&
+                salary.Year == year &&
+                (
+                    salary.User.Role == null ||
+                    (
+                        salary.User.Role.RoleName !=
+                            "ADMIN" &&
+                        salary.User.Role.RoleName !=
+                            "MANAGER"
+                    )
+                ))
+            .OrderBy(salary =>
+                salary.User.FullName ??
+                salary.User.Email ??
+                salary.User.PhoneNumber)
+            .ToListAsync();
+
+    if (salaries.Count == 0)
     {
-        continue;
+        throw new InvalidOperationException(
+            "Không có bảng lương nhân viên " +
+            "trong kỳ đã chọn.");
     }
 
-    if (rule != null)
+    // Chỉ kiểm tra các bảng lương chưa chốt.
+    var pendingSalaryIds =
+        salaries
+            .Where(salary =>
+            {
+                var status =
+                    (salary.Status ?? "PENDING")
+                        .Trim()
+                        .ToUpperInvariant();
+
+                return status == "PENDING";
+            })
+            .Select(salary =>
+                salary.Id)
+            .ToList();
+
+    var pendingEmployee =
+        await _context
+            .LuongSalaryAdjustmentHistories
+            .AsNoTracking()
+            .Where(history =>
+                pendingSalaryIds.Contains(
+                    history.SalaryId) &&
+                history.Status ==
+                    AdjustmentPending)
+            .Select(history =>
+                history.User.FullName ??
+                history.User.Email ??
+                history.User.PhoneNumber)
+            .FirstOrDefaultAsync();
+
+    if (pendingEmployee != null)
     {
-        var adjustment =
-            await BuildAdjustmentDtoAsync(
-                salary.User,
-                month,
-                year,
-                rule);
-
-        await SetSalaryAdjustmentTotalsAsync(
-            salary,
-            adjustment);
+        throw new InvalidOperationException(
+            $"Nhân viên {pendingEmployee} còn yêu cầu " +
+            "thưởng/phạt đang chờ Admin duyệt.");
     }
 
-    salary.Status = "FINALIZED";
-    salary.FinalizedAt = DateTime.Now;
-    salary.FinalizedByUserId =
-        managerUserId;
+    var rule =
+        await _context.LuongSalaryRules
+            .AsNoTracking()
+            .Where(item =>
+                item.BranchId == branchId)
+            .OrderByDescending(item =>
+                item.Id)
+            .FirstOrDefaultAsync();
+
+    foreach (var salary in salaries)
+    {
+        var status =
+            (salary.Status ?? "PENDING")
+                .Trim()
+                .ToUpperInvariant();
+
+        if (status == "PAID" ||
+            status == "FINALIZED")
+        {
+            // Không tính lại thưởng, phạt, BHXH
+            // hoặc khoản thu hồi trên bảng lương
+            // đã chốt hay đã thanh toán.
+            continue;
+        }
+
+        if (status != "PENDING")
+        {
+            var employeeName =
+                salary.User.FullName ??
+                salary.User.Email ??
+                salary.User.PhoneNumber ??
+                $"ID {salary.UserId}";
+
+            throw new InvalidOperationException(
+                $"Bảng lương của {employeeName} " +
+                "có trạng thái không hợp lệ.");
+        }
+
+        // Tính lại thưởng, phạt và tổng lương trước
+        // khi xác định khoản BHXH có thể khấu trừ.
+        if (rule != null)
+        {
+            var adjustment =
+                await BuildAdjustmentDtoAsync(
+                    salary.User,
+                    month,
+                    year,
+                    rule);
+
+            await SetSalaryAdjustmentTotalsAsync(
+                salary,
+                adjustment);
+        }
+
+        // Khấu trừ BHXH của tháng hiện tại trước.
+        // Phần lương còn lại được dùng để thu hồi
+        // các khoản doanh nghiệp đã ứng trước.
+        await ApplySocialInsuranceDeductionAsync(
+            salary);
+
+        salary.Status =
+            "FINALIZED";
+
+        salary.FinalizedAt =
+            DateTime.Now;
+
+        salary.FinalizedByUserId =
+            managerUserId;
+    }
+
+    await _context.SaveChangesAsync();
+
+    await transaction.CommitAsync();
+
+    return salaries
+        .Select(ToDto)
+        .ToList();
 }
-
-        await _context.SaveChangesAsync();
-        await transaction.CommitAsync();
-
-        return salaries.Select(ToDto).ToList();
-    }
 
     public async Task<List<SalaryAdjustmentHistoryDto>> GetPendingAdjustmentRequestsAsync()
     {

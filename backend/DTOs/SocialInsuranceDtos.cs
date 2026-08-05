@@ -419,6 +419,15 @@ public class BhxhMonthlyContributionDto
 
     // Tiền nhân viên phải đóng.
     public decimal EmployeeAmount { get; set; }
+    // Số tiền đã trừ thực tế từ lương nhân viên.
+public decimal EmployeeDeductedAmount { get; set; }
+
+// Số tiền doanh nghiệp tạm ứng cho phần nhân viên còn thiếu.
+public decimal EmployeeOutstandingAmount { get; set; }
+
+// NONE / PARTIAL / FULL.
+public string DeductionStatus { get; set; }
+    = "NONE";
 
     // Tiền doanh nghiệp phải đóng.
     public decimal EmployerAmount { get; set; }

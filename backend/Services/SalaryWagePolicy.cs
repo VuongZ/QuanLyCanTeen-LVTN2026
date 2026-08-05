@@ -79,6 +79,17 @@ public static class SalaryWagePolicy
         return normalized == FullTime || normalized == Maternity;
     }
 
+    // Chỉ nhân viên FULL_TIME thuộc đối tượng áp dụng BHXH
+    // trong phạm vi nghiệp vụ của đề tài.
+    //
+    // Không dùng IsFullTimeEquivalent ở đây vì hàm đó còn
+    // bao gồm nhân viên MATERNITY để phục vụ xếp lịch và lương.
+    public static bool IsSocialInsuranceEligible(string? employmentType)
+    {
+        var normalized = NormalizeEmploymentType(employmentType);
+        return normalized == FullTime;
+    }
+
     private static int GetCompletedYears(DateOnly hireDate, DateOnly referenceDate)
     {
         var years = referenceDate.Year - hireDate.Year;

@@ -46,10 +46,10 @@ private async Task SynchronizeCurrentPendingSalarySnapshotsAsync(
         return;
     }
 
-    var fullTimeUserIds =
+    var eligibleUserIds =
         salaries
             .Where(salary =>
-                SalaryWagePolicy.IsFullTimeEquivalent(
+                SalaryWagePolicy.IsSocialInsuranceEligible(
                     salary.User.EmploymentType))
             .Select(salary =>
                 salary.UserId)
@@ -60,7 +60,7 @@ private async Task SynchronizeCurrentPendingSalarySnapshotsAsync(
         await _context.BhxhMonthlyContributions
             .AsNoTracking()
             .Where(item =>
-                fullTimeUserIds.Contains(item.UserId) &&
+                eligibleUserIds.Contains(item.UserId) &&
                 item.Month == today.Month &&
                 item.Year == today.Year &&
                 (item.Status.ToUpper() == "CONFIRMED" ||
@@ -92,15 +92,19 @@ private async Task SynchronizeCurrentPendingSalarySnapshotsAsync(
             (salary.TotalBonus ?? 0) -
             (salary.TotalPenalty ?? 0);
 
-        if (SalaryWagePolicy.IsFullTimeEquivalent(
+        if (SalaryWagePolicy.IsSocialInsuranceEligible(
                 salary.User.EmploymentType) &&
             contributionByUserId.TryGetValue(
                 salary.UserId,
                 out var contribution))
         {
-            salary.BhxhContributionId = contribution.Id;
+            salary.BhxhContributionId =
+                contribution.Id;
+
+            // Chỉ hiển thị đúng số tiền đã thực tế
+            // khấu trừ khỏi lương nhân viên.
             salary.SocialInsuranceDeduction =
-                contribution.EmployeeAmount;
+                contribution.EmployeeDeductedAmount;
         }
         else
         {
@@ -175,13 +179,22 @@ private static SalaryDto ToDto(
         TotalPenalty =
             s.TotalPenalty ?? 0,
 
-        // ID khoản đóng BHXH liên kết với bảng lương.
-        BhxhContributionId =
-            s.BhxhContributionId,
+        // ID khoản đóng BHXH phát sinh trong tháng lương.
+BhxhContributionId =
+    s.BhxhContributionId,
 
-        // Phần BHXH do nhân viên đóng.
-        SocialInsuranceDeduction =
-            s.SocialInsuranceDeduction,
+// BHXH phát sinh trong chính tháng lương.
+CurrentBhxhDeduction =
+    s.CurrentBhxhDeduction,
+
+// Khoản doanh nghiệp ứng trước từ các tháng cũ
+// được thu hồi trong bảng lương này.
+PreviousBhxhRecovery =
+    s.PreviousBhxhRecovery,
+
+// Tổng khấu trừ BHXH trên bảng lương.
+SocialInsuranceDeduction =
+    s.SocialInsuranceDeduction,
 
         Status =
             s.Status,
@@ -206,108 +219,543 @@ private static SalaryDto ToDto(
 }
 
 /// <summary>
-/// Liên kết khoản đóng BHXH với bảng lương.
+/// Tìm khoản đóng BHXH của tháng hoặc tự động tạo mới
+/// từ hồ sơ ACTIVE và cấu hình tỷ lệ có hiệu lực.
+/// </summary>
+private async Task<BhxhMonthlyContribution>
+    GetOrCreateSocialInsuranceContributionAsync(
+        LuongMonthlySalary salary)
+{
+    var existingContribution =
+        await _context.BhxhMonthlyContributions
+            .FirstOrDefaultAsync(contribution =>
+                contribution.UserId == salary.UserId &&
+                contribution.Month == salary.Month &&
+                contribution.Year == salary.Year);
+
+    if (existingContribution != null)
+    {
+        return existingContribution;
+    }
+
+    var firstDayOfMonth =
+        new DateOnly(
+            salary.Year,
+            salary.Month,
+            1);
+
+    var lastDayOfMonth =
+        firstDayOfMonth
+            .AddMonths(1)
+            .AddDays(-1);
+
+    var profile =
+        await _context.BhxhEmployeeProfiles
+            .FirstOrDefaultAsync(item =>
+                item.UserId == salary.UserId &&
+                item.Status.ToUpper() == "ACTIVE" &&
+                item.StaffConfirmationStatus.ToUpper() ==
+                    "CONFIRMED" &&
+                item.StartDate <= lastDayOfMonth &&
+                (item.EndDate == null ||
+                 item.EndDate >= firstDayOfMonth));
+
+    if (profile == null)
+    {
+        var employeeName =
+            salary.User?.FullName
+            ?? salary.User?.Email
+            ?? salary.User?.PhoneNumber
+            ?? $"ID {salary.UserId}";
+
+        throw new InvalidOperationException(
+            $"Nhân viên {employeeName} chưa có hồ sơ BHXH " +
+            $"ACTIVE và đã được xác nhận cho " +
+            $"tháng {salary.Month}/{salary.Year}.");
+    }
+
+    if (profile.InsuranceSalaryBasis <= 0)
+    {
+        throw new InvalidOperationException(
+            "Mức lương làm căn cứ đóng BHXH không hợp lệ.");
+    }
+
+    var rateConfig =
+        await _context.BhxhRateConfigs
+            .AsNoTracking()
+            .Where(rate =>
+                rate.EffectiveFrom <= firstDayOfMonth &&
+                (rate.EffectiveTo == null ||
+                 rate.EffectiveTo >= firstDayOfMonth))
+            .OrderByDescending(rate =>
+                rate.EffectiveFrom)
+            .FirstOrDefaultAsync();
+
+    if (rateConfig == null)
+    {
+        throw new InvalidOperationException(
+            $"Không tìm thấy cấu hình tỷ lệ BHXH " +
+            $"có hiệu lực trong tháng " +
+            $"{salary.Month}/{salary.Year}.");
+    }
+
+    var employeeAmount =
+        Math.Round(
+            profile.InsuranceSalaryBasis *
+            rateConfig.EmployeeRate /
+            100m,
+            2,
+            MidpointRounding.AwayFromZero);
+
+    var employerAmount =
+        Math.Round(
+            profile.InsuranceSalaryBasis *
+            rateConfig.EmployerRate /
+            100m,
+            2,
+            MidpointRounding.AwayFromZero);
+
+    var now =
+        DateTime.UtcNow.AddHours(7);
+
+    var contribution =
+        new BhxhMonthlyContribution
+        {
+            UserId =
+                salary.UserId,
+
+            ProfileId =
+                profile.Id,
+
+            RateConfigId =
+                rateConfig.Id,
+
+            Month =
+                (sbyte)salary.Month,
+
+            Year =
+                (short)salary.Year,
+
+            InsuranceSalaryBasis =
+                profile.InsuranceSalaryBasis,
+
+            EmployeeRate =
+                rateConfig.EmployeeRate,
+
+            EmployerRate =
+                rateConfig.EmployerRate,
+
+            EmployeeAmount =
+                employeeAmount,
+
+            EmployeeDeductedAmount =
+                0,
+
+            EmployeeOutstandingAmount =
+                employeeAmount,
+
+            DeductionStatus =
+                "NONE",
+
+            EmployerAmount =
+                employerAmount,
+
+            TotalAmount =
+                employeeAmount + employerAmount,
+
+            Status =
+                "DRAFT",
+
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+    await _context.BhxhMonthlyContributions
+        .AddAsync(contribution);
+
+    return contribution;
+}
+
+/// <summary>
+/// Thêm ghi chú nhưng không lặp lại cùng một nội dung.
+/// </summary>
+private static void AppendContributionNote(
+    BhxhMonthlyContribution contribution,
+    string message)
+{
+    var normalizedMessage =
+        message.Trim();
+
+    if (string.IsNullOrWhiteSpace(
+            normalizedMessage))
+    {
+        return;
+    }
+
+    if (!string.IsNullOrWhiteSpace(
+            contribution.Note) &&
+        contribution.Note.Contains(
+            normalizedMessage,
+            StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
+    contribution.Note =
+        string.IsNullOrWhiteSpace(
+            contribution.Note)
+            ? normalizedMessage
+            : contribution.Note.Trim() +
+              " | " +
+              normalizedMessage;
+}
+
+/// <summary>
+/// Liên kết và khấu trừ BHXH khi chốt bảng lương.
 ///
 /// Quy tắc:
-/// - PART_TIME không bị khấu trừ BHXH.
-/// - FULL_TIME phải có khoản đóng BHXH cùng tháng.
-/// - Chỉ dùng khoản có trạng thái CONFIRMED hoặc PAID.
-/// - Chỉ trừ phần EmployeeAmount.
-/// - EmployerAmount là phần doanh nghiệp đóng,
-///   không trừ vào lương nhân viên.
+/// - Chỉ FULL_TIME tham gia BHXH.
+/// - Nếu lương đủ, khấu trừ toàn bộ phần nhân viên đóng.
+/// - Nếu lương không đủ, khấu trừ tối đa số tiền hiện có.
+/// - Phần còn thiếu được ghi nhận là doanh nghiệp tạm ứng.
+/// - Bảng lương vẫn được chốt và khoản đóng chuyển CONFIRMED.
+/// - Admin chỉ chuyển CONFIRMED sang PAID sau khi doanh nghiệp
+///   thực tế nộp khoản BHXH.
 /// </summary>
-private async Task ApplySocialInsuranceDeductionAsync(
-    LuongMonthlySalary salary)
+
+
+/// <summary>
+/// Khấu trừ BHXH khi chốt bảng lương.
+///
+/// Thứ tự thực hiện:
+/// 1. Khấu trừ khoản BHXH của tháng hiện tại.
+/// 2. Dùng phần lương còn lại để thu hồi các khoản
+///    doanh nghiệp đã ứng trước ở những tháng cũ.
+/// 3. Ưu tiên thu hồi khoản cũ nhất.
+/// </summary>
+private async Task
+    ApplySocialInsuranceDeductionAsync(
+        LuongMonthlySalary salary)
 {
     if (salary.User == null)
     {
         throw new InvalidOperationException(
-            "Không xác định được nhân viên của bảng lương.");
+            "Không xác định được nhân viên " +
+            "của bảng lương.");
     }
 
-    /*
-      Nhân viên PART_TIME không tham gia
-      phân hệ BHXH trong phạm vi đồ án.
-    */
-    if (!SalaryWagePolicy.IsFullTimeEquivalent(
+    // Hàm này chỉ được gọi đối với bảng lương PENDING.
+    // Việc đặt lại các giá trị giúp tránh sử dụng
+    // dữ liệu tạm của lần tính trước.
+    salary.CurrentBhxhDeduction =
+        0;
+
+    salary.PreviousBhxhRecovery =
+        0;
+
+    salary.SocialInsuranceDeduction =
+        0;
+
+    var availableSalary =
+        Math.Max(
+            0m,
+            salary.TotalSalary);
+
+    var vietnamNow =
+        DateTime.UtcNow.AddHours(7);
+
+    // =====================================================
+    // 1. KHẤU TRỪ BHXH CỦA THÁNG HIỆN TẠI
+    // =====================================================
+
+    if (SalaryWagePolicy
+        .IsSocialInsuranceEligible(
             salary.User.EmploymentType))
     {
-        salary.BhxhContributionId = null;
-        salary.SocialInsuranceDeduction = 0;
+        var currentContribution =
+            await GetOrCreateSocialInsuranceContributionAsync(
+                salary);
+
+        var currentStatus =
+            (currentContribution.Status ?? "DRAFT")
+                .Trim()
+                .ToUpperInvariant();
+
+        if (currentStatus == "PAID")
+        {
+            throw new InvalidOperationException(
+                "Khoản BHXH của tháng hiện tại đã được " +
+                "xác nhận nộp nhưng bảng lương chưa chốt. " +
+                "Vui lòng kiểm tra lại dữ liệu.");
+        }
+
+        if (currentStatus != "CANCELLED")
+        {
+            salary.BhxhContribution =
+                currentContribution;
+
+            // Nếu khoản mới được tạo thì ID hiện tại có thể
+            // bằng 0. EF Core sẽ tự cập nhật khóa ngoại khi lưu.
+            if (currentContribution.Id > 0)
+            {
+                salary.BhxhContributionId =
+                    currentContribution.Id;
+            }
+
+            var currentOutstanding =
+                Math.Max(
+                    0m,
+                    currentContribution
+                        .EmployeeOutstandingAmount);
+
+            var currentDeduction =
+                Math.Min(
+                    availableSalary,
+                    currentOutstanding);
+
+            currentContribution
+                .EmployeeDeductedAmount +=
+                    currentDeduction;
+
+            currentContribution
+                .EmployeeOutstandingAmount -=
+                    currentDeduction;
+
+            UpdateDeductionStatus(
+                currentContribution);
+
+            // Khoản phải đóng đã được xác định khi
+            // bảng lương được chốt.
+            currentContribution.Status =
+                "CONFIRMED";
+
+            currentContribution.ConfirmedAt =
+                vietnamNow;
+
+            currentContribution.UpdatedAt =
+                vietnamNow;
+
+            salary.CurrentBhxhDeduction =
+                currentDeduction;
+
+            availableSalary -=
+                currentDeduction;
+
+            if (currentContribution
+                    .EmployeeOutstandingAmount > 0)
+            {
+                AppendContributionNote(
+                    currentContribution,
+                    $"Đã khấu trừ " +
+                    $"{currentDeduction:N0} đồng trong kỳ " +
+                    $"{salary.Month}/{salary.Year}; " +
+                    $"doanh nghiệp ứng trước phần còn thiếu " +
+                    $"{currentContribution.EmployeeOutstandingAmount:N0} đồng.");
+            }
+            else
+            {
+                AppendContributionNote(
+                    currentContribution,
+                    $"Đã khấu trừ đủ phần nhân viên đóng " +
+                    $"trong kỳ {salary.Month}/{salary.Year}.");
+            }
+        }
+        else
+        {
+            // Khoản của tháng đã bị hủy hợp lệ.
+            salary.BhxhContribution =
+                currentContribution;
+
+            if (currentContribution.Id > 0)
+            {
+                salary.BhxhContributionId =
+                    currentContribution.Id;
+            }
+        }
+    }
+    else
+    {
+        salary.BhxhContribution =
+            null;
+
+        salary.BhxhContributionId =
+            null;
+    }
+
+    // =====================================================
+    // 2. THU HỒI CÁC KHOẢN DOANH NGHIỆP ĐÃ ỨNG TRƯỚC
+    // =====================================================
+
+    if (availableSalary > 0)
+    {
+        var previousContributions =
+            await _context
+                .BhxhMonthlyContributions
+                .Where(item =>
+                    item.UserId ==
+                        salary.UserId &&
+
+                    // Chỉ thu hồi khoản đã được xử lý
+                    // trong một bảng lương trước đó.
+                    (
+                        item.Status == "CONFIRMED" ||
+                        item.Status == "PAID"
+                    ) &&
+
+                    item.EmployeeOutstandingAmount >
+                        0 &&
+
+                    (
+                        item.Year < salary.Year ||
+                        (
+                            item.Year == salary.Year &&
+                            item.Month < salary.Month
+                        )
+                    ))
+                .OrderBy(item =>
+                    item.Year)
+                .ThenBy(item =>
+                    item.Month)
+                .ThenBy(item =>
+                    item.Id)
+                .ToListAsync();
+
+        foreach (var previousContribution
+                 in previousContributions)
+        {
+            if (availableSalary <= 0)
+            {
+                break;
+            }
+
+            var previousOutstanding =
+                Math.Max(
+                    0m,
+                    previousContribution
+                        .EmployeeOutstandingAmount);
+
+            var recoveryAmount =
+                Math.Min(
+                    availableSalary,
+                    previousOutstanding);
+
+            if (recoveryAmount <= 0)
+            {
+                continue;
+            }
+
+            previousContribution
+                .EmployeeDeductedAmount +=
+                    recoveryAmount;
+
+            previousContribution
+                .EmployeeOutstandingAmount -=
+                    recoveryAmount;
+
+            UpdateDeductionStatus(
+                previousContribution);
+
+            previousContribution.UpdatedAt =
+                vietnamNow;
+
+            // Trạng thái PAID hoặc CONFIRMED của khoản cũ
+            // không bị thay đổi. Việc thu hồi chỉ liên quan
+            // đến số tiền doanh nghiệp đã ứng cho Staff.
+            var recovery =
+                new BhxhDeductionRecovery
+                {
+                    UserId =
+                        salary.UserId,
+
+                    SourceContribution =
+                        previousContribution,
+
+                    RecoverySalary =
+                        salary,
+
+                    RecoveryAmount =
+                        recoveryAmount,
+
+                    Note =
+                        $"Thu hồi khoản doanh nghiệp " +
+                        $"đã ứng trước kỳ " +
+                        $"{previousContribution.Month}/" +
+                        $"{previousContribution.Year}.",
+
+                    CreatedAt =
+                        vietnamNow
+                };
+
+            await _context
+                .BhxhDeductionRecoveries
+                .AddAsync(recovery);
+
+            salary.PreviousBhxhRecovery +=
+                recoveryAmount;
+
+            availableSalary -=
+                recoveryAmount;
+
+            AppendContributionNote(
+                previousContribution,
+                $"Đã thu hồi {recoveryAmount:N0} đồng " +
+                $"qua bảng lương kỳ " +
+                $"{salary.Month}/{salary.Year}. " +
+                $"Còn phải thu hồi " +
+                $"{previousContribution.EmployeeOutstandingAmount:N0} đồng.");
+        }
+    }
+
+    // Tổng khấu trừ trên bảng lương gồm:
+    // - BHXH của tháng hiện tại.
+    // - Khoản thu hồi tạm ứng của các tháng trước.
+    salary.SocialInsuranceDeduction =
+        salary.CurrentBhxhDeduction +
+        salary.PreviousBhxhRecovery;
+}
+
+/// <summary>
+/// Cập nhật trạng thái khấu trừ phần nhân viên đóng.
+///
+/// NONE:
+/// Chưa khấu trừ được.
+///
+/// PARTIAL:
+/// Đã khấu trừ hoặc thu hồi được một phần.
+///
+/// FULL:
+/// Đã khấu trừ và thu hồi đầy đủ.
+/// </summary>
+private static void UpdateDeductionStatus(
+    BhxhMonthlyContribution contribution)
+{
+    contribution.EmployeeDeductedAmount =
+        Math.Max(
+            0m,
+            contribution.EmployeeDeductedAmount);
+
+    contribution.EmployeeOutstandingAmount =
+        Math.Max(
+            0m,
+            contribution.EmployeeOutstandingAmount);
+
+    if (contribution.EmployeeOutstandingAmount <= 0)
+    {
+        contribution.EmployeeOutstandingAmount =
+            0;
+
+        contribution.DeductionStatus =
+            "FULL";
 
         return;
     }
 
-    /*
-      FULL_TIME phải có khoản đóng BHXH
-      cùng tháng và cùng năm.
-
-      Chỉ lấy khoản đã được Admin xác nhận
-      hoặc đã được đánh dấu là đã nộp.
-    */
-    var contribution =
-        await _context.BhxhMonthlyContributions
-            .AsNoTracking()
-            .Where(c =>
-                c.UserId == salary.UserId
-                && c.Month == salary.Month
-                && c.Year == salary.Year)
-            .Where(c =>
-                c.Status.ToUpper() == "CONFIRMED"
-                || c.Status.ToUpper() == "PAID")
-            .OrderByDescending(c =>
-                c.Status.ToUpper() == "PAID")
-            .ThenByDescending(c => c.Id)
-            .FirstOrDefaultAsync();
-
-    if (contribution == null)
-    {
-        var employeeName =
-            salary.User.FullName
-            ?? salary.User.Email
-            ?? salary.User.PhoneNumber
-            ?? $"ID {salary.UserId}";
-
-        throw new InvalidOperationException(
-            $"Nhân viên {employeeName} thuộc diện FULL_TIME/Thai sản nhưng " +
-            $"chưa có khoản đóng BHXH đã xác nhận cho " +
-            $"tháng {salary.Month}/{salary.Year}.");
-    }
-
-    /*
-      Kiểm tra khoản BHXH có đang được liên kết
-      với một bảng lương khác hay không.
-
-      Việc kiểm tra trước giúp trả thông báo rõ ràng,
-      thay vì chờ database báo lỗi UNIQUE.
-    */
-    var linkedToAnotherSalary =
-        await _context.LuongMonthlySalaries
-            .AsNoTracking()
-            .AnyAsync(s =>
-                s.BhxhContributionId == contribution.Id
-                && s.Id != salary.Id);
-
-    if (linkedToAnotherSalary)
-    {
-        throw new InvalidOperationException(
-            "Khoản đóng BHXH này đã được liên kết " +
-            "với một bảng lương khác.");
-    }
-
-    /*
-      Lưu liên kết tới khoản đóng BHXH.
-    */
-    salary.BhxhContributionId =
-        contribution.Id;
-
-    /*
-      Chỉ khấu trừ phần nhân viên đóng.
-      Không trừ EmployerAmount.
-    */
-    salary.SocialInsuranceDeduction =
-        contribution.EmployeeAmount;
+    contribution.DeductionStatus =
+        contribution.EmployeeDeductedAmount > 0
+            ? "PARTIAL"
+            : "NONE";
 }
+
     private static bool IsSalaryLocked(string? status)
     {
         return string.Equals(status, "FINALIZED", StringComparison.OrdinalIgnoreCase)
