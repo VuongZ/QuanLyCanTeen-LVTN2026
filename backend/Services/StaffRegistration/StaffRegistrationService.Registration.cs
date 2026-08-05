@@ -6,14 +6,24 @@ namespace LuanVanTotNghiep.Services;
 
 public partial class StaffRegistrationService
 {
-public async Task<CaStaffRegistration> RegisterAsync(
+    // Nhân viên PART_TIME đăng ký ca.
+    //
+    // Nếu còn vị trí chính thức:
+    // REGISTERED.
+    //
+    // Nếu hết vị trí chính thức:
+    // WAITLIST.
+    public async Task<CaStaffRegistration> RegisterAsync(
         RegisterShiftDto dto)
     {
+        // Dùng transaction SERIALIZABLE để hạn chế trường hợp
+        // nhiều nhân viên đăng ký cùng một vị trí tại cùng thời điểm.
         await using var transaction =
             await _repo.BeginSerializableTransactionAsync();
 
         var period =
-            await _repo.GetPeriodByIdAsync(dto.PeriodId);
+            await _repo.GetPeriodByIdAsync(
+                dto.PeriodId);
 
         if (period == null)
         {
@@ -30,8 +40,11 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 "Đợt đăng ký đã khóa hoặc đã công bố.");
         }
 
-        var today = GetVietnamToday();
+        var today =
+            GetVietnamToday();
 
+        // Khi đã đến ngày bắt đầu của đợt,
+        // Staff không được đăng ký hoặc thay đổi ca nữa.
         if (today >= period.StartDate)
         {
             throw new InvalidOperationException(
@@ -46,7 +59,8 @@ public async Task<CaStaffRegistration> RegisterAsync(
         }
 
         var user =
-            await _repo.GetUserByIdAsync(dto.UserId);
+            await _repo.GetUserByIdAsync(
+                dto.UserId);
 
         if (user == null)
         {
@@ -60,16 +74,20 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 "Bạn chỉ được đăng ký ca làm tại chi nhánh của mình.");
         }
 
+        // FULL_TIME và MATERNITY được tự động xếp lịch,
+        // nên không đăng ký giống PART_TIME.
         if (SalaryWagePolicy.IsFullTimeEquivalent(
                 user.EmploymentType))
         {
             throw new InvalidOperationException(
-                "Nhân viên FULL_TIME hoặc Thai sản được hệ thống tự động xếp vào " +
-                "mọi ca hoạt động trong tuần, không cần đăng ký ca.");
+                "Nhân viên FULL_TIME hoặc Thai sản được hệ thống " +
+                "tự động xếp vào mọi ca hoạt động trong tuần, " +
+                "không cần đăng ký ca.");
         }
 
         var shift =
-            await _repo.GetShiftByIdAsync(dto.ShiftId);
+            await _repo.GetShiftByIdAsync(
+                dto.ShiftId);
 
         if (shift == null)
         {
@@ -91,6 +109,8 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 dto.ShiftId,
                 targetDay);
 
+        // MaxStaff bằng 0 nghĩa là ca không được mở
+        // trong ngày Staff đang chọn.
         if (config == null ||
             config.MaxStaff.GetValueOrDefault() <= 0)
         {
@@ -113,6 +133,8 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 $"Ca làm này không mở vào {vietnameseDayName}.");
         }
 
+        // Không cho một nhân viên có hai phiếu chưa hủy
+        // trong cùng đợt, cùng ngày và cùng ca.
         var isDuplicate =
             await _repo
                 .HasNonCancelledRegistrationAsync(
@@ -127,8 +149,10 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 "Bạn đã đăng ký ca này vào ngày này rồi.");
         }
 
-        // Manager và toàn bộ nhân viên FULL_TIME được hệ thống tự thêm
-        // khi công bố lịch nên phải giữ sẵn vị trí trong MaxStaff.
+        // MaxStaff bao gồm:
+        // - 1 vị trí Quản lý.
+        // - Nhân viên FULL_TIME/MATERNITY tự động xếp.
+        // - Nhân viên PART_TIME đăng ký.
         var maxStaff =
             config.MaxStaff.GetValueOrDefault();
 
@@ -136,17 +160,17 @@ public async Task<CaStaffRegistration> RegisterAsync(
             await _repo.CountBranchFullTimeStaffAsync(
                 period.BranchId);
 
+        // Số vị trí chính thức dành cho PART_TIME.
+        //
+        // Giá trị có thể bằng 0.
+        // Khi bằng 0, PART_TIME vẫn được đăng ký
+        // nhưng sẽ được đưa vào WAITLIST.
         var staffSlot =
             Math.Max(
-                maxStaff - 1 - fullTimeStaffCount,
+                maxStaff -
+                1 -
+                fullTimeStaffCount,
                 0);
-
-        if (staffSlot <= 0)
-        {
-            throw new InvalidOperationException(
-                "Ca làm này đã hết vị trí sau khi xếp Quản lý và " +
-                "nhân viên FULL_TIME; nhân viên PART_TIME không thể đăng ký.");
-        }
 
         // Chỉ đếm REGISTERED.
         // WAITLIST không chiếm vị trí chính thức.
@@ -156,6 +180,8 @@ public async Task<CaStaffRegistration> RegisterAsync(
                 dto.ShiftId,
                 dto.WorkDate);
 
+        // Còn vị trí thì REGISTERED.
+        // Hết vị trí hoặc staffSlot bằng 0 thì WAITLIST.
         var assignedStatus =
             registeredCount < staffSlot
                 ? RegisteredStatus
@@ -164,12 +190,23 @@ public async Task<CaStaffRegistration> RegisterAsync(
         var registration =
             new CaStaffRegistration
             {
-                UserId = dto.UserId,
-                PeriodId = dto.PeriodId,
-                ShiftId = dto.ShiftId,
-                WorkDate = dto.WorkDate,
-                Status = assignedStatus,
-                RegisteredAt = GetVietnamNow()
+                UserId =
+                    dto.UserId,
+
+                PeriodId =
+                    dto.PeriodId,
+
+                ShiftId =
+                    dto.ShiftId,
+
+                WorkDate =
+                    dto.WorkDate,
+
+                Status =
+                    assignedStatus,
+
+                RegisteredAt =
+                    GetVietnamNow()
             };
 
         await _repo.Add(registration);
