@@ -10,6 +10,7 @@ public class SupplementalAttendanceEntryDto
 {
     public int ScheduleId { get; set; }
     public DateTime CheckInTime { get; set; }
+    public DateTime? CheckOutTime { get; set; }
 }
 
 public class RejectSupplementalAttendanceDto
@@ -28,6 +29,7 @@ public class SupplementalAttendanceCandidateDto
     public string EndTime { get; set; } = "";
     public int? PreviousRequestId { get; set; }
     public string? PreviousCheckInTime { get; set; }
+    public string? PreviousCheckOutTime { get; set; }
     public string? PreviousRejectReason { get; set; }
 }
 

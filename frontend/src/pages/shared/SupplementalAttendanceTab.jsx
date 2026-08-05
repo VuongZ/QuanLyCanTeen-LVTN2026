@@ -55,7 +55,7 @@ function RequestRow({ item, reviewing, onChanged }) {
       </div>
       <div className="sa-request-info">
         <span>Giờ vào đề nghị <strong>{dateTime(item.proposedCheckInTime)}</strong></span>
-        <span>Giờ ra theo ca <strong>{dateTime(item.proposedCheckOutTime)}</strong></span>
+        <span>Giờ ra đề nghị <strong>{dateTime(item.proposedCheckOutTime)}</strong></span>
         <span>Tính lương <strong>{item.workedHours} giờ</strong></span>
       </div>
       <p className="sa-meta">{item.branchName || 'Chưa rõ cơ sở'} · Quản lý: {item.managerName || '—'} · {item.reason || 'Không có ghi chú'}</p>
@@ -139,7 +139,8 @@ export function SupplementalAttendanceTab({ isAdmin }) {
       ...current,
       [item.scheduleId]: {
         checked,
-        time: current[item.scheduleId]?.time || item.previousCheckInTime?.slice(11, 16) || item.startTime,
+        checkInTime: current[item.scheduleId]?.checkInTime || item.previousCheckInTime?.slice(11, 16) || item.startTime,
+        checkOutTime: current[item.scheduleId]?.checkOutTime || item.previousCheckOutTime?.slice(11, 16) || item.endTime,
       },
     }))
   }
@@ -150,7 +151,8 @@ export function SupplementalAttendanceTab({ isAdmin }) {
       .filter((item) => selected[item.scheduleId]?.checked)
       .map((item) => ({
         scheduleId: item.scheduleId,
-        checkInTime: `${workDate}T${selected[item.scheduleId].time}:00`,
+        checkInTime: `${workDate}T${selected[item.scheduleId].checkInTime}:00`,
+        checkOutTime: `${workDate}T${selected[item.scheduleId].checkOutTime}:00`,
       }))
     if (entries.length === 0) {
       setMessage({ type: 'error', text: 'Vui lòng chọn ít nhất một nhân viên.' })
@@ -180,7 +182,7 @@ export function SupplementalAttendanceTab({ isAdmin }) {
           <h2>{isAdmin ? 'Duyệt chấm công bổ sung' : 'Tạo chấm công bổ sung'}</h2>
           <p>{isAdmin
             ? 'Giờ làm chỉ được cộng vào lương sau khi admin duyệt.'
-            : 'Chọn ngày, nhân viên và giờ vào ca. Giờ ra được lấy theo lịch ca đã công bố.'}</p>
+            : 'Chọn ngày, nhân viên, giờ vào và giờ ra thực tế để gửi admin duyệt.'}</p>
         </div>
         <button className="sa-refresh" disabled={loading} onClick={load} type="button">Làm mới</button>
       </div>
@@ -195,10 +197,10 @@ export function SupplementalAttendanceTab({ isAdmin }) {
           </div>
           <div className="sa-table-wrap">
             <table className="sd-table sa-table">
-              <thead><tr><th>Chọn</th><th>Nhân viên</th><th>Ca làm</th><th>Giờ vào bổ sung</th><th>Ghi chú</th></tr></thead>
+              <thead><tr><th>Chọn</th><th>Nhân viên</th><th>Ca làm</th><th>Giờ vào bổ sung</th><th>Giờ ra bổ sung</th><th>Ghi chú</th></tr></thead>
               <tbody>
-                {loading ? <tr><td colSpan={5}>Đang tải...</td></tr>
-                  : candidates.length === 0 ? <tr><td colSpan={5}>Không có ca đủ điều kiện. Ca đã có chấm công hoặc yêu cầu đang chờ sẽ không hiển thị.</td></tr>
+                {loading ? <tr><td colSpan={6}>Đang tải...</td></tr>
+                  : candidates.length === 0 ? <tr><td colSpan={6}>Không có ca đủ điều kiện. Ca đã có chấm công hoặc yêu cầu đang chờ sẽ không hiển thị.</td></tr>
                     : candidates.map((item) => (
                       <tr key={item.scheduleId}>
                         <td><input checked={Boolean(selected[item.scheduleId]?.checked)} onChange={(event) => toggleCandidate(item, event.target.checked)} type="checkbox" /></td>
@@ -206,10 +208,17 @@ export function SupplementalAttendanceTab({ isAdmin }) {
                         <td>{item.shiftName}<span className="sa-subline">{item.startTime}–{item.endTime}</span></td>
                         <td><input
                           disabled={!selected[item.scheduleId]?.checked}
-                          onChange={(event) => setSelected((current) => ({ ...current, [item.scheduleId]: { ...current[item.scheduleId], time: event.target.value } }))}
+                          onChange={(event) => setSelected((current) => ({ ...current, [item.scheduleId]: { ...current[item.scheduleId], checkInTime: event.target.value } }))}
                           required={Boolean(selected[item.scheduleId]?.checked)}
                           type="time"
-                          value={selected[item.scheduleId]?.time || item.previousCheckInTime?.slice(11, 16) || item.startTime}
+                          value={selected[item.scheduleId]?.checkInTime || item.previousCheckInTime?.slice(11, 16) || item.startTime}
+                        /></td>
+                        <td><input
+                          disabled={!selected[item.scheduleId]?.checked}
+                          onChange={(event) => setSelected((current) => ({ ...current, [item.scheduleId]: { ...current[item.scheduleId], checkOutTime: event.target.value } }))}
+                          required={Boolean(selected[item.scheduleId]?.checked)}
+                          type="time"
+                          value={selected[item.scheduleId]?.checkOutTime || item.previousCheckOutTime?.slice(11, 16) || item.endTime}
                         /></td>
                         <td>{item.previousRejectReason ? <span className="sa-rejected-hint">Gửi lại: {item.previousRejectReason}</span> : 'Chưa có chấm công'}</td>
                       </tr>

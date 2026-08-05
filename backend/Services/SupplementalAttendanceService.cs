@@ -61,6 +61,7 @@ public class SupplementalAttendanceService
                 EndTime = schedule.Shift.EndTime.ToString("HH:mm"),
                 PreviousRequestId = previous?.Id,
                 PreviousCheckInTime = previous == null ? null : AsVietnamLocal(previous.ProposedCheckInTime).ToString("yyyy-MM-ddTHH:mm"),
+                PreviousCheckOutTime = previous == null ? null : AsVietnamLocal(previous.ProposedCheckOutTime).ToString("yyyy-MM-ddTHH:mm"),
                 PreviousRejectReason = previous?.RejectReason
             };
         }).ToList();
@@ -110,13 +111,25 @@ public class SupplementalAttendanceService
                 throw new InvalidOperationException($"Ca của {DisplayName(schedule.User)} đã có chấm công, không thể chấm công bổ sung.");
 
             var checkInLocal = DateTime.SpecifyKind(entry.CheckInTime, DateTimeKind.Unspecified);
+            if (entry.CheckOutTime is null)
+                throw new InvalidOperationException($"Vui lòng nhập giờ ra ca của {DisplayName(schedule.User)}.");
+
+            var checkOutLocal = DateTime.SpecifyKind(entry.CheckOutTime.Value, DateTimeKind.Unspecified);
+            if (checkOutLocal <= checkInLocal)
+                checkOutLocal = checkOutLocal.AddDays(1);
+
             var dayStart = schedule.WorkDate.ToDateTime(TimeOnly.MinValue);
-            var checkOutLocal = GetShiftEndLocal(schedule);
-            if (checkInLocal < dayStart || checkInLocal >= checkOutLocal)
-                throw new InvalidOperationException($"Giờ vào ca của {DisplayName(schedule.User)} phải thuộc ngày làm và trước giờ kết thúc ca.");
-            if (checkInLocal > DateTime.UtcNow.Add(VietnamOffset).AddMinutes(1))
+            var nowLocal = DateTime.UtcNow.Add(VietnamOffset).AddMinutes(1);
+            if (checkInLocal < dayStart || checkInLocal >= dayStart.AddDays(1))
+                throw new InvalidOperationException($"Giờ vào ca của {DisplayName(schedule.User)} phải thuộc ngày làm đã chọn.");
+            if (checkInLocal > nowLocal)
                 throw new InvalidOperationException("Giờ vào ca bổ sung không được nằm trong tương lai.");
-            if ((checkOutLocal - checkInLocal).TotalHours > 18)
+            if (checkOutLocal > nowLocal)
+                throw new InvalidOperationException("Giờ ra ca bổ sung không được nằm trong tương lai.");
+            var duration = checkOutLocal - checkInLocal;
+            if (duration <= TimeSpan.Zero)
+                throw new InvalidOperationException("Giờ ra ca bổ sung phải sau giờ vào ca.");
+            if (duration.TotalHours > 18)
                 throw new InvalidOperationException("Thời lượng ca bổ sung không được vượt quá 18 giờ.");
 
             var existing = schedule.SupplementalAttendanceRequests.SingleOrDefault();
@@ -329,11 +342,6 @@ public class SupplementalAttendanceService
 
     private static string DisplayName(NsUser user) => user.FullName ?? user.Email ?? user.PhoneNumber ?? $"Người dùng {user.Id}";
     private static DateOnly GetVietnamToday() => DateOnly.FromDateTime(DateTime.UtcNow.Add(VietnamOffset));
-    private static DateTime GetShiftEndLocal(CaFinalSchedule schedule)
-    {
-        var value = schedule.WorkDate.ToDateTime(schedule.Shift.EndTime);
-        return schedule.Shift.EndTime <= schedule.Shift.StartTime ? value.AddDays(1) : value;
-    }
     private static DateTime AsVietnamLocal(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
     private static DateTime ToVietnamFromUtc(DateTime value) => DateTime.SpecifyKind(value.Add(VietnamOffset), DateTimeKind.Unspecified);
     private static bool IsSalaryLocked(string? status) =>
