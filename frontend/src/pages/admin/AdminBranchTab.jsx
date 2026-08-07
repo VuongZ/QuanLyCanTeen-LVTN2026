@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { getAllBranches, createBranch, updateBranch, deleteBranch } from '../../api/BranchApi'
-import { getAllShifts, createShift, updateShift, deleteShift } from '../../api/ShiftApi'
+import { getAllBranches, createBranch, updateBranch, deactivateBranch, restoreBranch } from '../../api/BranchApi'
+import { getAllShifts, createShift, updateShift, deactivateShift, restoreShift } from '../../api/ShiftApi'
 
 const EN_DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const VN_DAYS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
@@ -23,9 +23,10 @@ export function AdminBranchTab({ branches, setBranches }) {
   const [modalShift, setModalShift] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [statusReason, setStatusReason] = useState('')
 
   useEffect(() => {
-    getAllShifts().then((data) => setShifts(Array.isArray(data) ? data : [])).catch(() => { })
+    getAllShifts(true).then((data) => setShifts(Array.isArray(data) ? data : [])).catch(() => { })
     axios.get('/api/BranchShiftConfig').then(res => setShiftConfigs(res.data || [])).catch(() => { })
   }, [])
 
@@ -44,8 +45,15 @@ export function AdminBranchTab({ branches, setBranches }) {
     setError(''); setBranchModal('edit')
   }
 
-  function openDeleteBranch() {
-    setError(''); setBranchModal('delete')
+  function openDeactivateBranch() {
+    setStatusReason('')
+    setError('')
+    setBranchModal('deactivate')
+  }
+
+  function openRestoreBranch() {
+    setError('')
+    setBranchModal('restore')
   }
 
   async function handleSaveBranch() {
@@ -63,19 +71,44 @@ export function AdminBranchTab({ branches, setBranches }) {
         await updateBranch(branchForm.id, payload)
         if (selectedBranch) setSelectedBranch({ ...selectedBranch, ...payload })
       }
-      const newData = await getAllBranches()
+      const newData = await getAllBranches(true)
       setBranches(Array.isArray(newData) ? newData : [])
       setBranchModal(null)
     } catch { setError('Lỗi lưu cơ sở!') } finally { setSaving(false) }
   }
 
-  async function handleDeleteBranch() {
-    setSaving(true); setError('')
+  async function handleDeactivateBranch() {
+    setSaving(true)
+    setError('')
+
     try {
-      await deleteBranch(selectedBranch.id)
-      setBranches((prev) => prev.filter((b) => b.id !== selectedBranch.id))
-      setSelectedBranch(null); setBranchModal(null)
-    } catch { setError('Lỗi xóa cơ sở!') } finally { setSaving(false) }
+      await deactivateBranch(selectedBranch.id, statusReason.trim())
+      const newData = await getAllBranches(true)
+      setBranches(Array.isArray(newData) ? newData : [])
+      setSelectedBranch((current) => current ? { ...current, isActive: false, inactiveReason: statusReason.trim() || null } : current)
+      setBranchModal(null)
+    } catch (e) {
+      setError(e.response?.data?.message || 'Không thể ngừng hoạt động cơ sở.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRestoreBranch() {
+    setSaving(true)
+    setError('')
+
+    try {
+      await restoreBranch(selectedBranch.id)
+      const newData = await getAllBranches(true)
+      setBranches(Array.isArray(newData) ? newData : [])
+      setSelectedBranch((current) => current ? { ...current, isActive: true, inactiveReason: null, inactiveAt: null, inactiveBy: null } : current)
+      setBranchModal(null)
+    } catch (e) {
+      setError(e.response?.data?.message || 'Không thể khôi phục cơ sở.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const displayedShifts = selectedBranch ? shifts.filter((s) => s.branchId === selectedBranch.id) : []
@@ -90,9 +123,17 @@ export function AdminBranchTab({ branches, setBranches }) {
     setError(''); setModalShift(s); setShiftModal('edit')
   }
 
-  function openDeleteShift(s) {
+  function openDeactivateShift(s) {
     setModalShift(s)
-    setError(''); setShiftModal('delete')
+    setStatusReason('')
+    setError('')
+    setShiftModal('deactivate')
+  }
+
+  function openRestoreShift(s) {
+    setModalShift(s)
+    setError('')
+    setShiftModal('restore')
   }
 
   async function handleSaveShift() {
@@ -111,7 +152,7 @@ export function AdminBranchTab({ branches, setBranches }) {
       } else {
         await updateShift(shiftForm.id, payloadShift)
       }
-      const newData = await getAllShifts()
+      const newData = await getAllShifts(true)
       setShifts(Array.isArray(newData) ? newData : [])
 
       const configData = await axios.get('/api/BranchShiftConfig')
@@ -120,13 +161,36 @@ export function AdminBranchTab({ branches, setBranches }) {
     } catch { setError('Dữ liệu không hợp lệ!') } finally { setSaving(false) }
   }
 
-  async function handleDeleteShift() {
-    setSaving(true); setError('')
+  async function handleDeactivateShift() {
+    setSaving(true)
+    setError('')
+
     try {
-      await deleteShift(modalShift.id)
-      setShifts((prev) => prev.filter((s) => s.id !== modalShift.id))
+      await deactivateShift(modalShift.id, statusReason.trim())
+      const newData = await getAllShifts(true)
+      setShifts(Array.isArray(newData) ? newData : [])
       setShiftModal(null)
-    } catch { setError('Lỗi khi xóa ca.') } finally { setSaving(false) }
+    } catch (e) {
+      setError(e.response?.data?.message || 'Không thể ngừng hoạt động ca.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRestoreShift() {
+    setSaving(true)
+    setError('')
+
+    try {
+      await restoreShift(modalShift.id)
+      const newData = await getAllShifts(true)
+      setShifts(Array.isArray(newData) ? newData : [])
+      setShiftModal(null)
+    } catch (e) {
+      setError(e.response?.data?.message || 'Không thể khôi phục ca.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function openConfigShift(shift) {
@@ -209,6 +273,7 @@ export function AdminBranchTab({ branches, setBranches }) {
                   <th className="sd-th sd-text-center sd-hide-mobile" style={{ width: 60 }}>ID</th>
                   <th className="sd-th sd-td-name-col">Tên Cơ Sở</th>
                   <th className="sd-th sd-td-info-col sd-hide-mobile">Địa Chỉ</th>
+                  <th className="sd-th sd-text-center">Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,6 +282,7 @@ export function AdminBranchTab({ branches, setBranches }) {
                     <td className="sd-td sd-text-center sd-text-bold sd-text-muted sd-hide-mobile" style={{ width: 60 }}>#{b.id}</td>
                     <td className="sd-td sd-td-name-col"><span className="sd-td-name sd-text-primary">{b.name}</span></td>
                     <td className="sd-td sd-td-info-col sd-hide-mobile"><span className="sd-text-sm sd-text-muted">{b.address}</span></td>
+                    <td className="sd-td sd-text-center"><span className={`sd-role-pill ${b.isActive ? 'sd-badge-success' : 'sd-badge-neutral'}`}>{b.isActive ? 'Đang hoạt động' : 'Đã ngừng'}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -230,19 +296,25 @@ export function AdminBranchTab({ branches, setBranches }) {
             <div className="sd-card-header append-flex">
               <div><p className="sd-eyebrow">Chi tiết</p><h2>{selectedBranch.name}</h2></div>
               <div className="sd-flex-start">
-                <button className="sd-action-btn sd-action-edit" onClick={() => openEditBranch(selectedBranch)}>✎</button>
-                <button className="sd-action-btn sd-action-delete" onClick={openDeleteBranch}>✕</button>
+                <button className="sd-action-btn sd-action-edit" onClick={() => openEditBranch(selectedBranch)} disabled={!selectedBranch.isActive}>✎</button>
+                {selectedBranch.isActive ? (
+                  <button className="sd-btn-ghost btn-delete" onClick={openDeactivateBranch}>Ngừng hoạt động</button>
+                ) : (
+                  <button className="sd-btn-restore" onClick={openRestoreBranch}>↻ Khôi phục</button>
+                )}
               </div>
             </div>
             <div className="sd-flex-column sd-text-muted" style={{ fontSize: 14 }}>
               <p style={{ margin: 0 }}>📍 <strong className="sd-text-bold">Địa chỉ:</strong> {selectedBranch.address}</p>
               <p style={{ margin: 0 }}>🗺️ <strong className="sd-text-bold">Tọa độ GPS:</strong> {selectedBranch.latitude || '—'},{' '}{selectedBranch.longitude || '—'}</p>
+              <p style={{ margin: 0 }}><strong>Trạng thái:</strong> {selectedBranch.isActive ? 'Đang hoạt động' : 'Đã ngừng hoạt động'}</p>
+              {!selectedBranch.isActive && selectedBranch.inactiveReason && <p style={{ margin: 0 }}><strong>Lý do:</strong> {selectedBranch.inactiveReason}</p>}
             </div>
           </div>
           <div className="sd-card">
             <div className="sd-card-header sd-flex-between" style={{ marginBottom: 20 }}>
               <div><p className="sd-eyebrow">Cấu hình</p><h2>Ca làm việc</h2></div>
-              <button className="sd-btn-add" onClick={openAddShift}><span>＋</span> Thêm ca</button>
+              <button className="sd-btn-add" onClick={openAddShift} disabled={!selectedBranch?.isActive}><span>＋</span> Thêm ca</button>
             </div>
             <div className="sd-table-wrap sd-box-bordered">
               <table className="sd-table">
@@ -251,13 +323,14 @@ export function AdminBranchTab({ branches, setBranches }) {
                     <th className="sd-th sd-td-name-col">Tên Ca</th>
                     <th className="sd-th">Thời Gian</th>
                     <th className="sd-th sd-text-center sd-hide-mobile">Tăng Ca (OT)</th>
+                    <th className="sd-th sd-text-center">Trạng thái</th>
                     <th className="sd-th sd-text-center sd-hide-mobile">Cấu hình từng ngày</th>
                     <th className="sd-th sd-th-actions">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayedShifts.length === 0 && (
-                    <tr><td colSpan={5} className="sd-td-empty sd-td-empty-sm"><div className="sd-empty-state"><span className="sd-empty-icon">⏱️</span><p>Chưa có ca làm nào</p></div></td></tr>
+                    <tr><td colSpan={6} className="sd-td-empty sd-td-empty-sm"><div className="sd-empty-state"><span className="sd-empty-icon">⏱️</span><p>Chưa có ca làm nào</p></div></td></tr>
                   )}
                   {displayedShifts.map((s) => (
                     <tr key={s.id} className="sd-tr">
@@ -266,15 +339,20 @@ export function AdminBranchTab({ branches, setBranches }) {
                       <td className="sd-td sd-text-center sd-hide-mobile">
                         <span className={`sd-role-pill ${s.isOt ? 'sd-badge-success' : 'sd-badge-neutral'}`}>{s.isOt ? 'Có' : 'Không'}</span>
                       </td>
+                      <td className="sd-td sd-text-center"><span className={`sd-role-pill ${s.isActive ? 'sd-badge-success' : 'sd-badge-neutral'}`}>{s.isActive ? 'Hoạt động' : 'Đã ngừng'}</span></td>
                       <td className="sd-td sd-text-center sd-hide-mobile">
-                        <button className="sd-btn-ghost" style={{ fontSize: 12, padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0' }} onClick={() => openConfigShift(s)}>
+                        <button className="sd-btn-ghost" disabled={!s.isActive || !selectedBranch?.isActive} style={{ fontSize: 12, padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0' }} onClick={() => openConfigShift(s)}>
                           ⚙️ Cấu hình tuần
                         </button>
                       </td>
                       <td className="sd-td sd-td-actions">
-                        <button className="sd-action-btn sd-show-mobile-only" style={{ color: '#475569' }} onClick={() => openConfigShift(s)}>⚙️</button>
-                        <button className="sd-action-btn sd-action-edit" onClick={() => openEditShift(s)}>✎</button>
-                        <button className="sd-action-btn sd-action-delete" onClick={() => openDeleteShift(s)}>✕</button>
+                        <button className="sd-action-btn sd-show-mobile-only" style={{ color: '#475569' }} disabled={!s.isActive || !selectedBranch?.isActive} onClick={() => openConfigShift(s)}>⚙️</button>
+                        <button className="sd-action-btn sd-action-edit" disabled={!s.isActive || !selectedBranch?.isActive} onClick={() => openEditShift(s)}>✎</button>
+                        {s.isActive ? (
+                          <button className="sd-btn-ghost btn-delete" onClick={() => openDeactivateShift(s)}>Ngừng</button>
+                        ) : (
+                          <button className="sd-btn-restore" onClick={() => openRestoreShift(s)}>↻ Khôi phục</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -336,14 +414,31 @@ export function AdminBranchTab({ branches, setBranches }) {
         </div>
       )}
 
-      {branchModal === 'delete' && (
+      {branchModal === 'deactivate' && (
         <div className="sd-overlay" onClick={() => setBranchModal(null)}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={() => setBranchModal(null)}>✕</button></div>
-            <div className="sd-modal-body"><p>Xoá cơ sở <strong className="sd-text-primary">{selectedBranch?.name}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-header"><h2>Ngừng hoạt động cơ sở</h2><button onClick={() => setBranchModal(null)}>✕</button></div>
+            <div className="sd-modal-body">
+              <p>Ngừng cơ sở <strong className="sd-text-primary">{selectedBranch?.name}</strong>? Dữ liệu lịch sử vẫn được giữ.</p>
+              <div className="sd-field"><label>Lý do</label><textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} /></div>
+              {error && <p className="sd-status sd-status-error">{error}</p>}
+            </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={() => setBranchModal(null)}>Huỷ</button>
-              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeleteBranch}>Xoá ngay</button>
+              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeactivateBranch}>{saving ? 'Đang xử lý...' : 'Ngừng hoạt động'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {branchModal === 'restore' && (
+        <div className="sd-overlay" onClick={() => setBranchModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>Khôi phục cơ sở</h2><button onClick={() => setBranchModal(null)}>✕</button></div>
+            <div className="sd-modal-body"><p>Khôi phục cơ sở <strong className="sd-text-primary">{selectedBranch?.name}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setBranchModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary" disabled={saving} onClick={handleRestoreBranch}>{saving ? 'Đang xử lý...' : 'Khôi phục'}</button>
             </div>
           </div>
         </div>
@@ -378,14 +473,31 @@ export function AdminBranchTab({ branches, setBranches }) {
         </div>
       )}
 
-      {shiftModal === 'delete' && (
+      {shiftModal === 'deactivate' && (
         <div className="sd-overlay" onClick={() => setShiftModal(null)}>
           <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sd-modal-header"><h2>Xác nhận xoá</h2><button onClick={() => setShiftModal(null)}>✕</button></div>
-            <div className="sd-modal-body"><p>Xoá ca <strong className="sd-text-primary">{modalShift?.shiftName}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-header"><h2>Ngừng hoạt động ca</h2><button onClick={() => setShiftModal(null)}>✕</button></div>
+            <div className="sd-modal-body">
+              <p>Ngừng ca <strong className="sd-text-primary">{modalShift?.shiftName}</strong>? Lịch đã công bố trước đây vẫn được giữ.</p>
+              <div className="sd-field"><label>Lý do</label><textarea value={statusReason} onChange={(e) => setStatusReason(e.target.value)} /></div>
+              {error && <p className="sd-status sd-status-error">{error}</p>}
+            </div>
             <div className="sd-modal-footer">
               <button className="sd-btn-ghost" onClick={() => setShiftModal(null)}>Huỷ</button>
-              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeleteShift}>Xoá ngay</button>
+              <button className="sd-btn-primary btn-danger" disabled={saving} onClick={handleDeactivateShift}>{saving ? 'Đang xử lý...' : 'Ngừng hoạt động'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shiftModal === 'restore' && (
+        <div className="sd-overlay" onClick={() => setShiftModal(null)}>
+          <div className="sd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="sd-modal-header"><h2>Khôi phục ca</h2><button onClick={() => setShiftModal(null)}>✕</button></div>
+            <div className="sd-modal-body"><p>Khôi phục ca <strong className="sd-text-primary">{modalShift?.shiftName}</strong>?</p>{error && <p className="sd-status sd-status-error">{error}</p>}</div>
+            <div className="sd-modal-footer">
+              <button className="sd-btn-ghost" onClick={() => setShiftModal(null)}>Huỷ</button>
+              <button className="sd-btn-primary" disabled={saving} onClick={handleRestoreShift}>{saving ? 'Đang xử lý...' : 'Khôi phục'}</button>
             </div>
           </div>
         </div>

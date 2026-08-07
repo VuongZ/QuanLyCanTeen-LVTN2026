@@ -110,8 +110,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const [selectedUser, setSelectedUser] = useState(null)
 
   useEffect(() => {
-    getAllBranches().then((data) => setBranches(Array.isArray(data) ? data : [])).catch(() => setBranches([]))
-  }, [])
+    getAllBranches(isAdmin)
+      .then((data) => setBranches(Array.isArray(data) ? data : []))
+      .catch(() => setBranches([]))
+  }, [isAdmin])
 
   const branch = branches.find((b) => b.id === user.branchId)
   const activeUsers = localUsers ?? initUsers ?? []
@@ -259,7 +261,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'inventoryReport': return isAdmin
         ? { eyebrow: 'Báo cáo kho', title: 'Tồn kho toàn hệ thống' }
         : { eyebrow: 'Báo cáo kho', title: 'Tồn kho cơ sở' }
-      case 'suppliers': return { eyebrow: 'Quản trị', title: 'Danh mục Nhà cung cấp' }
+      case 'suppliers': return { eyebrow: 'Quản trị', title: 'Nhà cung cấp & Sản phẩm' }
       case 'salaries': return isAdmin
         ? { eyebrow: 'Tài chính', title: 'Tổng lương theo cơ sở' }
         : { eyebrow: 'Tài chính', title: 'Trả lương nhân viên' }
@@ -292,7 +294,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Salary rule' })
     NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
     NAV_ITEMS.push({id: 'socialInsurance',icon: '🛡️',label: 'Bảo hiểm xã hội'});
-    NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp' })
+    NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp & SP' })
     NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca toàn cục' });
@@ -608,7 +610,15 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                   <label>Chi nhánh</label>
                   <select name="branchId" value={form.branchId || ''} onChange={handleFormChange}>
                     <option value="">-- Chọn chi nhánh --</option>
-                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {branches.map((b) => (
+                      <option
+                        key={b.id}
+                        value={b.id}
+                        disabled={!b.isActive && String(b.id) !== String(form.branchId || '')}
+                      >
+                        {b.name}{b.isActive ? '' : ' (Đã ngừng)'}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -656,6 +666,3 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     </div>
   )
 }
-
-
-

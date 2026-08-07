@@ -69,6 +69,12 @@ public async Task<int>
                     dto.BranchId
                 );
 
+            if (!await _exportRepo.BranchIsActiveAsync(dto.BranchId))
+            {
+                throw new InvalidOperationException(
+                    "Cơ sở đã ngừng hoạt động nên không thể xuất hàng ra quầy.");
+            }
+
             // Kiểm tra lịch làm và khung giờ.
             await ValidateScheduleForExportAsync(
                 dto,
@@ -159,6 +165,13 @@ public async Task<int>
                             {
                                 throw new InvalidOperationException(
                                     $"Không tìm thấy sản phẩm có ID {item.ProductId}."
+                                );
+                            }
+
+                            if (product.IsActive == false)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Sản phẩm '{product.ProductName}' đã ngừng hoạt động nên không thể xuất ra quầy."
                                 );
                             }
 
@@ -272,4 +285,3 @@ public async Task<int>
         /// </summary>
     }
 }
-

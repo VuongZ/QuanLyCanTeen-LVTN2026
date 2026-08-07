@@ -31,6 +31,12 @@ public partial class StaffRegistrationService
                 "Đợt đăng ký không tồn tại.");
         }
 
+        if (!await _repo.IsBranchActiveAsync(period.BranchId))
+        {
+            throw new InvalidOperationException(
+                "Cơ sở đã ngừng hoạt động nên không thể đăng ký ca mới.");
+        }
+
         if (!string.Equals(
                 period.Status,
                 "OPEN",
@@ -93,6 +99,12 @@ public partial class StaffRegistrationService
         {
             throw new KeyNotFoundException(
                 "Không tìm thấy ca làm.");
+        }
+
+        if (!shift.IsActive)
+        {
+            throw new InvalidOperationException(
+                "Ca làm đã ngừng hoạt động nên không thể đăng ký mới.");
         }
 
         if (shift.BranchId != period.BranchId)

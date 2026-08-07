@@ -106,9 +106,20 @@ namespace LuanVanTotNghiep.Controllers
         {
             if (id != user.Id)
                 return BadRequest("ID không tồn tại");
-            await userService.UpdateUser(user);
 
-            return NoContent();
+            try
+            {
+                await userService.UpdateUser(user);
+                return NoContent();
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpPut("{id}/profile")]

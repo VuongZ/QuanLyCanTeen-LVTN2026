@@ -74,6 +74,11 @@ public async Task<List<ExportScheduleOptionDto>>
                 );
             }
 
+            if (!await _exportRepo.BranchIsActiveAsync(manager.BranchId.Value))
+            {
+                return new List<ExportScheduleOptionDto>();
+            }
+
             var today =
                 DateOnly.FromDateTime(
                     DateTime.Today
@@ -96,9 +101,10 @@ public async Task<List<ExportScheduleOptionDto>>
                     today
                 )
 
-                // Lịch phải có thông tin ca.
+                // Lịch phải có thông tin ca và ca vẫn đang hoạt động.
                 .Where(schedule =>
-                    schedule.Shift != null
+                    schedule.Shift != null &&
+                    schedule.Shift.IsActive
                 )
 
                 // Ca phải thuộc đúng chi nhánh
@@ -191,4 +197,3 @@ public async Task<List<ExportScheduleOptionDto>>
         /// </summary>
     }
 }
-

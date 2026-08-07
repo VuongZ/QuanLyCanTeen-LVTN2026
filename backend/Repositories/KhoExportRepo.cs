@@ -49,6 +49,15 @@ namespace LuanVanTotNghiep.Repositories
                 );
         }
 
+        public async Task<bool> BranchIsActiveAsync(int branchId)
+        {
+            return await _context.DmBranches
+                .AsNoTracking()
+                .AnyAsync(branch =>
+                    branch.Id == branchId &&
+                    branch.IsActive);
+        }
+
         /// <summary>
         /// Lấy các lịch làm chính thức
         /// được phân công cho một người dùng.

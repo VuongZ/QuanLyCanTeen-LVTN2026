@@ -91,3 +91,31 @@ export async function getInventoryImportTicketDetail(
 
   return response.data;
 }
+// Admin lấy danh sách sản phẩm theo trạng thái.
+export async function getAdminProducts(active = true) {
+  const response = await axios.get(
+    `${BASE_URL}/products`,
+    { params: { active } }
+  );
+
+  return response.data;
+}
+
+// Admin ngừng hoạt động sản phẩm.
+export async function deactivateProduct(id, reason = '') {
+  const response = await axios.patch(
+    `${BASE_URL}/products/${id}/deactivate`,
+    { reason }
+  );
+
+  return response.data;
+}
+
+// Admin khôi phục sản phẩm.
+export async function restoreProduct(id) {
+  const response = await axios.patch(
+    `${BASE_URL}/products/${id}/restore`
+  );
+
+  return response.data;
+}

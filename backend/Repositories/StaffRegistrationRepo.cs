@@ -49,6 +49,15 @@ public class StaffRegistrationRepo
                 shift.Id == shiftId);
     }
 
+    public async Task<bool> IsBranchActiveAsync(int branchId)
+    {
+        return await Context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId &&
+                branch.IsActive);
+    }
+
     public async Task<CaBranchShiftConfig?>
         GetShiftConfigAsync(
             int shiftId,

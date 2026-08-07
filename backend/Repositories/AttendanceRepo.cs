@@ -46,6 +46,7 @@ public class AttendanceRepo : Repository<CaAttendance>
     {
         return await Context.CaShifts
             .AsNoTracking()
+            .Include(shift => shift.Branch)
             .FirstOrDefaultAsync(shift =>
                 shift.Id == shiftId);
     }

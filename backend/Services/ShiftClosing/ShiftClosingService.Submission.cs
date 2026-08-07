@@ -188,7 +188,7 @@ public async Task<int>
     // được Staff gửi lên.
     var frontStocks =
         await _shiftClosingRepo
-            .GetActiveFrontStocksByProductIdsAsync(
+            .GetFrontStocksByProductIdsAsync(
                 branchId,
                 productIds
             );
@@ -199,7 +199,7 @@ public async Task<int>
     )
     {
         throw new InvalidOperationException(
-            "Có sản phẩm không tồn tại trong tồn quầy hoặc đã ngừng kinh doanh."
+            "Có sản phẩm không tồn tại trong tồn quầy hiện tại."
         );
     }
 
@@ -462,4 +462,3 @@ public async Task<int>
 /// </summary>
     }
 }
-

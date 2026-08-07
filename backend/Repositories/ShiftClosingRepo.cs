@@ -102,11 +102,14 @@ namespace LuanVanTotNghiep.Repositories
         }
 
         /// <summary>
-        /// Lấy danh sách tồn quầy đang hoạt động
-        /// của một chi nhánh.
+        /// Lấy danh sách tồn quầy của một chi nhánh.
+        ///
+        /// Không lọc theo trạng thái kinh doanh của sản phẩm.
+        /// Sản phẩm đã ngừng vẫn phải xuất hiện nếu còn tồn quầy
+        /// để nhân viên kiểm kê và báo cáo kết ca.
         /// </summary>
         public async Task<List<KhoBranchFrontStock>>
-            GetActiveFrontStocksByBranchAsync(
+            GetFrontStocksByBranchAsync(
                 int branchId)
         {
             return await _context
@@ -117,9 +120,7 @@ namespace LuanVanTotNghiep.Repositories
                 )
                 .Where(frontStock =>
                     frontStock.BranchId ==
-                        branchId &&
-                    frontStock.Product.IsActive ==
-                        true
+                        branchId
                 )
                 .OrderBy(frontStock =>
                     frontStock.Product.ProductName
@@ -419,7 +420,7 @@ public async Task<KhoShiftClosingReport?>
 /// Dữ liệu chỉ được đọc nên dùng AsNoTracking.
 /// </summary>
 public async Task<List<KhoBranchFrontStock>>
-    GetActiveFrontStocksByProductIdsAsync(
+    GetFrontStocksByProductIdsAsync(
         int branchId,
         List<int> productIds)
 {
@@ -433,8 +434,7 @@ public async Task<List<KhoBranchFrontStock>>
             frontStock.BranchId == branchId &&
             productIds.Contains(
                 frontStock.ProductId
-            ) &&
-            frontStock.Product.IsActive == true
+            )
         )
         .ToListAsync();
 }

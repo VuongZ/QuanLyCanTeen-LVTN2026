@@ -92,6 +92,18 @@ public async Task<int>
                 );
             }
 
+            var branchIsActive =
+                await _importRepo.BranchIsActiveAsync(
+                    dto.BranchId
+                );
+
+            if (!branchIsActive)
+            {
+                throw new InvalidOperationException(
+                    "Cơ sở đã ngừng hoạt động nên không thể nhập kho mới."
+                );
+            }
+
             // Kiểm tra nhà phân phối tồn tại
             // và chưa bị xóa mềm.
             var supplierExists =
@@ -348,4 +360,3 @@ public async Task<int>
         /// </summary>
     }
 }
-

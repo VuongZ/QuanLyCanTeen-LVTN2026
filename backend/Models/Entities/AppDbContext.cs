@@ -214,6 +214,7 @@ public partial class AppDbContext : DbContext
 
             entity.HasOne(d => d.Shift).WithMany(p => p.CaBranchShiftConfigs)
                 .HasForeignKey(d => d.ShiftId)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_config_shift");
         });
 
@@ -343,6 +344,7 @@ public partial class AppDbContext : DbContext
     entity.HasOne(d => d.Shift)
         .WithMany(p => p.CaFinalSchedules)
         .HasForeignKey(d => d.ShiftId)
+        .OnDelete(DeleteBehavior.Restrict)
         .HasConstraintName("fk_final_shift");
 
     entity.HasOne(d => d.User)
@@ -493,6 +495,8 @@ public partial class AppDbContext : DbContext
                 .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.BranchId, "fk_branch_shift");
+            entity.HasIndex(e => e.IsActive, "idx_shift_is_active");
+            entity.HasIndex(e => e.InactiveBy, "idx_shift_inactive_by");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.BranchId).HasColumnName("branch_id");
@@ -502,6 +506,17 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.IsOt)
                 .HasDefaultValueSql("'0'")
                 .HasColumnName("is_ot");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("is_active");
+            entity.Property(e => e.InactiveAt)
+                .HasColumnType("datetime")
+                .HasColumnName("inactive_at");
+            entity.Property(e => e.InactiveBy)
+                .HasColumnName("inactive_by");
+            entity.Property(e => e.InactiveReason)
+                .HasMaxLength(255)
+                .HasColumnName("inactive_reason");
             entity.Property(e => e.MaxStaff)
                 .HasDefaultValueSql("'3'")
                 .HasColumnName("max_staff");
@@ -592,6 +607,7 @@ public partial class AppDbContext : DbContext
         .WithMany(p =>
             p.CaStaffRegistrations)
         .HasForeignKey(d => d.ShiftId)
+        .OnDelete(DeleteBehavior.Restrict)
         .HasConstraintName("fk_reg_shift");
 
     entity.HasOne(d => d.User)
@@ -1101,6 +1117,9 @@ entity.Property(e =>
                 .ToTable("dm_branch")
                 .UseCollation("utf8mb4_unicode_ci");
 
+            entity.HasIndex(e => e.IsActive, "idx_branch_is_active");
+            entity.HasIndex(e => e.InactiveBy, "idx_branch_inactive_by");
+
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Address)
                 .HasMaxLength(255)
@@ -1111,6 +1130,17 @@ entity.Property(e =>
             entity.Property(e => e.Longitude)
                 .HasPrecision(11, 8)
                 .HasColumnName("longitude");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValueSql("'1'")
+                .HasColumnName("is_active");
+            entity.Property(e => e.InactiveAt)
+                .HasColumnType("datetime")
+                .HasColumnName("inactive_at");
+            entity.Property(e => e.InactiveBy)
+                .HasColumnName("inactive_by");
+            entity.Property(e => e.InactiveReason)
+                .HasMaxLength(255)
+                .HasColumnName("inactive_reason");
             entity.Property(e => e.Name)
                 .HasMaxLength(255)
                 .HasColumnName("name");
@@ -1228,6 +1258,7 @@ entity.Property(e =>
 
             entity.HasOne(d => d.Branch).WithMany(p => p.KhoExportTickets)
                 .HasForeignKey(d => d.BranchId)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_exp_branch");
 
             entity.HasOne(d => d.Manager).WithMany(p => p.KhoExportTickets)
@@ -1745,6 +1776,7 @@ entity.Property(e =>
 
             entity.HasOne(d => d.Branch).WithMany(p => p.LuongSalaryRules)
                 .HasForeignKey(d => d.BranchId)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("luong_salary_rule_ibfk_1");
         });
 

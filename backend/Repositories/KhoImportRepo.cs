@@ -60,6 +60,17 @@ namespace LuanVanTotNghiep.Repositories
                 );
         }
 
+        public async Task<bool> BranchIsActiveAsync(
+            int branchId)
+        {
+            return await _context.DmBranches
+                .AsNoTracking()
+                .AnyAsync(branch =>
+                    branch.Id == branchId &&
+                    branch.IsActive
+                );
+        }
+
         /// <summary>
         /// Kiểm tra nhà phân phối có tồn tại
         /// và chưa bị xóa mềm hay không.
@@ -149,6 +160,59 @@ namespace LuanVanTotNghiep.Repositories
             await _context.SaveChangesAsync();
 
             return product;
+        }
+
+        public async Task<List<ProductAdminDto>>
+            GetProductsForAdminAsync(bool active)
+        {
+            return await _context.KhoProducts
+                .AsNoTracking()
+                .Include(product => product.Supplier)
+                .Where(product =>
+                    (product.IsActive ?? true) == active)
+                .OrderBy(product => product.ProductName)
+                .Select(product => new ProductAdminDto
+                {
+                    Id = product.Id,
+                    ProductCode = product.ProductCode,
+                    ProductName = product.ProductName,
+                    Unit = product.Unit,
+                    SupplierId = product.SupplierId,
+                    SupplierName = product.Supplier != null
+                        ? product.Supplier.SupplierName
+                        : null,
+                    IsActive = product.IsActive ?? true,
+                    InactiveAt = product.InactiveAt,
+                    InactiveBy = product.InactiveBy,
+                    InactiveReason = product.InactiveReason,
+                    TotalInventory = product.KhoBranchInventories
+                        .Sum(item => item.Quantity ?? 0),
+                    TotalFrontStock = product.KhoBranchFrontStocks
+                        .Sum(item => item.Quantity ?? 0)
+                })
+                .ToListAsync();
+        }
+
+        public async Task<KhoProduct?>
+            GetProductForStatusChangeAsync(int productId)
+        {
+            return await _context.KhoProducts
+                .FirstOrDefaultAsync(product =>
+                    product.Id == productId);
+        }
+
+        public async Task<(int Inventory, int FrontStock)>
+            GetProductStockTotalsAsync(int productId)
+        {
+            var inventory = await _context.KhoBranchInventories
+                .Where(item => item.ProductId == productId)
+                .SumAsync(item => (int?)(item.Quantity ?? 0)) ?? 0;
+
+            var frontStock = await _context.KhoBranchFrontStocks
+                .Where(item => item.ProductId == productId)
+                .SumAsync(item => (int?)(item.Quantity ?? 0)) ?? 0;
+
+            return (inventory, frontStock);
         }
 
         // =====================================================

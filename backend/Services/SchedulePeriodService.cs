@@ -1,16 +1,21 @@
 using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.DTOs;
 using LuanVanTotNghiep.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace LuanVanTotNghiep.Services;
 
 public class SchedulePeriodService
 {
     private readonly SchedulePeriodRepo _repo;
+    private readonly AppDbContext _context;
 
-    public SchedulePeriodService(SchedulePeriodRepo repo)
+    public SchedulePeriodService(
+        SchedulePeriodRepo repo,
+        AppDbContext context)
     {
         _repo = repo;
+        _context = context;
     }
 
     private static string NormalizePeriodStatus(string? status)
@@ -78,9 +83,15 @@ public class SchedulePeriodService
     {
         var today = GetVietnamToday();
         var periods = await _repo.GetOpenPeriodsAsync();
+        var activeBranchIds = await _context.DmBranches
+            .AsNoTracking()
+            .Where(branch => branch.IsActive)
+            .Select(branch => branch.Id)
+            .ToListAsync();
 
         return periods
             .Where(period =>
+                activeBranchIds.Contains(period.BranchId) &&
                 string.Equals(
                     period.Status,
                     "OPEN",
@@ -99,6 +110,8 @@ public class SchedulePeriodService
 
     public async Task AddAsync(CreatePeriodDto dto)
     {
+        await EnsureBranchActiveAsync(dto.BranchId);
+
         var today = GetVietnamToday();
 
         if (dto.StartDate <= today)
@@ -131,6 +144,8 @@ public class SchedulePeriodService
 
         if (existingPeriod == null)
             throw new KeyNotFoundException("Không tìm thấy đợt đăng ký.");
+
+        await EnsureBranchActiveAsync(existingPeriod.BranchId);
 
         if (string.Equals(
                 existingPeriod.Status,
@@ -178,6 +193,11 @@ public class SchedulePeriodService
             throw new KeyNotFoundException("Không tìm thấy đợt đăng ký.");
 
         var normalizedStatus = NormalizePeriodStatus(newStatus);
+
+        if (normalizedStatus == "OPEN")
+        {
+            await EnsureBranchActiveAsync(period.BranchId);
+        }
         var today = GetVietnamToday();
 
         if (string.Equals(
@@ -236,4 +256,20 @@ public class SchedulePeriodService
             today,
             cancellationToken);
     }
+
+    private async Task EnsureBranchActiveAsync(int branchId)
+    {
+        var isActive = await _context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId &&
+                branch.IsActive);
+
+        if (!isActive)
+        {
+            throw new InvalidOperationException(
+                "Cơ sở đã ngừng hoạt động nên không thể tạo hoặc mở đợt đăng ký ca.");
+        }
+    }
+
 }

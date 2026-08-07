@@ -47,6 +47,7 @@ private async Task<KhoProduct>
 
                 if (productById != null)
                 {
+                    EnsureProductIsActive(productById);
                     return productById;
                 }
             }
@@ -66,6 +67,7 @@ private async Task<KhoProduct>
 
                 if (productByCode != null)
                 {
+                    EnsureProductIsActive(productByCode);
                     return productByCode;
                 }
             }
@@ -85,6 +87,8 @@ private async Task<KhoProduct>
 
                 if (productByName != null)
                 {
+                    EnsureProductIsActive(productByName);
+
                     // Bổ sung mã sản phẩm nếu sản phẩm
                     // cũ chưa có mã.
                     if (
@@ -155,6 +159,15 @@ private async Task<KhoProduct>
             return await _importRepo
                 .AddProductAsync(newProduct);
         }
+
+        private static void EnsureProductIsActive(KhoProduct product)
+        {
+            if (product.IsActive == false)
+            {
+                throw new InvalidOperationException(
+                    $"Sản phẩm '{product.ProductName}' đã ngừng hoạt động. " +
+                    "Admin phải khôi phục sản phẩm trước khi nhập kho.");
+            }
+        }
     }
 }
-

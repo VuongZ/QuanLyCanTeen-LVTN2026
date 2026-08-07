@@ -14,6 +14,23 @@ public async Task<bool> HasActivePermissionAsync(
         int shiftId,
         DateOnly workDate)
     {
+        var branchIsActive = await context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId &&
+                branch.IsActive);
+
+        var shiftIsActive = await context.CaShifts
+            .AsNoTracking()
+            .AnyAsync(shift =>
+                shift.Id == shiftId &&
+                shift.IsActive);
+
+        if (!branchIsActive || !shiftIsActive)
+        {
+            return false;
+        }
+
         var now = UtcNow();
         return await context.CaShiftDelegations.AnyAsync(item =>
             item.DelegateUserId == actorId &&
@@ -47,4 +64,3 @@ public async Task<bool> HasActivePermissionAsync(
             await AddAuditAsync(delegation.Id, actorId, actionType, details);
     }
 }
-

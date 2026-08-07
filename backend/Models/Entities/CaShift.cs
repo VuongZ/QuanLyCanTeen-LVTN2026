@@ -19,6 +19,14 @@ public partial class CaShift
 
     public bool? IsOt { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public DateTime? InactiveAt { get; set; }
+
+    public int? InactiveBy { get; set; }
+
+    public string? InactiveReason { get; set; }
+
     public DateTime? RowVersion { get; set; }
 
     public virtual DmBranch? Branch { get; set; }

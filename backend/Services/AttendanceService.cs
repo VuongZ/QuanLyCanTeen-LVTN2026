@@ -180,6 +180,24 @@ public partial class AttendanceService
                 "Thao tác điểm danh phải là CHECKIN hoặc CHECKOUT.");
         }
 
+        // Cơ sở/ca đã ngừng hoạt động không nhận check-in mới.
+        // Checkout của ca đã check-in trước đó vẫn được phép để
+        // không làm nhân viên bị mắc kẹt giữa ca.
+        if (action == "CHECKIN")
+        {
+            if (shift.Branch == null || !shift.Branch.IsActive)
+            {
+                throw new InvalidOperationException(
+                    "Cơ sở đã ngừng hoạt động nên không thể check-in ca mới.");
+            }
+
+            if (!shift.IsActive)
+            {
+                throw new InvalidOperationException(
+                    "Ca làm đã ngừng hoạt động nên không thể check-in mới.");
+            }
+        }
+
         // Checkout chỉ được thực hiện khi báo cáo kết ca đã duyệt.
         if (action == "CHECKOUT")
         {

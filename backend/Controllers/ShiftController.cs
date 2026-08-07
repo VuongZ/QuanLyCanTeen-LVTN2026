@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using LuanVanTotNghiep.backend.Models.Entities;
 using LuanVanTotNghiep.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LuanVanTotNghiep.DTOs;
 
@@ -7,6 +9,7 @@ namespace LuanVanTotNghiep.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ShiftController : ControllerBase
 {
     private readonly ShiftService _shiftService;
@@ -17,29 +20,42 @@ public class ShiftController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] bool includeInactive = false)
     {
-        var shifts = await _shiftService.GetAllShiftsAsync();
+        var canSeeInactive = includeInactive && User.IsInRole("ADMIN");
+        var shifts = await _shiftService.GetAllShiftsAsync(canSeeInactive);
         return Ok(shifts);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
         var shift = await _shiftService.GetShiftByIdAsync(id);
-        if (shift == null) return NotFound(new { message = "Không tìm thấy ca làm!" });
-        
+        if (shift == null)
+        {
+            return NotFound(new { message = "Không tìm thấy ca làm!" });
+        }
+
         return Ok(shift);
     }
 
-    // POST MỚI: Gọi thẳng vào hàm tạo Ca kèm 7 ngày Config
     [HttpPost]
+    [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> CreateShift([FromBody] CreateShiftDto dto)
     {
         try
         {
             var result = await _shiftService.CreateShiftWithAutoConfigAsync(dto);
-            return Ok(new { message = "Tạo ca làm và tự động cấu hình 7 ngày thành công!", data = result });
+            return Ok(new
+            {
+                message = "Tạo ca làm và tự động cấu hình 7 ngày thành công!",
+                data = result
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -47,19 +63,82 @@ public class ShiftController : ControllerBase
         }
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Update(int id, [FromBody] CaShift shift)
+    [HttpPut("{id:int}")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> Update(
+        int id,
+        [FromBody] CaShift shift)
     {
-        if (id != shift.Id) return BadRequest(new { message = "ID không khớp!" });
-        
-        await _shiftService.UpdateShiftAsync(shift);
-        return Ok(new { message = "Đã cập nhật ca làm thành công!" });
+        try
+        {
+            var updated = await _shiftService.UpdateShiftAsync(id, shift);
+            return Ok(new
+            {
+                message = "Đã cập nhật ca làm thành công!",
+                data = updated
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
+    [HttpPatch("{id:int}/deactivate")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> Deactivate(
+        int id,
+        [FromBody] ChangeShiftStatusDto? dto)
     {
-        await _shiftService.DeleteShiftAsync(id);
-        return Ok(new { message = "Đã xóa ca làm thành công!" });
+        try
+        {
+            var updated = await _shiftService.DeactivateShiftAsync(
+                id,
+                GetCurrentUserId(),
+                dto?.Reason);
+
+            return Ok(new
+            {
+                message = "Đã ngừng hoạt động ca làm. Lịch sử đã công bố vẫn được giữ nguyên.",
+                data = updated
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{id:int}/restore")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> Restore(int id)
+    {
+        try
+        {
+            var updated = await _shiftService.RestoreShiftAsync(id);
+            return Ok(new
+            {
+                message = "Đã khôi phục ca làm.",
+                data = updated
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    private int GetCurrentUserId()
+    {
+        var value = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(value, out var userId) ? userId : 0;
     }
 }

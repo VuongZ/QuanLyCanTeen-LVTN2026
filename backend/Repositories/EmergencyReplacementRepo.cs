@@ -32,6 +32,15 @@ public class EmergencyReplacementRepo
     /// <summary>
     /// Lấy người đang thực hiện thao tác và vai trò.
     /// </summary>
+    public async Task<bool> IsBranchActiveAsync(int branchId)
+    {
+        return await _context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId &&
+                branch.IsActive);
+    }
+
     public async Task<NsUser?> GetActorAsync(
         int actorId)
     {

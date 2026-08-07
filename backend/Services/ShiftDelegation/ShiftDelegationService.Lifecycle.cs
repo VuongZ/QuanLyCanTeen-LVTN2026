@@ -34,6 +34,27 @@ public async Task<ShiftDelegationDto> RespondAsync(
         if (delegation.EndsAtUtc <= DateTime.UtcNow)
             throw new InvalidOperationException("Ca làm đã kết thúc.");
 
+        if (accept)
+        {
+            var branchIsActive = await context.DmBranches
+                .AsNoTracking()
+                .AnyAsync(branch =>
+                    branch.Id == delegation.BranchId &&
+                    branch.IsActive);
+
+            var shiftIsActive = await context.CaShifts
+                .AsNoTracking()
+                .AnyAsync(shift =>
+                    shift.Id == delegation.ShiftId &&
+                    shift.IsActive);
+
+            if (!branchIsActive || !shiftIsActive)
+            {
+                throw new InvalidOperationException(
+                    "Cơ sở hoặc ca làm đã ngừng hoạt động nên không thể nhận ủy quyền.");
+            }
+        }
+
         delegation.Status = accept ? Accepted : Rejected;
         delegation.RespondedAtUtc = UtcNow();
         await context.SaveChangesAsync();

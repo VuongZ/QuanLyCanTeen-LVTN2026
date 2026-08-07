@@ -318,11 +318,12 @@ public async Task<ClosingShiftInfoDto?>
             var branchId =
                 staff.BranchId!.Value;
 
-            // Lấy tồn quầy đang hoạt động
-            // thông qua Repository.
+            // Lấy toàn bộ tồn quầy của cơ sở.
+            // Không ẩn sản phẩm đã ngừng kinh doanh vì
+            // số lượng còn tại quầy vẫn phải được kiểm kê.
             var frontStocks =
                 await _shiftClosingRepo
-                    .GetActiveFrontStocksByBranchAsync(
+                    .GetFrontStocksByBranchAsync(
                         branchId
                     );
 
@@ -363,4 +364,3 @@ public async Task<ClosingShiftInfoDto?>
 /// </summary>
     }
 }
-

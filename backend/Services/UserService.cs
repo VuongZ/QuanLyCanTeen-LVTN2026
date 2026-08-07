@@ -51,6 +51,8 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         if (duplicateMessages.Count > 0)
             throw new ArgumentException(string.Join(" ", duplicateMessages));
 
+        await EnsureBranchCanBeAssignedAsync(dto.BranchId);
+
         var initialPassword = GenerateSixDigitPassword();
         await using var transaction = await context.Database.BeginTransactionAsync();
 
@@ -117,6 +119,12 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             us1.Email = Normalize(user.Email);
             us1.FullName = user.FullName;
             us1.PhoneNumber = Normalize(user.PhoneNumber ?? user.Phone);
+
+            if (user.BranchId != us1.BranchId)
+            {
+                await EnsureBranchCanBeAssignedAsync(user.BranchId);
+            }
+
             us1.BranchId = user.BranchId;
             us1.RoleId = user.RoleId;
             us1.HireDate = user.HireDate;
@@ -372,6 +380,26 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
         bank.BankAccountNumber = Normalize(bankAccountNumber);
         bank.BankAccountName = Normalize(bankAccountName);
         await context.SaveChangesAsync();
+    }
+
+    private async Task EnsureBranchCanBeAssignedAsync(int? branchId)
+    {
+        if (!branchId.HasValue || branchId.Value <= 0)
+        {
+            return;
+        }
+
+        var isActive = await context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId.Value &&
+                branch.IsActive);
+
+        if (!isActive)
+        {
+            throw new InvalidOperationException(
+                "Không thể phân công nhân viên vào cơ sở đã ngừng hoạt động.");
+        }
     }
 
     private static string? Normalize(string? value)

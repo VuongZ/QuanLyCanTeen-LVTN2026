@@ -468,11 +468,45 @@ function PublishedScheduleView({ period, user }) {
           return String(shift.branchId) === String(user.branchId);
         });
 
+        // Lịch đã công bố phải tiếp tục hiển thị cả ca đã ngừng hoạt động.
+        // API /Shift mặc định chỉ trả ca đang hoạt động cho Staff, vì vậy
+        // bổ sung các ca xuất hiện trực tiếp trong dữ liệu lịch chính thức.
+        const publishedShifts = (scheduleRows || [])
+          .map((row) => row?.shift)
+          .filter((shift) =>
+            shift &&
+            String(shift.branchId) === String(user.branchId)
+          );
+
+        const mergedShifts = [...branchShifts];
+
+        publishedShifts.forEach((shift) => {
+          const alreadyExists = mergedShifts.some(
+            (item) => Number(item.id) === Number(shift.id)
+          );
+
+          if (!alreadyExists) {
+            mergedShifts.push({
+              ...shift,
+              isActive: false,
+            });
+          }
+        });
+
+        mergedShifts.sort((a, b) => {
+          const startCompare = String(a.startTime || '')
+            .localeCompare(String(b.startTime || ''));
+
+          return startCompare !== 0
+            ? startCompare
+            : Number(a.id) - Number(b.id);
+        });
+
         const branchShiftIds = new Set(
-          branchShifts.map((shift) => shift.id)
+          mergedShifts.map((shift) => shift.id)
         );
 
-        setShifts(branchShifts);
+        setShifts(mergedShifts);
         setShiftConfigs(
           (configRes.data || []).filter((config) => {
             return branchShiftIds.has(config.shiftId);

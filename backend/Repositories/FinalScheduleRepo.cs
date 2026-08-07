@@ -108,6 +108,15 @@ public async Task<List<CaFinalSchedule>>
         .ToListAsync();
 }
 
+    public async Task<bool> IsBranchActiveAsync(int branchId)
+    {
+        return await Context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId &&
+                branch.IsActive);
+    }
+
     /// <summary>
     /// Lấy Manager thuộc chi nhánh.
     /// </summary>
@@ -230,7 +239,8 @@ public async Task<List<CaFinalSchedule>>
         return await Context.CaShifts
             .AsNoTracking()
             .Where(shift =>
-                shift.BranchId == branchId)
+                shift.BranchId == branchId &&
+                shift.IsActive)
             .OrderBy(shift =>
                 shift.StartTime)
             .ThenBy(shift =>

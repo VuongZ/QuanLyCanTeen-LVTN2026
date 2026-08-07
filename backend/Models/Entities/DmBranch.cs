@@ -15,6 +15,14 @@ public partial class DmBranch
 
     public decimal? Longitude { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    public DateTime? InactiveAt { get; set; }
+
+    public int? InactiveBy { get; set; }
+
+    public string? InactiveReason { get; set; }
+
     public virtual ICollection<CaShift> CaShifts { get; set; } = new List<CaShift>();
 
     public virtual ICollection<KhoBranchFrontStock> KhoBranchFrontStocks { get; set; } = new List<KhoBranchFrontStock>();

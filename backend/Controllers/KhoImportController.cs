@@ -358,6 +358,80 @@ namespace LuanVanTotNghiep.Controllers
         /// - Số dương: lọc theo chi nhánh.
         /// - -1: không tìm thấy BranchId hợp lệ.
         /// </summary>
+        [HttpGet("products")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> GetProductsForAdmin(
+            [FromQuery] bool active = true)
+        {
+            var data = await _importService
+                .GetProductsForAdminAsync(active);
+
+            return Ok(data);
+        }
+
+        [HttpPatch("products/{id:int}/deactivate")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> DeactivateProduct(
+            int id,
+            [FromBody] ChangeProductStatusDto? dto)
+        {
+            try
+            {
+                var userIdString = GetClaimValue(
+                    ClaimTypes.NameIdentifier,
+                    "UserId",
+                    "userId",
+                    "id");
+
+                var adminUserId = int.TryParse(
+                    userIdString,
+                    out var parsedUserId)
+                        ? parsedUserId
+                        : 0;
+
+                var product = await _importService
+                    .DeactivateProductAsync(
+                        id,
+                        adminUserId,
+                        dto?.Reason);
+
+                return Ok(new
+                {
+                    message = "Đã ngừng hoạt động sản phẩm.",
+                    data = product
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPatch("products/{id:int}/restore")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> RestoreProduct(int id)
+        {
+            try
+            {
+                var product = await _importService
+                    .RestoreProductAsync(id);
+
+                return Ok(new
+                {
+                    message = "Đã khôi phục sản phẩm.",
+                    data = product
+                });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
         private int ResolveBranchIdForQuery(
             int? requestedBranchId)
         {

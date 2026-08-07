@@ -26,12 +26,26 @@ public async Task<ShiftDelegationDto> CreateAsync(
         if (branchId is not > 0)
             throw new InvalidOperationException("Vui lòng chọn chi nhánh cần ủy quyền.");
 
+        var branchIsActive = await context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId.Value &&
+                branch.IsActive);
+
+        if (!branchIsActive)
+            throw new InvalidOperationException(
+                "Cơ sở đã ngừng hoạt động nên không thể tạo ủy quyền ca mới.");
+
         var shift = await context.CaShifts
             .FirstOrDefaultAsync(item =>
                 item.Id == dto.ShiftId &&
                 item.BranchId == branchId);
         if (shift == null)
             throw new InvalidOperationException("Ca làm không thuộc chi nhánh đã chọn.");
+
+        if (!shift.IsActive)
+            throw new InvalidOperationException(
+                "Ca làm đã ngừng hoạt động nên không thể tạo ủy quyền mới.");
 
         var delegateUser = await context.NsUsers
             .Include(user => user.Role)
@@ -121,4 +135,3 @@ public async Task<ShiftDelegationDto> CreateAsync(
             .FirstAsync(item => item.Id == delegation.Id)));
     }
 }
-

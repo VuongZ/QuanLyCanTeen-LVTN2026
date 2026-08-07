@@ -29,6 +29,12 @@ public async Task<PublishScheduleResultDto> PublishScheduleAsync(
                     "Không tìm thấy đợt đăng ký này.");
             }
 
+            if (!await _repo.IsBranchActiveAsync(period.BranchId))
+            {
+                throw new InvalidOperationException(
+                    "Cơ sở đã ngừng hoạt động nên không thể công bố lịch mới.");
+            }
+
             if (string.Equals(
                     period.Status,
                     PublishedStatus,

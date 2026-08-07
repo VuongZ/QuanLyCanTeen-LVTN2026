@@ -184,7 +184,7 @@ export function AdminSystemScheduleTab({ branches }) {
             : []
         )
 
-        // Chỉ giữ các ca thuộc cơ sở Admin đang chọn.
+        // Chỉ giữ các ca đang hoạt động thuộc cơ sở Admin đang chọn.
         const branchShifts = (shiftRows || [])
           .filter((shift) => {
             return (
@@ -193,7 +193,41 @@ export function AdminSystemScheduleTab({ branches }) {
             )
           })
 
-        setShifts(branchShifts)
+        // Lịch đã công bố phải giữ được tên ca cũ ngay cả khi Admin
+        // đã ngừng hoạt động ca đó. Dữ liệu lịch chính thức đã chứa
+        // thông tin shift, nên ghép thêm các ca lịch sử còn thiếu.
+        const publishedShifts = (scheduleRows || [])
+          .map((row) => row?.shift)
+          .filter((shift) =>
+            shift &&
+            String(shift.branchId) === String(selectedBranchId)
+          )
+
+        const mergedShifts = [...branchShifts]
+
+        publishedShifts.forEach((shift) => {
+          const alreadyExists = mergedShifts.some(
+            (item) => Number(item.id) === Number(shift.id)
+          )
+
+          if (!alreadyExists) {
+            mergedShifts.push({
+              ...shift,
+              isActive: false,
+            })
+          }
+        })
+
+        mergedShifts.sort((a, b) => {
+          const startCompare = String(a.startTime || '')
+            .localeCompare(String(b.startTime || ''))
+
+          return startCompare !== 0
+            ? startCompare
+            : Number(a.id) - Number(b.id)
+        })
+
+        setShifts(mergedShifts)
 
         // =====================================================
         // VÒNG WHILE: TẠO DANH SÁCH CÁC NGÀY CỦA TUẦN

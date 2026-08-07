@@ -16,6 +16,24 @@ public async Task<object> MarkAttendanceStatusAsync(
         if (actor.BranchId is not int branchId)
             throw new InvalidOperationException("Tài khoản chưa được gán chi nhánh.");
 
+        var branchIsActive = await context.DmBranches
+            .AsNoTracking()
+            .AnyAsync(branch =>
+                branch.Id == branchId &&
+                branch.IsActive);
+
+        var shiftIsActive = await context.CaShifts
+            .AsNoTracking()
+            .AnyAsync(shift =>
+                shift.Id == dto.ShiftId &&
+                shift.IsActive);
+
+        if (!branchIsActive || !shiftIsActive)
+        {
+            throw new InvalidOperationException(
+                "Cơ sở hoặc ca làm đã ngừng hoạt động nên không thể ghi nhận đi trễ hoặc vắng mặt mới.");
+        }
+
         var actorRole = Normalize(actor.Role?.RoleName);
         var isManager = IsManager(actorRole);
         var hasDelegation = await HasActivePermissionAsync(
@@ -80,4 +98,3 @@ public async Task<object> MarkAttendanceStatusAsync(
         };
     }
 }
-

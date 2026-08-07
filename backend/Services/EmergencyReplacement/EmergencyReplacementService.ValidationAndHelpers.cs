@@ -53,6 +53,18 @@ private async Task<int>
                 "chi nhánh khác.");
         }
 
+        if (!await _repo.IsBranchActiveAsync(actorBranchId))
+        {
+            throw new InvalidOperationException(
+                "Cơ sở đã ngừng hoạt động nên không thể xử lý nghỉ, vắng hoặc thay thế mới.");
+        }
+
+        if (!schedule.Shift.IsActive)
+        {
+            throw new InvalidOperationException(
+                "Ca làm đã ngừng hoạt động nên không thể xử lý thay thế mới.");
+        }
+
         return actorBranchId;
     }
 
@@ -166,4 +178,3 @@ private async Task<int>
                 firstEndMinutes);
     }
 }
-
