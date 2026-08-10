@@ -267,7 +267,7 @@ function getVietnamCurrentPeriod() {
 
 function formatEmploymentType(value) {
   return normalizeStatus(value) ===
-    'FULL_TIME'
+    'FULL TIME'
     ? 'Full-time'
     : value || '—';
 }
@@ -1781,7 +1781,7 @@ export function AdminSocialInsuranceTab() {
         `Sinh khoản đóng BHXH tháng ` +
         `${selectedMonth}/${selectedYear}?\n\n` +
         `Chỉ hồ sơ ACTIVE, Staff đã xác nhận ` +
-        `và nhân viên FULL_TIME mới được tạo.`
+        `và nhân viên FULL TIME mới được tạo.`
       );
 
     if (!accepted) {
@@ -1988,7 +1988,7 @@ export function AdminSocialInsuranceTab() {
             </span>
 
             <div>
-              <p>Nhân viên FULL_TIME</p>
+              <p>Nhân viên FULL TIME</p>
               <strong>
                 {profileStatistics.employees}
               </strong>
@@ -3893,7 +3893,7 @@ export function AdminSocialInsuranceTab() {
 
               <ul>
                 <li>
-                  Nhân viên vẫn là FULL_TIME.
+                  Nhân viên vẫn là FULL TIME.
                 </li>
 
                 <li>

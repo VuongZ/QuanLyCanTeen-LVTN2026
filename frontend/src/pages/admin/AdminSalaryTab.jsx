@@ -844,7 +844,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
   </p>
 ) : String(
   selected.employmentType || ''
-).toUpperCase() === 'FULL_TIME' ? (
+).toUpperCase() === 'FULL TIME' ? (
   <p className="salary-insurance-note salary-insurance-note--empty">
     Khi Manager chốt lương, hệ thống sẽ tự tạo và liên kết
     khoản đóng BHXH tháng {selected.month}/{selected.year}.

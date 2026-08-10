@@ -902,7 +902,7 @@ function RegistrationView({ period, user }) {
   const normalizedEmploymentType =
     String(user.employmentType || '').toUpperCase();
   const isFullTimeUser =
-    normalizedEmploymentType === 'FULL_TIME' ||
+    normalizedEmploymentType === 'FULL TIME' ||
     normalizedEmploymentType === 'MATERNITY';
 
   const isRegistrationDisabled =
@@ -1122,7 +1122,7 @@ function RegistrationView({ period, user }) {
     return Number(config?.maxStaff ?? shift?.maxStaff ?? 0);
   }
 
-  // Manager và FULL_TIME được tự động xếp lịch nên giữ chỗ trước.
+  // Manager và FULL TIME được tự động xếp lịch nên giữ chỗ trước.
   function getStaffSlotForShiftDate(shiftId, dateObj) {
     const totalMaxStaff = getTotalMaxStaffForShiftDate(
       shiftId,

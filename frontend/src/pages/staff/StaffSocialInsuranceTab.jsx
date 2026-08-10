@@ -774,7 +774,7 @@ export function StaffSocialInsuranceTab() {
 
                 <span>
                   {profile.employmentType ||
-                    'FULL_TIME'}
+                    'FULL TIME'}
                 </span>
               </div>
             </div>

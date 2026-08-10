@@ -112,7 +112,7 @@ function ProfileInfoCard({ branch, user }) {
         <InfoRow
           label="Loại nhân viên"
           value={
-            user.employmentType === 'FULL_TIME'
+            user.employmentType === 'FULL TIME'
               ? 'Full-time'
               : user.employmentType === 'MATERNITY'
                 ? 'Thai sản'

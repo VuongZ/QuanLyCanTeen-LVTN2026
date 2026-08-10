@@ -40,7 +40,7 @@ function normalizeText(value = '') {
 }
 
 function formatEmploymentType(value) {
-  if (value === 'FULL_TIME') return 'Full-time'
+  if (value === 'FULL TIME') return 'Full-time'
   if (value === 'MATERNITY') return 'Thai sản'
   return 'Part-time'
 }
@@ -49,7 +49,7 @@ function calculateAutomaticSalaryCoefficient(hireDate, employmentType) {
   const start = hireDate ? new Date(`${hireDate.slice(0, 10)}T00:00:00`) : null
   const today = new Date()
 
-  if (employmentType === 'FULL_TIME' || employmentType === 'MATERNITY') {
+  if (employmentType === 'FULL TIME' || employmentType === 'MATERNITY') {
     if (!start || today < start) return 1.2
     let completedYears = today.getFullYear() - start.getFullYear()
     const anniversary = new Date(start)
@@ -585,7 +585,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                   <label>Loại nhân viên</label>
                   <select name="employmentType" value={form.employmentType || 'PART_TIME'} onChange={handleFormChange}>
                     <option value="PART_TIME">Part-time</option>
-                    <option value="FULL_TIME">Full-time</option>
+                    <option value="FULL TIME">Full-time</option>
                     <option value="MATERNITY">Thai sản</option>
                   </select>
                 </div>

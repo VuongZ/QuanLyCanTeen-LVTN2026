@@ -17,11 +17,11 @@ const BASE_URL = '/api/SocialInsurance';
 
 
 // ============================================================
-// 1. NHÂN VIÊN FULL_TIME
+// 1. NHÂN VIÊN FULL TIME
 // ============================================================
 
 /*
-  Admin lấy danh sách nhân viên FULL_TIME.
+  Admin lấy danh sách nhân viên FULL TIME.
 
   Kết quả còn cho biết:
   - Nhân viên đã có hồ sơ BHXH chưa.
@@ -190,7 +190,7 @@ export async function getSocialInsuranceProfileByUserId(
 }
 
 /*
-  Admin tạo hồ sơ BHXH cho nhân viên FULL_TIME.
+  Admin tạo hồ sơ BHXH cho nhân viên FULL TIME.
 
   payload có dạng:
 
