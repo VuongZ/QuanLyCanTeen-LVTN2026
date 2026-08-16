@@ -99,6 +99,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState('ALL')
+  const [filterBranch, setFilterBranch] = useState('ALL')
   const [employmentStatus, setEmploymentStatus] = useState('ACTIVE')
   const [deletedUsers, setDeletedUsers] = useState([])
   const [deletedUsersLoaded, setDeletedUsersLoaded] = useState(false)
@@ -121,10 +122,17 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   const visibleUsers = isManager && !isAdmin
     ? users.filter((u) => String(u.branchId || '') === String(user.branchId || ''))
     : users
+  const branchFilteredUsers = isAdmin
+    ? visibleUsers.filter((u) => {
+        if (filterBranch === 'ALL') return true
+        if (filterBranch === 'UNASSIGNED') return !u.branchId
+        return String(u.branchId) === filterBranch
+      })
+    : visibleUsers
   const getPhone = (u) => u?.phoneNumber || u?.phone || ''
 
   // LOGIC TÌM KIẾM NHÂN VIÊN
-  const displayed = visibleUsers
+  const displayed = branchFilteredUsers
     .filter((u) => {
       const matchSearch = [u.fullName, u.email, u.username, getPhone(u), u.bankName, u.bankAccountNumber, u.bankAccountName, u.branchName].some((v) => v?.toLowerCase().includes(search.toLowerCase()))
       const matchRole = filterRole === 'ALL' || u.roleName?.toUpperCase() === filterRole
@@ -240,7 +248,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     }
   }
 
-  const countByRole = (r) => visibleUsers.filter((u) => u.roleName?.toUpperCase() === r).length
+  const countByRole = (r) => branchFilteredUsers.filter((u) => u.roleName?.toUpperCase() === r).length
 
   const getHeaderInfo = () => {
     switch (activeTab) {
@@ -392,6 +400,25 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                           <input className="sd-input-search" placeholder="Tìm tên, email, SĐT, chi nhánh..." value={search} onChange={(e) => setSearch(e.target.value)} />
                           {search && <button className="sd-search-clear" onClick={() => setSearch('')}>✕</button>}
                         </div>
+                        {isAdmin && (
+                          <select
+                            aria-label="Lọc nhân sự theo cơ sở"
+                            className="sd-branch-filter"
+                            value={filterBranch}
+                            onChange={(e) => {
+                              setFilterBranch(e.target.value)
+                              setSelectedUser(null)
+                            }}
+                          >
+                            <option value="ALL">Tất cả cơ sở</option>
+                            {branches.map((item) => (
+                              <option key={item.id} value={String(item.id)}>
+                                {item.name || item.branchName}{item.isActive === false ? ' (ngừng hoạt động)' : ''}
+                              </option>
+                            ))}
+                            <option value="UNASSIGNED">Chưa gán cơ sở</option>
+                          </select>
+                        )}
                         <div className="sd-filter-chips">
                           <button className={`sd-filter-chip ${employmentStatus === 'ACTIVE' ? 'active' : ''}`} onClick={() => { setEmploymentStatus('ACTIVE'); setSelectedUser(null) }}>
                             Đang làm
@@ -400,14 +427,22 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
                             Đã xóa
                           </button>
                         </div>
-                        <div className="sd-filter-chips">
-                          {['ALL', 'ADMIN', 'MANAGER', 'STAFF'].map((r) => (
-                            <button key={r} className={`sd-filter-chip ${filterRole === r ? 'active' : ''}`} onClick={() => setFilterRole(r)}>
-                              {r === 'ALL' ? 'Tất cả' : r}
-                              {r !== 'ALL' && <span className="sd-chip-count">{countByRole(r)}</span>}
-                            </button>
+                        <select
+                          aria-label="Lọc nhân sự theo chức vụ"
+                          className="sd-branch-filter"
+                          value={filterRole}
+                          onChange={(e) => {
+                            setFilterRole(e.target.value)
+                            setSelectedUser(null)
+                          }}
+                        >
+                          <option value="ALL">Tất cả chức vụ</option>
+                          {['ADMIN', 'MANAGER', 'STAFF'].map((roleName) => (
+                            <option key={roleName} value={roleName}>
+                              {roleName} ({countByRole(roleName)})
+                            </option>
                           ))}
-                        </div>
+                        </select>
                       </div>
                       <div className="sd-users-toolbar-right">
                         <span className="sd-result-count">{displayed.length} nhân viên</span>

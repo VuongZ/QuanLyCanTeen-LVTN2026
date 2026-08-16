@@ -12,7 +12,7 @@ namespace LuanVanTotNghiep.Controllers;
 /// Phạm vi:
 ///
 /// Admin:
-/// - Quản lý nhân viên FULL_TIME.
+/// - Quản lý nhân viên FULL TIME.
 /// - Quản lý cấu hình tỷ lệ.
 /// - Quản lý hồ sơ BHXH.
 /// - Sinh, xác nhận, thanh toán và hủy khoản đóng.
@@ -136,11 +136,11 @@ public class SocialInsuranceController : ControllerBase
 
 
     // ========================================================
-    // 1. NHÂN VIÊN FULL_TIME - ADMIN
+    // 1. NHÂN VIÊN FULL TIME - ADMIN
     // ========================================================
 
     /// <summary>
-    /// Admin lấy danh sách nhân viên FULL_TIME.
+    /// Admin lấy danh sách nhân viên FULL TIME.
     ///
     /// Kết quả cho biết:
     /// - Nhân viên đã có hồ sơ BHXH chưa.
@@ -464,7 +464,7 @@ public async Task<IActionResult>
     }
 
     /// <summary>
-    /// Admin tạo hồ sơ BHXH cho nhân viên FULL_TIME.
+    /// Admin tạo hồ sơ BHXH cho nhân viên FULL TIME.
     ///
     /// POST:
     /// /api/SocialInsurance/profiles
@@ -715,7 +715,7 @@ public async Task<IActionResult>
     /// POST:
     /// /api/SocialInsurance/contributions/generate
     ///
-    /// Chỉ hồ sơ ACTIVE và nhân viên FULL_TIME
+    /// Chỉ hồ sơ ACTIVE và nhân viên FULL TIME
     /// mới được tạo khoản đóng.
     ///
     /// Bản ghi mới có trạng thái DRAFT.

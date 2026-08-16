@@ -414,7 +414,7 @@ private static void AppendContributionNote(
 /// Liên kết và khấu trừ BHXH khi chốt bảng lương.
 ///
 /// Quy tắc:
-/// - Chỉ FULL_TIME tham gia BHXH.
+/// - Chỉ FULL TIME tham gia BHXH.
 /// - Nếu lương đủ, khấu trừ toàn bộ phần nhân viên đóng.
 /// - Nếu lương không đủ, khấu trừ tối đa số tiền hiện có.
 /// - Phần còn thiếu được ghi nhận là doanh nghiệp tạm ứng.

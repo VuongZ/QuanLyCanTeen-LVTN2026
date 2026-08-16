@@ -106,7 +106,7 @@ public class StaffRegistrationRepo
     }
 
     /// <summary>
-    /// Đếm nhân viên FULL_TIME được tự động xếp vào mọi ca của chi nhánh.
+    /// Đếm nhân viên FULL TIME được tự động xếp vào mọi ca của chi nhánh.
     /// </summary>
     public async Task<int>
         CountBranchFullTimeStaffAsync(
@@ -116,7 +116,7 @@ public class StaffRegistrationRepo
             .Where(user =>
                 user.BranchId == branchId &&
                 user.IsDeleted != true &&
-                (user.EmploymentType == "FULL_TIME" ||
+                (user.EmploymentType == "FULL TIME" ||
                  user.EmploymentType == "MATERNITY") &&
                 user.Role != null &&
                 user.Role.RoleName != null)

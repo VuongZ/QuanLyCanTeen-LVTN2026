@@ -73,7 +73,7 @@ public partial class SalaryService
                     "chưa được chốt. Không thể chuyển quỹ lương.");
             }
 
-            // Nhân viên FULL_TIME phải được liên kết với
+            // Nhân viên FULL TIME phải được liên kết với
             // khoản đóng BHXH khi chốt lương.
             //
             // SocialInsuranceDeduction có thể bằng 0 nếu

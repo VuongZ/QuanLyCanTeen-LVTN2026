@@ -3,10 +3,10 @@ using System.Collections.Generic;
 
 namespace LuanVanTotNghiep.backend.Models.Entities;
 
-// Hồ sơ BHXH hiện tại của một nhân viên FULL_TIME.
+// Hồ sơ BHXH hiện tại của một nhân viên FULL TIME.
 //
 // Quy tắc nghiệp vụ được kiểm tra ở Service:
-// - Chỉ nhân viên FULL_TIME mới được tạo hồ sơ.
+// - Chỉ nhân viên FULL TIME mới được tạo hồ sơ.
 // - Mỗi nhân viên có tối đa một hồ sơ hiện tại.
 // - Mã số BHXH không được trùng.
 // - Staff phải xác nhận hồ sơ trước khi Admin kích hoạt.

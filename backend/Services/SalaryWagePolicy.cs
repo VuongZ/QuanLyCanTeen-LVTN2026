@@ -5,7 +5,7 @@ namespace LuanVanTotNghiep.Services;
 public static class SalaryWagePolicy
 {
     public const string PartTime = "PART_TIME";
-    public const string FullTime = "FULL_TIME";
+    public const string FullTime = "FULL TIME";
     public const string Maternity = "MATERNITY";
     public const decimal DefaultCoefficient = 1.00m;
     public const decimal SixMonthCoefficient = 1.20m;
@@ -79,7 +79,7 @@ public static class SalaryWagePolicy
         return normalized == FullTime || normalized == Maternity;
     }
 
-    // Chỉ nhân viên FULL_TIME thuộc đối tượng áp dụng BHXH
+    // Chỉ nhân viên FULL TIME thuộc đối tượng áp dụng BHXH
     // trong phạm vi nghiệp vụ của đề tài.
     //
     // Không dùng IsFullTimeEquivalent ở đây vì hàm đó còn

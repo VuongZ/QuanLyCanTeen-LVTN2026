@@ -5,10 +5,10 @@ namespace LuanVanTotNghiep.DTOs;
 
 
 // ============================================================
-// 1. DTO DANH SÁCH NHÂN VIÊN FULL_TIME
+// 1. DTO DANH SÁCH NHÂN VIÊN FULL TIME
 // ============================================================
 
-// Dùng để hiển thị danh sách nhân viên FULL_TIME
+// Dùng để hiển thị danh sách nhân viên FULL TIME
 // cho Admin lựa chọn khi tạo hồ sơ BHXH.
 //
 // DTO không trả mật khẩu hoặc các thông tin
@@ -29,7 +29,7 @@ public class SocialInsuranceFullTimeEmployeeDto
     // Số điện thoại có thể để trống.
     public string? PhoneNumber { get; set; }
 
-    // Theo nghiệp vụ nhóm, giá trị phải là FULL_TIME.
+    // Theo nghiệp vụ nhóm, giá trị phải là FULL TIME.
     public string EmploymentType { get; set; }
         = string.Empty;
 
@@ -235,7 +235,7 @@ public class BhxhEmployeeProfileDto
 
 // Dữ liệu Admin gửi lên khi tạo hồ sơ BHXH.
 //
-// Quy tắc chỉ FULL_TIME mới được tạo hồ sơ
+// Quy tắc chỉ FULL TIME mới được tạo hồ sơ
 // sẽ được Service kiểm tra lại.
 public class CreateBhxhEmployeeProfileRequest
 {

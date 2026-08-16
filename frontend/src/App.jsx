@@ -23,6 +23,7 @@ function normalizeRole(value = '') {
 function App() {
   const [pageData, setPageData] = useState({ users: [], roles: [], branches: [] })
   const [loginForm, setLoginForm] = useState({ identifier: '', password: '' })
+  const [showPassword, setShowPassword] = useState(false)
   const [authMode, setAuthMode] = useState('login')
   const [resetForm, setResetForm] = useState({ identifier: '', otp: '', newPassword: '', confirmPassword: '' })
   const [resetMessage, setResetMessage] = useState(null)
@@ -144,6 +145,7 @@ function App() {
     localStorage.removeItem('currentUser')
     localStorage.removeItem('ACCESS_TOKEN')
     setLoginForm({ identifier: '', password: '' })
+    setShowPassword(false)
   }
 
   function handleUserUpdated(updatedUser) {
@@ -201,16 +203,37 @@ function App() {
 
             <div className="auth-field">
               <label htmlFor="password">Mật khẩu</label>
-              <input
-                autoComplete="current-password"
-                className="auth-input"
-                id="password"
-                name="password"
-                onChange={handleLoginChange}
-                placeholder="Nhập password"
-                type="password"
-                value={loginForm.password}
-              />
+              <div className="auth-password-wrap">
+                <input
+                  autoComplete="current-password"
+                  className="auth-input"
+                  id="password"
+                  name="password"
+                  onChange={handleLoginChange}
+                  placeholder="Nhập password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={loginForm.password}
+                />
+                <button
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  aria-pressed={showPassword}
+                  className="auth-password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  type="button"
+                >
+                  {showPassword ? (
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="m3 3 18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5.5 9 8a10.8 10.8 0 0 1-2.1 3.5M6.6 6.6C4.3 8.1 3 10.5 3 12c0 2.5 3.5 8 9 8 1.5 0 2.8-.4 4-1" />
+                    </svg>
+                  ) : (
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M3 12c0-2.5 3.5-8 9-8s9 5.5 9 8-3.5 8-9 8-9-5.5-9-8Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && <div className="auth-error-msg">{error}</div>}
@@ -219,7 +242,7 @@ function App() {
             <button className="auth-submit-btn" disabled={isLoading} type="submit">
               {isLoading ? 'Đang tải...' : 'Đăng Nhập'}
             </button>
-            <button className="auth-link-btn" onClick={() => { setAuthMode('reset'); setError(''); setResetMessage(null) }} type="button">
+            <button className="auth-link-btn" onClick={() => { setAuthMode('reset'); setShowPassword(false); setError(''); setResetMessage(null) }} type="button">
               Quên mật khẩu?
             </button>
           </form>

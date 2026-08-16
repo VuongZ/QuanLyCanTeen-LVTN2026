@@ -80,13 +80,13 @@ public partial class StaffRegistrationService
                 "Bạn chỉ được đăng ký ca làm tại chi nhánh của mình.");
         }
 
-        // FULL_TIME và MATERNITY được tự động xếp lịch,
+        // FULL TIME và MATERNITY được tự động xếp lịch,
         // nên không đăng ký giống PART_TIME.
         if (SalaryWagePolicy.IsFullTimeEquivalent(
                 user.EmploymentType))
         {
             throw new InvalidOperationException(
-                "Nhân viên FULL_TIME hoặc Thai sản được hệ thống " +
+                "Nhân viên FULL TIME hoặc Thai sản được hệ thống " +
                 "tự động xếp vào mọi ca hoạt động trong tuần, " +
                 "không cần đăng ký ca.");
         }
@@ -163,7 +163,7 @@ public partial class StaffRegistrationService
 
         // MaxStaff bao gồm:
         // - 1 vị trí Quản lý.
-        // - Nhân viên FULL_TIME/MATERNITY tự động xếp.
+        // - Nhân viên FULL TIME/MATERNITY tự động xếp.
         // - Nhân viên PART_TIME đăng ký.
         var maxStaff =
             config.MaxStaff.GetValueOrDefault();
@@ -186,7 +186,7 @@ public partial class StaffRegistrationService
 
         // Chỉ đếm REGISTERED.
         // WAITLIST không chiếm vị trí chính thức.
-        // Kể cả khi Quản lý và FULL_TIME đã giữ hết chỗ
+        // Kể cả khi Quản lý và FULL TIME đã giữ hết chỗ
         // (staffSlot = 0), PART_TIME vẫn được đăng ký WAITLIST
         // để có thể thay thế khi nhân viên chính thức nghỉ.
         var registeredCount =

@@ -451,7 +451,7 @@ const selectedSalary = useMemo(() => {
                   <th>Số giờ làm</th>
                   <th>Hệ số lương</th>
                   <th>Loại ngày</th>
-                  <th>Tổng lương ngày</th>
+                  <th>Lương ca</th>
                   <th>Trạng thái</th>
                 </tr>
               </thead>

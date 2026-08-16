@@ -519,7 +519,7 @@ public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branc
 /// Khi chốt:
 /// - Kiểm tra yêu cầu thưởng/phạt.
 /// - Tính lại thưởng, phạt và tổng lương.
-/// - Liên kết khoản đóng BHXH đối với FULL_TIME.
+/// - Liên kết khoản đóng BHXH đối với FULL TIME.
 /// - Lưu phần BHXH nhân viên phải đóng.
 /// - Chuyển trạng thái sang FINALIZED.
 }

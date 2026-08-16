@@ -8,7 +8,7 @@ namespace LuanVanTotNghiep.Services;
 //
 // Service chịu trách nhiệm:
 // - Kiểm tra dữ liệu đầu vào.
-// - Kiểm tra nhân viên FULL_TIME.
+// - Kiểm tra nhân viên FULL TIME.
 // - Kiểm tra trạng thái hồ sơ.
 // - Tính tiền đóng BHXH.
 // - Chuyển Entity sang DTO.
@@ -23,9 +23,9 @@ public partial class SocialInsuranceService
     : ISocialInsuranceService
 {
     // Theo nghiệp vụ của nhóm,
-    // chỉ nhân viên FULL_TIME tham gia BHXH.
+    // chỉ nhân viên FULL TIME tham gia BHXH.
     private const string FullTimeType =
-        "FULL_TIME";
+        "FULL TIME";
 
     // Trạng thái hồ sơ do Admin quản lý.
     private const string PendingStatus =
@@ -135,7 +135,7 @@ public partial class SocialInsuranceService
     // Kiểm tra nhân viên có đủ điều kiện
     // tham gia BHXH theo nghiệp vụ của nhóm hay không.
     //
-    // Chỉ nhân viên FULL_TIME và chưa bị xóa
+    // Chỉ nhân viên FULL TIME và chưa bị xóa
     // mới được tạo hoặc kích hoạt hồ sơ BHXH.
     private static void EnsureFullTimeEmployee(
         NsUser user)
@@ -146,7 +146,7 @@ public partial class SocialInsuranceService
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Chỉ nhân viên FULL_TIME mới được tham gia BHXH.");
+                "Chỉ nhân viên FULL TIME mới được tham gia BHXH.");
         }
 
         if (user.IsDeleted == true)

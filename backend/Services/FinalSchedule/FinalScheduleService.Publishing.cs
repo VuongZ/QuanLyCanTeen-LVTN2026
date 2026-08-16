@@ -67,7 +67,7 @@ public async Task<PublishScheduleResultDto> PublishScheduleAsync(
                     "để thêm vào lịch làm.");
             }
 
-            // FULL_TIME không cần đăng ký ca. Hệ thống sẽ tự động
+            // FULL TIME không cần đăng ký ca. Hệ thống sẽ tự động
             // thêm họ vào mọi ca đang hoạt động trong đợt.
             var fullTimeStaff =
                 await _repo.GetBranchFullTimeStaffAsync(
@@ -207,7 +207,7 @@ public async Task<PublishScheduleResultDto> PublishScheduleAsync(
                             $"{currentDate:dd/MM/yyyy} có MaxStaff=" +
                             $"{config.MaxStaff.GetValueOrDefault()}, " +
                             $"nhưng cần ít nhất {fixedStaffCount} vị trí " +
-                            "cho Quản lý và nhân viên FULL_TIME.");
+                            "cho Quản lý và nhân viên FULL TIME.");
                     }
 
                     var managerKey =
@@ -231,7 +231,7 @@ public async Task<PublishScheduleResultDto> PublishScheduleAsync(
                                 currentDate
                             );
 
-                        // Ghi đè nếu FULL_TIME từng đăng ký thủ công:
+                        // Ghi đè nếu FULL TIME từng đăng ký thủ công:
                         // lịch này vẫn là lịch tự động, không có phiếu nguồn.
                         desiredSchedules[fullTimeKey] =
                             null;

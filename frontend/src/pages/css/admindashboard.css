@@ -578,6 +578,25 @@
   padding: 2px;
 }
 
+.sd-branch-filter {
+  min-width: 170px;
+  max-width: 230px;
+  padding: 8px 32px 8px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #475569;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sd-branch-filter:focus {
+  border-color: #ea580c;
+  background: #fff;
+  outline: none;
+}
+
 .sd-filter-chips {
   display: flex;
   gap: 6px;
@@ -1259,7 +1278,8 @@
   }
 
   /* 👉 ĐÂY LÀ ĐOẠN FIX BỘ LỌC CƠ SỞ CHO ADMIN */
-  .sd-users-toolbar-left select.sd-input-search {
+  .sd-users-toolbar-left select.sd-input-search,
+  .sd-users-toolbar-left .sd-branch-filter {
     width: 100% !important;
     max-width: none !important;
     margin-top: 4px !important; 

@@ -43,10 +43,10 @@ public class SocialInsuranceRepo : ISocialInsuranceRepo
         .AsNoTracking()
 
         // Theo nghiệp vụ của nhóm:
-        // chỉ nhân viên FULL_TIME tham gia BHXH.
+        // chỉ nhân viên FULL TIME tham gia BHXH.
         .Where(user =>
             user.IsDeleted != true &&
-            user.EmploymentType == "FULL_TIME")
+            user.EmploymentType == "FULL TIME")
 
         // Sắp xếp theo tên để Admin dễ tìm.
         .OrderBy(user =>
@@ -227,7 +227,7 @@ public async Task<BhxhEmployeeProfile?>
     return await _context.BhxhEmployeeProfiles
 
         // Nạp thông tin nhân viên để Service kiểm tra
-        // người này vẫn là nhân viên FULL_TIME.
+        // người này vẫn là nhân viên FULL TIME.
         .Include(profile => profile.User)
 
         // Nạp thông tin Admin tạo và cập nhật hồ sơ,
@@ -320,7 +320,7 @@ public async Task<BhxhEmployeeProfile?>
     return await _context.BhxhEmployeeProfiles
 
         // Nạp thông tin nhân viên để Service
-        // tạo khoản đóng và kiểm tra FULL_TIME.
+        // tạo khoản đóng và kiểm tra FULL TIME.
         .Include(profile => profile.User)
 
         .Where(profile =>
@@ -332,9 +332,9 @@ public async Task<BhxhEmployeeProfile?>
             profile.StaffConfirmationStatus ==
                 "CONFIRMED" &&
 
-            // Chỉ FULL_TIME tham gia BHXH.
+            // Chỉ FULL TIME tham gia BHXH.
             profile.User.EmploymentType ==
-                "FULL_TIME" &&
+                "FULL TIME" &&
 
             // Không tính cho nhân viên đã bị xóa.
             profile.User.IsDeleted != true &&

@@ -148,7 +148,7 @@ public async Task<List<CaFinalSchedule>>
     }
 
     /// <summary>
-    /// Lấy các nhân viên FULL_TIME đang hoạt động thuộc chi nhánh.
+    /// Lấy các nhân viên FULL TIME đang hoạt động thuộc chi nhánh.
     /// </summary>
     public async Task<List<NsUser>>
         GetBranchFullTimeStaffAsync(
@@ -161,7 +161,7 @@ public async Task<List<CaFinalSchedule>>
             .Where(user =>
                 user.BranchId == branchId &&
                 user.IsDeleted != true &&
-                (user.EmploymentType == "FULL_TIME" ||
+                (user.EmploymentType == "FULL TIME" ||
                  user.EmploymentType == "MATERNITY") &&
                 user.Role != null &&
                 user.Role.RoleName != null)

@@ -109,7 +109,7 @@ public partial class SocialInsuranceService
         }
 
         // Theo nghiệp vụ của nhóm,
-        // chỉ FULL_TIME tham gia BHXH.
+        // chỉ FULL TIME tham gia BHXH.
         EnsureFullTimeEmployee(user);
 
         var profileExists =
@@ -246,7 +246,7 @@ public partial class SocialInsuranceService
                 "Không tìm thấy hồ sơ BHXH.");
         }
 
-        // Nhân viên phải tiếp tục là FULL_TIME.
+        // Nhân viên phải tiếp tục là FULL TIME.
         EnsureFullTimeEmployee(
             entity.User);
 

@@ -8,7 +8,7 @@ namespace LuanVanTotNghiep.Repositories;
 ///
 /// Repository chỉ chịu trách nhiệm truy vấn và lưu dữ liệu.
 /// Các quy tắc nghiệp vụ như:
-/// - Chỉ FULL_TIME được tham gia.
+/// - Chỉ FULL TIME được tham gia.
 /// - Hồ sơ phải ACTIVE.
 /// - Công thức tính tiền đóng.
 ///
@@ -21,14 +21,14 @@ public interface ISocialInsuranceRepo
     // ========================================================
 
     ///  
-    /// Lấy danh sách nhân viên FULL_TIME chưa bị xóa.
+    /// Lấy danh sách nhân viên FULL TIME chưa bị xóa.
     ///  
     Task<List<NsUser>> GetFullTimeEmployeesAsync();
 
     ///  
     /// Tìm nhân viên theo ID.
     /// Dùng khi kiểm tra nhân viên có tồn tại
-    /// và có phải FULL_TIME hay không.
+    /// và có phải FULL TIME hay không.
     ///  
     Task<NsUser?> GetUserByIdAsync(int userId);
 

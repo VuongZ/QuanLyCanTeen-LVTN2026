@@ -342,15 +342,6 @@ public class SalaryController : ControllerBase
             };
         }).ToList();
 
-        var dailyTotals = result
-            .GroupBy(item => item.WorkDate)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Sum(item => item.TotalSalary));
-
-        foreach (var item in result)
-            item.TotalSalary = dailyTotals[item.WorkDate];
-
         return Ok(result);
     }
 

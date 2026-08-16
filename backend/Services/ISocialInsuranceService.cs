@@ -11,10 +11,10 @@ namespace LuanVanTotNghiep.Services;
 public interface ISocialInsuranceService
 {
     // ========================================================
-    // 1. NHÂN VIÊN FULL_TIME
+    // 1. NHÂN VIÊN FULL TIME
     // ========================================================
 
-    // Lấy danh sách nhân viên FULL_TIME chưa bị xóa.
+    // Lấy danh sách nhân viên FULL TIME chưa bị xóa.
     //
     // Kết quả cho biết:
     // - Nhân viên đã có hồ sơ BHXH hay chưa.
@@ -85,7 +85,7 @@ public interface ISocialInsuranceService
     // Tạo hồ sơ BHXH mới cho nhân viên.
     //
     // Quy tắc:
-    // - Chỉ nhân viên FULL_TIME.
+    // - Chỉ nhân viên FULL TIME.
     // - Mỗi nhân viên có tối đa một hồ sơ.
     // - Mã số BHXH không được trùng.
     // - Hồ sơ mới có trạng thái PENDING.
@@ -142,7 +142,7 @@ public interface ISocialInsuranceService
     // Sinh khoản đóng cho các hồ sơ đủ điều kiện:
     // - Hồ sơ ACTIVE.
     // - Staff đã CONFIRMED.
-    // - Nhân viên vẫn là FULL_TIME.
+    // - Nhân viên vẫn là FULL TIME.
     // - Thời gian hồ sơ giao với tháng được chọn.
     //
     // Khoản đóng mới có trạng thái DRAFT.

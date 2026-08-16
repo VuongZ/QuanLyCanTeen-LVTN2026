@@ -9,7 +9,7 @@ namespace LuanVanTotNghiep.Services;
 ///
 /// Service chịu trách nhiệm:
 /// - Kiểm tra dữ liệu.
-/// - Kiểm tra nhân viên FULL_TIME.
+/// - Kiểm tra nhân viên FULL TIME.
 /// - Tính tiền đóng BHXH.
 /// - Chuyển trạng thái.
 /// - Không xóa cứng dữ liệu.
