@@ -357,7 +357,7 @@ const selectedSalary = useMemo(() => {
       {selectedSalary && isTemporarySalary && (
         <p className="sd-status">
           Đây là bảng lương tạm tính. Tổng giờ, hệ số lương theo ngày,
-          thưởng, phạt và số tiền có thể thay đổi trước khi Manager chốt lương.
+          thưởng, phạt và số tiền có thể thay đổi trước khi Admin chốt lương.
         </p>
       )}
 
@@ -531,23 +531,23 @@ const selectedSalary = useMemo(() => {
               <p>
                 <strong>Trạng thái:</strong>{' '}
                 {(selectedComplaint.status || 'PENDING').toUpperCase() === 'RESOLVED'
-                  ? 'Manager đã phản hồi'
-                  : 'Đang chờ Manager xử lý'}
+                  ? 'Quản lý đã phản hồi'
+                  : 'Đang chờ quản lý xử lý'}
               </p>
               {selectedComplaint.managerResponse && (
                 <p className="sd-complaint-response">
-                  <strong>Phản hồi của Manager:</strong> {selectedComplaint.managerResponse}
+                  <strong>Phản hồi của quản lý:</strong> {selectedComplaint.managerResponse}
                 </p>
               )}
             </div>
-          ) : (selectedSalary.status || '').toUpperCase() === 'FINALIZED' ? (
+          ) : isTemporarySalary ? (
             <form className="sd-complaint-form" onSubmit={submitComplaint}>
               <div className="sd-field">
                 <label>Nội dung khiếu nại</label>
                 <textarea
                   maxLength="1000"
                   onChange={(event) => setComplaintContent(event.target.value)}
-                  placeholder="Mô tả khoản lương, giờ làm, thưởng hoặc phạt cần Manager kiểm tra..."
+                  placeholder="Mô tả khoản lương, giờ làm, thưởng hoặc phạt cần quản lý kiểm tra..."
                   required
                   rows="4"
                   value={complaintContent}
@@ -555,13 +555,13 @@ const selectedSalary = useMemo(() => {
               </div>
               {complaintError && <p className="sd-status sd-status-error">{complaintError}</p>}
               <button className="sd-btn-primary" disabled={complaintSaving || !complaintContent.trim()} type="submit">
-                {complaintSaving ? 'Đang gửi...' : 'Gửi khiếu nại cho Manager'}
+                {complaintSaving ? 'Đang gửi...' : 'Gửi khiếu nại cho quản lý'}
               </button>
             </form>
           ) : (
             <p className="sd-salary-empty">
               {isTemporarySalary
-                ? 'Đây là bảng lương tạm. Bạn có thể gửi khiếu nại sau khi Manager chốt lương.'
+                ? 'Bạn có thể gửi khiếu nại cho bảng lương tạm này trước khi Admin chốt.'
                 : 'Kỳ lương này đã được Admin chốt hoặc đã thanh toán nên không còn nhận khiếu nại mới.'}
             </p>
           )}

@@ -175,6 +175,9 @@ public decimal TotalNetSalary { get; set; }
 
     public int EmployeeCount { get; set; }
 
+    /// <summary>Số khiếu nại lương chưa được phản hồi trong kỳ của cơ sở.</summary>
+    public int PendingComplaintCount { get; set; }
+
     public int? TransferId { get; set; }
 
     public bool IsTransferred { get; set; }

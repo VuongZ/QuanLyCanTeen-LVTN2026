@@ -255,7 +255,7 @@ public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branc
         int branchId,
         int month,
         int year,
-        int managerUserId)
+        int finalizedByUserId)
 {
     if (month < 1 ||
         month > 12 ||
@@ -350,6 +350,21 @@ public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branc
             "thưởng/phạt đang chờ Admin duyệt.");
     }
 
+    var hasPendingComplaint = await _context.LuongSalaryComplaints
+        .AsNoTracking()
+        .AnyAsync(complaint =>
+            complaint.User.BranchId == branchId &&
+            complaint.Salary.Month == month &&
+            complaint.Salary.Year == year &&
+            complaint.Status == "PENDING");
+
+    if (hasPendingComplaint)
+    {
+        throw new InvalidOperationException(
+            "Cơ sở vẫn còn khiếu nại lương chưa được phản hồi. " +
+            "Vui lòng xử lý tất cả khiếu nại trước khi chốt lương.");
+    }
+
     var rule =
         await _context.LuongSalaryRules
             .AsNoTracking()
@@ -417,7 +432,7 @@ public async Task<SalaryRuleAdjustmentPageDto> GetRuleAdjustmentsAsync(int branc
             DateTime.Now;
 
         salary.FinalizedByUserId =
-            managerUserId;
+            finalizedByUserId;
     }
 
     await _context.SaveChangesAsync();

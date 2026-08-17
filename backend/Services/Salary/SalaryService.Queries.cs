@@ -275,6 +275,29 @@ EmployeeCount =
             .Distinct()
             .ToList();
 
+        var pendingComplaintCounts = await _context.LuongSalaryComplaints
+            .AsNoTracking()
+            .Where(complaint =>
+                complaint.Status == "PENDING" &&
+                complaint.User.BranchId != null &&
+                branchIds.Contains(complaint.User.BranchId.Value))
+            .GroupBy(complaint => new
+            {
+                BranchId = complaint.User.BranchId!.Value,
+                complaint.Salary.Month,
+                complaint.Salary.Year
+            })
+            .Select(group => new
+            {
+                group.Key.BranchId,
+                group.Key.Month,
+                group.Key.Year,
+                Count = group.Count()
+            })
+            .ToDictionaryAsync(
+                item => (item.BranchId, item.Month, item.Year),
+                item => item.Count);
+
         var managers = await _context.NsUsers
             .AsNoTracking()
             .Include(u => u.Role)
@@ -312,6 +335,13 @@ EmployeeCount =
 
         foreach (var summary in summaries)
         {
+            if (summary.BranchId != null && pendingComplaintCounts.TryGetValue(
+                    (summary.BranchId.Value, summary.Month, summary.Year),
+                    out var pendingComplaintCount))
+            {
+                summary.PendingComplaintCount = pendingComplaintCount;
+            }
+
             if (summary.BranchId == null || !managerByBranch.TryGetValue(summary.BranchId.Value, out var manager))
                 continue;
 

@@ -200,9 +200,9 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
       const updatedRule = await updateSalaryRule(payload);
       setRule(updatedRule);
       await loadAdjustments();
-      setMessage({ type: 'success', text: 'Đã lưu salary rule cho cơ sở.' });
+      setMessage({ type: 'success', text: 'Đã lưu Quy Tắc Lương cho cơ sở.' });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể lưu salary rule.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể lưu Quy Tắc Lương.' });
     } finally {
       setSavingRule(false);
     }
@@ -292,7 +292,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
 
       <div className="sd-card">
         <div className="sd-card-header">
-          <p className="sd-eyebrow">Salary rule</p>
+          <p className="sd-eyebrow">Quy Tắc Lương</p>
           <h2>Quy định thưởng phạt cơ sở</h2>
         </div>
         {isAdmin && (
@@ -316,7 +316,7 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
             <SalaryRuleMetric label="Phạt vắng ca" value={formatMoney(rule.absentPenalty)} />
           </div>
         ) : (
-          <p className="sd-status sd-status-error">Cơ sở này chưa có salary rule.</p>
+          <p className="sd-status sd-status-error">Cơ sở này chưa có Quy Tắc Lương.</p>
         )}
         {isAdmin && selectedBranchId && (
           <form className="sd-modal-grid" onSubmit={handleRuleSubmit}>
@@ -343,14 +343,14 @@ export function ManagerSalaryRuleTab({ user, isAdmin = false, branches = [] }) {
             <div className="sd-field">
               <label>&nbsp;</label>
               <button className="sd-btn-primary" disabled={savingRule} type="submit">
-                {savingRule ? 'Đang lưu...' : 'Lưu salary rule'}
+                {savingRule ? 'Đang lưu...' : 'Lưu Quy Tắc Lương'}
               </button>
             </div>
           </form>
         )}
       </div>
 
-      <div className="sd-users-toolbar">
+      <div className="sd-users-toolbar sd-salary-rule-toolbar">
         <div className="sd-users-toolbar-left">
           <div className="sd-field sd-salary-filter">
             <label>Xem tháng</label>

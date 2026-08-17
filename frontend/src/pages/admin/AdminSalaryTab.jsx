@@ -87,9 +87,37 @@ function getNetSalary(item) {
   );
 }
 
+function buildBranchSummaries(items) {
+  const summaries = new Map();
+
+  items.forEach((item) => {
+    if (item.branchId == null) return;
+    const key = `${item.branchId}-${periodKey(item)}`;
+    const current = summaries.get(key) || {
+      branchId: item.branchId,
+      branchName: item.branchName || `Cơ sở ${item.branchId}`,
+      month: item.month,
+      year: item.year,
+      employeeIds: new Set(),
+      totalSalary: 0,
+      totalNetSalary: 0,
+      pendingComplaintCount: 0,
+    };
+
+    current.employeeIds.add(item.userId);
+    current.totalSalary += Number(item.totalSalary || 0);
+    current.totalNetSalary += getNetSalary(item);
+    summaries.set(key, current);
+  });
+
+  return Array.from(summaries.values())
+    .map(({ employeeIds, ...summary }) => ({ ...summary, employeeCount: employeeIds.size }))
+    .sort((a, b) => `${b.year}-${String(b.month).padStart(2, '0')}`.localeCompare(`${a.year}-${String(a.month).padStart(2, '0')}`));
+}
+
 function statusLabel(status) {
   if ((status || '').toUpperCase() === 'PAID') return 'Đã thanh toán';
-  if ((status || '').toUpperCase() === 'FINALIZED') return 'Manager đã chốt - chờ trả';
+  if ((status || '').toUpperCase() === 'FINALIZED') return 'Admin đã chốt - chờ trả';
   if ((status || '').toUpperCase() === 'CANCELLED') return 'Đã huỷ';
   return 'Chưa thanh toán';
 }
@@ -120,10 +148,12 @@ function InfoRow({ label, value }) {
 
 export function AdminSalaryTab({ isAdmin = true }) {
   const [items, setItems] = useState([]);
+  const [branchSummaries, setBranchSummaries] = useState([]);
   const [query, setQuery] = useState('');
   const [viewMode, setViewMode] = useState('CURRENT');
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedPeriod, setSelectedPeriod] = useState('ALL');
+  const [showEmployeeList, setShowEmployeeList] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -156,6 +186,10 @@ export function AdminSalaryTab({ isAdmin = true }) {
       setItems(nextItems);
       setPendingAdjustments(Array.isArray(requests) ? requests : []);
       setComplaints(Array.isArray(complaintData) ? complaintData : []);
+      setBranchSummaries(isAdmin ? buildBranchSummaries(nextItems) : []);
+      if (isAdmin && selectedPeriod === 'ALL' && nextItems[0]) {
+        setSelectedPeriod(periodKey(nextItems[0]));
+      }
       if (selectedPeriod !== 'ALL' && !nextItems.some((item) => periodKey(item) === selectedPeriod)) {
         setSelectedPeriod(nextItems[0] ? periodKey(nextItems[0]) : 'ALL');
       }
@@ -179,9 +213,14 @@ export function AdminSalaryTab({ isAdmin = true }) {
           isAdmin ? Promise.resolve([]) : getBranchSalaryComplaints(),
         ]);
         if (!ignore) {
-          setItems(Array.isArray(data) ? data : []);
+          const nextItems = Array.isArray(data) ? data : [];
+          setItems(nextItems);
           setPendingAdjustments(Array.isArray(requests) ? requests : []);
           setComplaints(Array.isArray(complaintData) ? complaintData : []);
+          setBranchSummaries(isAdmin ? buildBranchSummaries(nextItems) : []);
+          if (isAdmin && selectedPeriod === 'ALL' && nextItems[0]) {
+            setSelectedPeriod(periodKey(nextItems[0]));
+          }
         }
       } catch (err) {
         if (!ignore) setMessage({ type: 'error', text: err.response?.data?.message || 'Không tải được dữ liệu lương.' });
@@ -192,6 +231,26 @@ export function AdminSalaryTab({ isAdmin = true }) {
     load();
     return () => { ignore = true; };
   }, [isAdmin]);
+
+  const visibleBranchSummaries = useMemo(
+    () => {
+      const keyword = query.trim().toLowerCase();
+      const matchingItems = items.filter((item) => {
+        const isHistory = (item.status || '').toUpperCase() === 'PAID';
+        if ((viewMode === 'HISTORY') !== isHistory) return false;
+        if (selectedPeriod !== 'ALL' && periodKey(item) !== selectedPeriod) return false;
+        const values = [item.fullName, item.username, item.branchName, item.bankName, item.bankAccountNumber];
+        return !keyword || values.some((value) => String(value || '').toLowerCase().includes(keyword));
+      });
+      return buildBranchSummaries(matchingItems);
+    },
+    [items, query, viewMode, selectedPeriod],
+  );
+
+  const selectedBranchPeriodSummary = useMemo(
+    () => visibleBranchSummaries.find((item) => String(item.branchId) === selectedBranch),
+    [visibleBranchSummaries, selectedBranch],
+  );
 
   const periodOptions = useMemo(() => {
     const uniquePeriods = new Map();
@@ -337,6 +396,11 @@ export function AdminSalaryTab({ isAdmin = true }) {
     selectedPeriod
   ]);
 
+  const branchCount = useMemo(
+    () => new Set(branchSummaries.map((item) => item.branchId).filter((id) => id != null)).size,
+    [branchSummaries],
+  );
+
   async function confirmPayment() {
     if (!selected) return;
     setSaving(true);
@@ -354,18 +418,22 @@ export function AdminSalaryTab({ isAdmin = true }) {
   }
 
   async function confirmBranchFinalization() {
-    if (isAdmin || selectedPeriod === 'ALL') {
-      setMessage({ type: 'error', text: 'Vui lòng chọn một kỳ lương cụ thể trước khi chốt.' });
+    if (!isAdmin || selectedBranch === 'ALL' || selectedPeriod === 'ALL') {
+      setMessage({ type: 'error', text: 'Vui lòng chọn một cơ sở và kỳ lương cụ thể trước khi chốt.' });
+      return;
+    }
+    if (Number(selectedBranchPeriodSummary?.pendingComplaintCount || 0) > 0) {
+      setMessage({ type: 'error', text: 'Cơ sở vẫn còn khiếu nại lương chưa được phản hồi.' });
       return;
     }
     const [year, month] = selectedPeriod.split('-').map(Number);
     setBulkFinalizing(true);
     setMessage(null);
     try {
-      const updated = await finalizeBranchSalaryPeriod(month, year);
+      const updated = await finalizeBranchSalaryPeriod(Number(selectedBranch), month, year);
       const updatedMap = new Map((Array.isArray(updated) ? updated : []).map((item) => [item.id, item]));
       setItems((current) => current.map((item) => updatedMap.get(item.id) || item));
-      setMessage({ type: 'success', text: `Đã chốt lương toàn bộ nhân viên cơ sở tháng ${month}/${year}.` });
+      setMessage({ type: 'success', text: `Admin đã chốt lương toàn bộ nhân viên cơ sở tháng ${month}/${year}.` });
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Không thể chốt lương toàn cơ sở.' });
     } finally {
@@ -441,13 +509,11 @@ export function AdminSalaryTab({ isAdmin = true }) {
     </span>
 
     <h3>
-      {summary.count}
+      {isAdmin ? branchCount : summary.count}
     </h3>
 
     <p>
-      {isAdmin
-        ? 'Bảng lương toàn hệ thống'
-        : 'Bảng lương cơ sở'}
+      {isAdmin ? 'Cơ sở có bảng lương' : 'Bảng lương cơ sở'}
     </p>
   </div>
 
@@ -507,6 +573,110 @@ export function AdminSalaryTab({ isAdmin = true }) {
     </p>
   </div>
 </div>
+
+      {isAdmin && (
+        <div className="sd-card sd-branch-salary-summary-card">
+          <div className="sd-card-header">
+            <div>
+              <p className="sd-eyebrow">Tổng lương theo cơ sở</p>
+              <h2>Chọn một cơ sở để xem lương từng nhân viên</h2>
+            </div>
+          </div>
+          <div className="sd-users-toolbar sd-salary-summary-toolbar">
+            <div className="sd-users-toolbar-left">
+              <div className="sd-search-wrap">
+                <span className="sd-search-icon">⌕</span>
+                <input className="sd-input-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm cơ sở, nhân viên, ngân hàng..." />
+                {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
+              </div>
+              <div className="sd-salary-view-filter">
+                <label htmlFor="salary-view">Hiển thị</label>
+                <select id="salary-view" value={viewMode} onChange={(event) => { setViewMode(event.target.value); setShowEmployeeList(false); }}>
+                  <option value="CURRENT">Chờ trả</option>
+                  <option value="HISTORY">Lịch sử trả lương</option>
+                </select>
+              </div>
+              {periodOptions.length > 0 && (
+                <div className="sd-salary-period-filter">
+                  <label htmlFor="salary-period">Kỳ lương</label>
+                  <select id="salary-period" value={selectedPeriod} onChange={(event) => { setSelectedPeriod(event.target.value); setShowEmployeeList(false); setSelectedBranch('ALL'); }}>
+                    <option value="ALL">Tất cả các tháng</option>
+                    {periodOptions.map((period) => <option key={period.key} value={period.key}>Tháng {period.month}/{period.year}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="sd-salary-toolbar-actions">
+              <button className="sd-btn-primary" disabled={bulkFinalizing || selectedBranch === 'ALL' || selectedPeriod === 'ALL' || Number(selectedBranchPeriodSummary?.pendingComplaintCount || 0) > 0} onClick={confirmBranchFinalization} type="button">
+                {bulkFinalizing ? 'Đang chốt...' : 'Admin chốt lương cơ sở'}
+              </button>
+              <button className="sd-btn-ghost" onClick={reload} type="button">Làm mới</button>
+            </div>
+          </div>
+          <div className="sd-table-wrap">
+            <table className="sd-table sd-branch-salary-summary-table">
+              <thead><tr><th>Cơ sở</th><th>Kỳ lương</th><th>Nhân viên</th><th>Tổng lương</th><th>Thực nhận</th><th>Khiếu nại chờ phản hồi</th></tr></thead>
+              <tbody>
+                {visibleBranchSummaries.length === 0 ? <tr><td colSpan={6} className="sd-td-empty">Chưa có dữ liệu lương theo bộ lọc đã chọn.</td></tr> : visibleBranchSummaries.map((item) => (
+                  <tr className="sd-tr sd-branch-salary-summary-row" key={`${item.branchId}-${periodKey(item)}`} role="button" tabIndex={0} onClick={() => { setSelectedBranch(String(item.branchId)); setSelectedPeriod(periodKey(item)); setShowEmployeeList(true); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedBranch(String(item.branchId)); setSelectedPeriod(periodKey(item)); setShowEmployeeList(true); } }}>
+                    <td><strong>{item.branchName || 'Chưa gán cơ sở'}</strong></td>
+                    <td>{item.month}/{item.year}</td>
+                    <td>{item.employeeCount}</td>
+                    <td>{money(item.totalSalary)}</td>
+                    <td>{money(item.totalNetSalary)}</td>
+                    <td>{item.pendingComplaintCount > 0 ? <span className="sd-status-pill pending">{item.pendingComplaintCount} chờ phản hồi</span> : <span className="sd-status-pill approved">Đã xử lý</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {(!isAdmin || showEmployeeList) && (
+        <>
+          {!isAdmin && (
+            <div className="sd-users-toolbar sd-manager-salary-toolbar">
+              <div className="sd-users-toolbar-left">
+                <div className="sd-search-wrap">
+                  <span className="sd-search-icon">⌕</span>
+                  <input className="sd-input-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm nhân viên, ngân hàng hoặc kỳ lương..." />
+                  {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
+                </div>
+                <div className="sd-salary-view-filter">
+                  <label htmlFor="manager-salary-view">Hiển thị</label>
+                  <select id="manager-salary-view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
+                    <option value="CURRENT">Chờ trả</option>
+                    <option value="HISTORY">Lịch sử trả lương</option>
+                  </select>
+                </div>
+                {periodOptions.length > 0 && (
+                  <div className="sd-salary-period-filter">
+                    <label htmlFor="manager-salary-period">Kỳ lương</label>
+                    <select id="manager-salary-period" value={selectedPeriod} onChange={(event) => setSelectedPeriod(event.target.value)}>
+                      <option value="ALL">Tất cả các tháng</option>
+                      {periodOptions.map((period) => <option key={period.key} value={period.key}>Tháng {period.month}/{period.year}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="sd-salary-toolbar-actions">
+                <button className="sd-btn-ghost" onClick={reload} type="button">Làm mới</button>
+              </div>
+            </div>
+          )}
+          {isAdmin && (
+            <div className="sd-salary-employee-list-header">
+              <div>
+                <p className="sd-eyebrow">Chi tiết lương cơ sở</p>
+                <h2>{selectedBranchPeriodSummary?.branchName || 'Danh sách nhân viên'}</h2>
+              </div>
+              <button className="sd-btn-ghost" onClick={() => { setShowEmployeeList(false); setSelectedBranch('ALL'); }} type="button">Quay lại tổng quan</button>
+            </div>
+          )}
+          <SalaryEmployeeTable history={viewMode === 'HISTORY'} isAdmin={isAdmin} items={filtered} loading={loading} onSelect={openSalaryDetail} />
+        </>
+      )}
 
       {isAdmin && (
         <div className="sd-card sd-adjustment-approval-card">
@@ -607,60 +777,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
         </div>
       )}
 
-      <div className="sd-users-toolbar">
-        <div className="sd-users-toolbar-left">
-          <div className="sd-search-wrap">
-            <span className="sd-search-icon">⌕</span>
-            <input className="sd-input-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm nhân viên, cơ sở, ngân hàng hoặc kỳ lương..." />
-            {query && <button className="sd-search-clear" onClick={() => setQuery('')} type="button">✕</button>}
-          </div>
-          <div className="sd-filter-chips">
-            <button className={`sd-filter-chip ${viewMode === 'CURRENT' ? 'active' : ''}`} onClick={() => setViewMode('CURRENT')} type="button">Chờ trả</button>
-            <button className={`sd-filter-chip ${viewMode === 'HISTORY' ? 'active' : ''}`} onClick={() => setViewMode('HISTORY')} type="button">Lịch sử trả lương</button>
-          </div>
-          {isAdmin && branchOptions.length > 0 && (
-            <div className="sd-salary-period-filter sd-salary-branch-filter">
-              <label htmlFor="salary-branch">Cơ sở</label>
-              <select
-                id="salary-branch"
-                onChange={(event) => setSelectedBranch(event.target.value)}
-                value={selectedBranch}
-              >
-                <option value="ALL">Tất cả cơ sở</option>
-                {branchOptions.map((branch) => (
-                  <option key={branch.id} value={branch.id}>{branch.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          {periodOptions.length > 0 && (
-            <div className="sd-salary-period-filter">
-              <label htmlFor="salary-period">Kỳ lương</label>
-              <select id="salary-period" value={selectedPeriod} onChange={(event) => setSelectedPeriod(event.target.value)}>
-                <option value="ALL">Tất cả các tháng</option>
-                {periodOptions.map((period) => <option key={period.key} value={period.key}>Tháng {period.month}/{period.year}</option>)}
-              </select>
-            </div>
-          )}
-        </div>
-        <div className="sd-salary-toolbar-actions">
-          {!isAdmin && (
-            <button
-              className="sd-btn-primary"
-              disabled={bulkFinalizing || selectedPeriod === 'ALL'}
-              onClick={confirmBranchFinalization}
-              type="button"
-            >
-              {bulkFinalizing ? 'Đang chốt...' : 'Chốt lương cả cơ sở'}
-            </button>
-          )}
-          <button className="sd-btn-ghost" onClick={reload} type="button">Làm mới</button>
-        </div>
-      </div>
-
       {message && <p className={`sd-status sd-status-${message.type}`}>{message.text}</p>}
-      <SalaryEmployeeTable history={viewMode === 'HISTORY'} isAdmin={isAdmin} items={filtered} loading={loading} onSelect={openSalaryDetail} />
-
       {selected && (
         <div className="sd-overlay" onClick={() => setSelected(null)}>
           <div className="sd-modal sd-salary-pay-modal sd-modal--wide" onClick={(event) => event.stopPropagation()}>
@@ -846,7 +963,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
   selected.employmentType || ''
 ).toUpperCase() === 'FULL TIME' ? (
   <p className="salary-insurance-note salary-insurance-note--empty">
-    Khi Manager chốt lương, hệ thống sẽ tự tạo và liên kết
+    Khi Admin chốt lương, hệ thống sẽ tự tạo và liên kết
     khoản đóng BHXH tháng {selected.month}/{selected.year}.
     Hồ sơ BHXH phải đang ACTIVE và có tỷ lệ còn hiệu lực.
   </p>
@@ -857,7 +974,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
   </p>
 )}
 
-                  {selected.finalizedAt && <p className="sd-salary-finalized-note">Chốt lúc {date(selected.finalizedAt)} bởi {selected.finalizedByName || 'Manager'}</p>}
+                  {selected.finalizedAt && <p className="sd-salary-finalized-note">Chốt lúc {date(selected.finalizedAt)} bởi {selected.finalizedByName || 'Admin'}</p>}
 
                   {detailLoading ? <p className="sd-salary-empty">Đang tải chi tiết lương...</p> : (
                     <>
@@ -909,7 +1026,7 @@ export function AdminSalaryTab({ isAdmin = true }) {
                   <InfoRow label="Nội dung" value={complaintTarget.content} />
                 </dl>
                 <div className="sd-field">
-                  <label>Phản hồi của Manager</label>
+                  <label>Phản hồi của quản lý</label>
                   <textarea
                     maxLength="1000"
                     onChange={(event) => setComplaintResponse(event.target.value)}
@@ -1007,7 +1124,7 @@ function SalaryEmployeeTable({
                   ? 'Chưa có lịch sử trả lương.'
                   : (
                       isAdmin
-                        ? 'Chưa có bảng lương nào được Manager chốt.'
+                        ? 'Chưa có bảng lương nào được Admin chốt.'
                         : 'Không có bảng lương đang chờ trả.'
                     )}
               </td>

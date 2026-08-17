@@ -262,7 +262,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
       case 'forgotCheckout': return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' }
       case 'shiftDelegation': return { eyebrow: 'Phân quyền', title: 'Ủy quyền trưởng ca' }
       case 'salaryRules': return isAdmin
-        ? { eyebrow: 'Lương', title: 'Salary rule theo cơ sở' }
+        ? { eyebrow: 'Lương', title: 'Quy Tắc Lương theo cơ sở' }
         : { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
@@ -299,10 +299,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     NAV_ITEMS.push({ id: 'users', icon: '👥', label: 'Nhân viên' })
     NAV_ITEMS.push({ id: 'branches', icon: '🏢', label: 'Cơ sở' })
     NAV_ITEMS.push({ id: 'systemSchedule', icon: '🗓️', label: 'Lịch các cơ sở' })
-    NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Salary rule' })
+    NAV_ITEMS.push({ id: 'salaryRules', icon: '⚖', label: 'Quy Tắc Lương' })
     NAV_ITEMS.push({ id: 'salaries', icon: '💵', label: 'Quản lý lương' })
     NAV_ITEMS.push({id: 'socialInsurance',icon: '🛡️',label: 'Bảo hiểm xã hội'});
-    NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp & SP' })
+    NAV_ITEMS.push({ id: 'suppliers', icon: '🏭', label: 'Nhà cung cấp Và Sán Phẩm' })
     NAV_ITEMS.push({ id: 'inventoryReport', icon: '📦', label: 'Tồn kho toàn cục' })// Admin xem tồn kho toàn hệ thống
     NAV_ITEMS.push({ id: 'frontStock', icon: '🛒', label: 'Tồn quầy toàn cục' })
     NAV_ITEMS.push({ id: 'shiftClosingReports', icon: '📋', label: 'Báo cáo kết ca toàn cục' });

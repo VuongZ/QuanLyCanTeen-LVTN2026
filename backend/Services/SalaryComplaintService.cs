@@ -26,8 +26,8 @@ public class SalaryComplaintService(AppDbContext context)
             ?? throw new KeyNotFoundException("Không tìm thấy bảng lương.");
 
         var salaryStatus = (salary.Status ?? "PENDING").ToUpperInvariant();
-        if (salaryStatus != "FINALIZED")
-            throw new InvalidOperationException("Chỉ có thể khiếu nại bảng lương đã được Manager chốt và chưa thanh toán.");
+        if (salaryStatus != "PENDING")
+            throw new InvalidOperationException("Chỉ có thể khiếu nại bảng lương tạm tính trước khi Admin chốt.");
 
         var exists = await context.LuongSalaryComplaints
             .AnyAsync(c => c.SalaryId == salaryId);

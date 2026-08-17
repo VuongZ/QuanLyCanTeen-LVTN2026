@@ -160,7 +160,7 @@ public partial class SalaryService
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Manager phải chốt bảng lương " +
+                "Admin phải chốt bảng lương " +
                 "trước khi xác nhận đã trả.");
         }
 
@@ -190,24 +190,6 @@ public partial class SalaryService
             throw new InvalidOperationException(
                 "Nhân viên đang có khiếu nại lương " +
                 "chưa được xử lý.");
-        }
-
-        // Manager chỉ được xác nhận đã trả lương
-        // sau khi Admin đã chuyển quỹ cho đúng cơ sở
-        // và kỳ lương.
-        var hasTransferredSalaryFund =
-            await _context.LuongSalaryTransfers
-                .AsNoTracking()
-                .AnyAsync(transfer =>
-                    transfer.BranchId == branchId &&
-                    transfer.Month == salary.Month &&
-                    transfer.Year == salary.Year);
-
-        if (!hasTransferredSalaryFund)
-        {
-            throw new InvalidOperationException(
-                "Admin chưa xác nhận chuyển quỹ lương " +
-                "cho cơ sở.");
         }
 
         salary.Status =

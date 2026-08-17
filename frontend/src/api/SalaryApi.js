@@ -45,14 +45,14 @@ export async function getSalaryWorkDetails(userId, month, year) {
   return response.data;
 }
 
-export async function finalizeSalary(salaryId) {
-  const response = await axios.put(`${BASE_URL}/${salaryId}/finalize`);
+export async function getBranchSalarySummaries() {
+  const response = await axios.get(`${BASE_URL}/branch-summaries`);
   return response.data;
 }
 
-export async function finalizeBranchSalaryPeriod(month, year) {
+export async function finalizeBranchSalaryPeriod(branchId, month, year) {
   const response = await axios.put(
-    `${BASE_URL}/branch/period/${year}/${month}/finalize`,
+    `${BASE_URL}/branch/${branchId}/period/${year}/${month}/finalize`,
   );
   return response.data;
 }

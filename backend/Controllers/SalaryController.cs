@@ -36,6 +36,15 @@ public class SalaryController : ControllerBase
         return Ok(await _salaryService.GetAllAsync());
     }
 
+    [HttpGet("branch-summaries")]
+    public async Task<IActionResult> GetBranchSummaries()
+    {
+        if (!IsAdmin())
+            return Forbid();
+
+        return Ok(await _salaryService.GetBranchSummariesAsync());
+    }
+
     [HttpGet("branch")]
     public async Task<IActionResult> GetBranchSalaries()
     {
@@ -389,10 +398,11 @@ public class SalaryController : ControllerBase
                     s.UserId == userId
                     && s.Month == month.Value
                     && s.Year == year.Value
-                    && ((s.Status ?? "").ToUpper() == "FINALIZED"
+                    && ((s.Status ?? "").ToUpper() == "PENDING"
+                        || (s.Status ?? "").ToUpper() == "FINALIZED"
                         || (s.Status ?? "").ToUpper() == "PAID"));
             if (!salaryIsVisible)
-                return NotFound(new { message = "Bảng lương chưa được Manager chốt." });
+                return NotFound(new { message = "Không tìm thấy bảng lương trong kỳ đã chọn." });
         }
 
         return Ok(await _salaryService.GetAdjustmentHistoryAsync(userId, month, year));
@@ -629,52 +639,22 @@ public class SalaryController : ControllerBase
         return Ok(salary);
     }
 
-    [HttpPut("{salaryId}/finalize")]
-    public async Task<IActionResult> FinalizeSalary(int salaryId)
+    [HttpPut("branch/{branchId}/period/{year}/{month}/finalize")]
+    public async Task<IActionResult> FinalizeBranchPeriodByAdmin(
+        int branchId,
+        int year,
+        int month)
     {
         var currentUser = await GetCurrentUserAsync();
         if (currentUser == null)
             return Unauthorized(new { message = "Không xác định được người dùng." });
-
-        if (!IsManager())
+        if (!IsAdmin())
             return Forbid();
-
-        if (currentUser.BranchId == null)
-            return BadRequest(new { message = "Tài khoản quản lý chưa được gắn cơ sở." });
-
-        try
-        {
-            var salary = await _salaryService.FinalizeAsync(
-                salaryId,
-                currentUser.BranchId.Value,
-                currentUser.Id);
-
-            if (salary == null)
-                return NotFound(new { message = "Không tìm thấy bảng lương trong cơ sở của bạn." });
-
-            return Ok(salary);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpPut("branch/period/{year}/{month}/finalize")]
-    public async Task<IActionResult> FinalizeBranchPeriod(int year, int month)
-    {
-        var currentUser = await GetCurrentUserAsync();
-        if (currentUser == null)
-            return Unauthorized(new { message = "Không xác định được người dùng." });
-        if (!IsManager())
-            return Forbid();
-        if (currentUser.BranchId == null)
-            return BadRequest(new { message = "Tài khoản Manager chưa được gắn cơ sở." });
 
         try
         {
             var salaries = await _salaryService.FinalizeBranchPeriodAsync(
-                currentUser.BranchId.Value,
+                branchId,
                 month,
                 year,
                 currentUser.Id);
