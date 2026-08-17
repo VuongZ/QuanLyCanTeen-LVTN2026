@@ -130,28 +130,10 @@ export function StaffDashboard({
           title: 'Giờ làm & lương'
         };
 
-      case 'socialInsurance':
-        return {
-          eyebrow: 'Phúc lợi',
-          title: 'Bảo hiểm xã hội'
-        };
-
       case 'inventory':
         return {
           eyebrow: 'Kho hàng',
           title: 'Tra cứu tồn kho'
-        };
-
-      case 'shiftClosing':
-        return {
-          eyebrow: 'Báo cáo cuối ca',
-          title: 'Báo cáo kết ca'
-        };
-
-      case 'forgotCheckout':
-        return {
-          eyebrow: 'Chấm công',
-          title: 'Xử lý quên checkout'
         };
 
       case 'shiftDelegation':

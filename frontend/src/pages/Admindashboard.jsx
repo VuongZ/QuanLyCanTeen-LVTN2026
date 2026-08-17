@@ -176,7 +176,10 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   function handleFormChange(e) {
     const { checked, name, type, value } = e.target
     setForm((f) => {
-      const next = { ...f, [name]: type === 'checkbox' ? checked : value }
+      const fieldValue = name === 'phoneNumber'
+        ? value.replace(/\D/g, '').slice(0, 10)
+        : value
+      const next = { ...f, [name]: type === 'checkbox' ? checked : fieldValue }
       if (name === 'branchId') { const b = branches.find((b) => String(b.id) === value); next.branchName = b?.name || b?.branchName || '' }
       if (name === 'roleId') { const r = roles.find((r) => String(r.id) === value); next.roleName = r?.roleName || '' }
       if (name === 'salaryCoefficient') next.salaryCoefficientIsManual = true
@@ -197,6 +200,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
   async function handleSaveAdd() {
     if (!form.email?.trim()) return setFormErr('Vui lòng nhập email để gửi mật khẩu cho nhân viên')
     if (!form.fullName) return setFormErr('Vui lòng nhập họ tên nhân viên')
+    if (form.phoneNumber && !/^\d{10}$/.test(form.phoneNumber)) return setFormErr('Số điện thoại phải gồm đúng 10 chữ số')
     setSaving(true); setFormErr('')
     try {
       const res = await axios.post('/api/User', form)
@@ -254,22 +258,13 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     switch (activeTab) {
       case 'overview': return { eyebrow: 'Hệ thống', title: 'Tổng quan' }
       case 'users': return { eyebrow: 'Quản lý', title: selectedUser ? 'Hồ sơ nhân viên' : 'Nhân sự' }
-      case 'account': return { eyebrow: 'Cài đặt', title: 'Tài khoản' }
       case 'branches': return { eyebrow: 'Hệ thống', title: 'Quản lý Cơ sở' }
       case 'periods': return { eyebrow: 'Lịch trình', title: 'Đợt đăng ký ca' }
-      case 'scanQr': return { eyebrow: 'Chấm công', title: 'Quét QR nhân viên' }
-      case 'supplementalAttendance': return { eyebrow: 'Chấm công', title: isAdmin ? 'Duyệt chấm công bổ sung' : 'Chấm công bổ sung' }
-      case 'forgotCheckout': return { eyebrow: 'Chấm công', title: 'Xử lý quên checkout' }
-      case 'shiftDelegation': return { eyebrow: 'Phân quyền', title: 'Ủy quyền trưởng ca' }
       case 'salaryRules': return isAdmin
         ? { eyebrow: 'Lương', title: 'Quy Tắc Lương theo cơ sở' }
         : { eyebrow: 'Lương', title: 'Thưởng phạt nhân viên' }
       case 'systemSchedule': return { eyebrow: 'Giám sát', title: 'Lịch làm các cơ sở' }
       case 'inventory': return { eyebrow: "Kho hàng", title: 'Nhập kho hàng hóa' }
-      case 'inventoryReport': return isAdmin
-        ? { eyebrow: 'Báo cáo kho', title: 'Tồn kho toàn hệ thống' }
-        : { eyebrow: 'Báo cáo kho', title: 'Tồn kho cơ sở' }
-      case 'suppliers': return { eyebrow: 'Quản trị', title: 'Nhà cung cấp & Sản phẩm' }
       case 'salaries': return isAdmin
         ? { eyebrow: 'Tài chính', title: 'Tổng lương theo cơ sở' }
         : { eyebrow: 'Tài chính', title: 'Trả lương nhân viên' }
@@ -278,15 +273,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
     title: 'Bảo hiểm xã hội'
   };
 
-      case 'frontStock':
-        return isAdmin
-          ? { eyebrow: 'Tồn quầy', title: 'Tồn quầy toàn hệ thống' }
-          : { eyebrow: 'Tồn quầy', title: 'Tồn quầy cơ sở' };
-
           case 'shiftClosingReports':
-  return isAdmin
-    ? { eyebrow: 'Báo cáo kết ca', title: 'Báo cáo kết ca toàn hệ thống' }
-    : { eyebrow: 'Báo cáo kết ca', title: 'Báo cáo kết ca cơ sở' };
       default: return { eyebrow: '', title: '' }
     }
   }
@@ -376,7 +363,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
             </div>
           </div>
 
-          <div className="sd-content">
+          <div className="sd-c    ontent">
             {/* THỐNG KÊ (Giữ lại trong file chính vì liên kết với user data trực tiếp) */}
             {activeTab === 'overview' && isAdmin && (
               <div className="sd-profile-layout">
@@ -609,7 +596,7 @@ export function AdminDashboard({ onLogout, onUserUpdated, roles, user, users: in
               <div className="sd-modal-grid">
                 <div className="sd-field"><label>Họ và tên *</label><input name="fullName" value={form.fullName} onChange={handleFormChange} /></div>
                 <div className="sd-field"><label>{modal === 'add' ? 'Email *' : 'Email'}</label><input name="email" type="email" value={form.email || ''} onChange={handleFormChange} /></div>
-                <div className="sd-field"><label>SĐT</label><input name="phoneNumber" value={form.phoneNumber || form.phone || ''} onChange={handleFormChange} /></div>
+                <div className="sd-field"><label>SĐT</label><input name="phoneNumber" inputMode="numeric" maxLength="10" pattern="[0-9]{10}" placeholder="Gồm 10 chữ số" value={form.phoneNumber || form.phone || ''} onChange={handleFormChange} /></div>
                 {modal === 'edit' && <div className="sd-field"><label>Ngân hàng</label><input name="bankName" value={form.bankName || ''} onChange={handleFormChange} /></div>}
                 {modal === 'edit' && <div className="sd-field"><label>Số tài khoản</label><input name="bankAccountNumber" value={form.bankAccountNumber || ''} onChange={handleFormChange} /></div>}
                 {modal === 'edit' && <div className="sd-field"><label>Tên tài khoản</label><input name="bankAccountName" value={form.bankAccountName || ''} onChange={handleFormChange} /></div>}
