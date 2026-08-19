@@ -418,12 +418,6 @@ export function ManagerQrAttendanceTab({ delegatedShiftId, user }) {
                       <strong>
                         {item.employeeName}
                       </strong>
-
-                      {item.roleName && (
-                        <small>
-                          {item.roleName}
-                        </small>
-                      )}
                     </td>
 
                     <td>

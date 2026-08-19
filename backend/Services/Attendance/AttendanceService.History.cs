@@ -16,11 +16,22 @@ public partial class AttendanceService
             ?? throw new KeyNotFoundException("Không tìm thấy quản lý.");
 
         var managerRole = NormalizeText(manager.Role?.RoleName);
-        if (!managerRole.Contains("MANAGER") &&
-            !managerRole.Contains("QUAN LY"))
+        var isManager =
+            managerRole.Contains("MANAGER") ||
+            managerRole.Contains("QUAN LY");
+        var hasTemporaryPermission =
+            shiftId.HasValue &&
+            manager.BranchId is int delegatedBranchId &&
+            await _shiftDelegationService.HasActivePermissionAsync(
+                manager.Id,
+                delegatedBranchId,
+                shiftId.Value,
+                workDate);
+
+        if (!isManager && !hasTemporaryPermission)
         {
             throw new UnauthorizedAccessException(
-                "Chỉ Quản lý mới được xem lịch sử chấm công.");
+                "Bạn không có quyền xem lịch sử chấm công của ca này.");
         }
 
         if (manager.BranchId is not int branchId)

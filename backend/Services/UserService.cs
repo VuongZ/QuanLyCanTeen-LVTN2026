@@ -4,6 +4,7 @@ using LuanVanTotNghiep.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Mail;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace LuanVanTotNghiep.Services;
 
@@ -32,6 +33,13 @@ public class UserService(UserRepo userRepo, AppDbContext context, EmailService e
             throw new ArgumentException("Vui lòng nhập email hợp lệ để gửi mật khẩu cho nhân viên.");
 
         var phoneNumber = Normalize(dto.PhoneNumber ?? dto.Phone);
+        if (!string.IsNullOrWhiteSpace(phoneNumber) &&
+            !Regex.IsMatch(phoneNumber, @"^\d{10}$"))
+        {
+            throw new ArgumentException(
+                "Số điện thoại phải gồm đúng 10 chữ số.");
+        }
+
         var normalizedEmail = email.ToLowerInvariant();
         var duplicateMessages = new List<string>();
 

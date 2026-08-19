@@ -18,7 +18,7 @@ namespace LuanVanTotNghiep.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "MANAGER")]
+[Authorize]
 public class AttendanceController : ControllerBase
 {
     private readonly AttendanceService
