@@ -24,12 +24,6 @@ function buildEmployeeQrPayload(user) {
   return JSON.stringify({
     type: 'EMPLOYEE',
     id: user.id,
-    identifier: user.email || user.phoneNumber || user.phone || user.username,
-    fullName: user.fullName,
-    roleName: user.roleName,
-    branchId: user.branchId,
-    branchName: user.branchName,
-    hireDate: user.hireDate,
   });
 }
 
@@ -41,9 +35,9 @@ export function EmployeeQrCard({ user }) {
     let isMounted = true;
     QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: 'M',
-      margin: 2,
-      width: 220,
-      color: { dark: '#1e293b', light: '#ffffff' },
+      margin: 4,
+      width: 320,
+      color: { dark: '#000000', light: '#ffffff' },
     })
       .then((url) => { if (isMounted) setQrUrl(url); })
       .catch(() => { if (isMounted) setQrUrl(''); });

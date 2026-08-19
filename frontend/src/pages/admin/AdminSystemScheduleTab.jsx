@@ -41,6 +41,70 @@ function formatDate(value) {
   )
 }
 
+function normalizeScheduleValue(value) {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+}
+
+function getAdminScheduleLabel(row) {
+  const status = normalizeScheduleValue(row?.status)
+  const assignmentType = normalizeScheduleValue(
+    row?.assignmentType
+  )
+
+  if (assignmentType === 'EMERGENCY_REPLACEMENT') {
+    return 'Nhân viên thay thế'
+  }
+
+  if (status === 'LEAVE_APPROVED') {
+    return 'Nghỉ có phép'
+  }
+
+  if (status === 'ABSENT') {
+    return 'Vắng không phép'
+  }
+
+  return 'Lịch chính thức'
+}
+
+function getAdminScheduleStyle(row) {
+  const status = normalizeScheduleValue(row?.status)
+  const assignmentType = normalizeScheduleValue(
+    row?.assignmentType
+  )
+
+  if (assignmentType === 'EMERGENCY_REPLACEMENT') {
+    return {
+      background: '#dcfce7',
+      borderColor: '#86efac',
+      color: '#166534'
+    }
+  }
+
+  if (status === 'LEAVE_APPROVED') {
+    return {
+      background: '#fef3c7',
+      borderColor: '#fcd34d',
+      color: '#92400e'
+    }
+  }
+
+  if (status === 'ABSENT') {
+    return {
+      background: '#fee2e2',
+      borderColor: '#fca5a5',
+      color: '#991b1b'
+    }
+  }
+
+  return {
+    background: '#f8fafc',
+    borderColor: '#e2e8f0',
+    color: '#475569'
+  }
+}
+
 export function AdminSystemScheduleTab({ branches }) {
   // Danh sách các đợt đã được công bố của cơ sở đang chọn.
   const [periods, setPeriods] = useState([])
@@ -625,24 +689,80 @@ export function AdminSystemScheduleTab({ branches }) {
                                   Mỗi Staff tạo ra một thẻ <div>.
                                 */}
                                 {staffRows.map((row) => {
+                                  const rowStyle =
+                                    getAdminScheduleStyle(row)
+
+                                  const assignmentType =
+                                    normalizeScheduleValue(
+                                      row?.assignmentType
+                                    )
+
+                                  const replacedRow =
+                                    assignmentType ===
+                                    'EMERGENCY_REPLACEMENT'
+                                      ? registrations.find(
+                                          (candidateRow) =>
+                                            Number(candidateRow.id) ===
+                                            Number(
+                                              row.replacesScheduleId
+                                            )
+                                        )
+                                      : null
+
                                   return (
                                     <div
                                       key={row.id}
                                       className="sd-reg-cardapproved"
                                       style={{
-                                        background: '#f8fafc',
-                                        borderColor: '#e2e8f0',
-                                        color: '#475569',
+                                        ...rowStyle,
                                         padding: '6px 8px',
                                         borderRadius: 6,
                                         marginBottom: 6,
                                         fontSize: 12,
-                                        fontWeight: 600
+                                        fontWeight: 600,
+                                        display: 'grid',
+                                        gap: 2
                                       }}
                                     >
                                       <span>
                                         {getScheduleUserName(row)}
                                       </span>
+
+                                      <small
+                                        style={{
+                                          fontSize: 10,
+                                          fontWeight: 700
+                                        }}
+                                      >
+                                        {getAdminScheduleLabel(row)}
+                                      </small>
+
+                                      {row.absenceReason && (
+                                        <small
+                                          title={row.absenceReason}
+                                          style={{
+                                            fontSize: 10,
+                                            fontWeight: 500,
+                                            opacity: 0.9
+                                          }}
+                                        >
+                                          Lý do: {row.absenceReason}
+                                        </small>
+                                      )}
+
+                                      {replacedRow && (
+                                        <small
+                                          style={{
+                                            fontSize: 10,
+                                            fontWeight: 500
+                                          }}
+                                        >
+                                          Thay cho:{' '}
+                                          {getScheduleUserName(
+                                            replacedRow
+                                          )}
+                                        </small>
+                                      )}
                                     </div>
                                   )
                                 })}

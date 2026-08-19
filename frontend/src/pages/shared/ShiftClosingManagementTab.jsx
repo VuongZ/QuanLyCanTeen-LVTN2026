@@ -165,37 +165,23 @@ export function ShiftClosingManagementTab({
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const filteredReports = useMemo(() => {
-    const searchText = keyword.trim().toLowerCase();
-    const statusPriority = {
-      PENDING: 0,
-      REJECTED: 1,
-      APPROVED: 2,
-    };
+const filteredReports = useMemo(() => {
+  const searchText = keyword.trim().toLowerCase();
 
-    return reports
-      .filter((report) => {
-        const matchesStatus =
-          statusFilter === 'ALL' || report.status === statusFilter;
+  return reports
+    .filter((report) => {
+      const matchesStatus =
+        statusFilter === 'ALL' || report.status === statusFilter;
 
-        if (!matchesStatus) return false;
-        if (!searchText) return true;
+      if (!matchesStatus) return false;
+      if (!searchText) return true;
 
-        return `#${report.id} ${report.id} ${report.staffName} ${report.branchName} ${report.shiftName} ${report.workDate} ${report.reportDate} ${getStatusLabel(report.status)}`
-          .toLowerCase()
-          .includes(searchText);
-      })
-      .sort((first, second) => {
-        const firstPriority = statusPriority[first.status] ?? 9;
-        const secondPriority = statusPriority[second.status] ?? 9;
-
-        if (firstPriority !== secondPriority) {
-          return firstPriority - secondPriority;
-        }
-
-        return second.id - first.id;
-      });
-  }, [reports, keyword, statusFilter]);
+      return `#${report.id} ${report.id} ${report.staffName} ${report.branchName} ${report.shiftName} ${report.workDate} ${report.reportDate} ${getStatusLabel(report.status)}`
+        .toLowerCase()
+        .includes(searchText);
+    })
+    .sort((first, second) => second.id - first.id);
+}, [reports, keyword, statusFilter]);
 
   const totalPages = Math.max(
     1,

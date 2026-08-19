@@ -41,14 +41,15 @@ public class AttendanceRepo : Repository<CaAttendance>
     }
 
     // Lấy thông tin ca làm.
-    public async Task<CaShift?> GetShiftByIdAsync(
-        int shiftId)
-    {
-        return await Context.CaShifts
-            .AsNoTracking()
-            .FirstOrDefaultAsync(shift =>
-                shift.Id == shiftId);
-    }
+   public async Task<CaShift?> GetShiftByIdAsync(
+    int shiftId)
+{
+    return await Context.CaShifts
+        .AsNoTracking()
+        .Include(shift => shift.Branch)
+        .FirstOrDefaultAsync(shift =>
+            shift.Id == shiftId);
+}
 
     // Lấy lịch làm chính thức của nhân viên.
     public async Task<CaFinalSchedule?>
